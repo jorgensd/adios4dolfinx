@@ -1,5 +1,12 @@
+# Copyright (C) 2023 Jørgen Schartum Dokken
+#
+# This file is part of adios4dolfinx
+#
+# SPDX-License-Identifier:    MIT
+
 """Top-level package for ADIOS2Wrappers."""
-from .checkpointing import write_mesh, read_mesh_from_legacy_checkpoint
+from .checkpointing import write_mesh
+from .legacy_readers import read_mesh_from_legacy_checkpoint
 from importlib.metadata import metadata
 
 meta = metadata("adios4dolfinx")
