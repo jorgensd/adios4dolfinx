@@ -1,0 +1,36 @@
+# Book settings
+# Learn more at https://jupyterbook.org/customize/config.html
+
+title: ADIOS2Wrappers
+author: Jørgen S. Dokken
+logo: "docs/logo.png"
+copyright: "2023"
+only_build_toc_files: true
+
+# Force re-execution of notebooks on each build.
+# See https://jupyterbook.org/content/execute.html
+execute:
+  execute_notebooks: cache
+
+# Information about where the book exists on the web
+repository:
+  url: https://github.com/jorgensd/adios4dolfinx # Online location of your book
+  branch: main
+
+html:
+  use_issues_button: true
+  use_repository_button: true
+
+parse:
+  myst_enable_extensions:
+    - amsmath
+    - dollarmath
+    - linkify
+
+sphinx:
+  extra_extensions:
+  - 'sphinx.ext.autodoc'
+  - 'sphinx.ext.napoleon'
+  - 'sphinx.ext.viewcode'
+
+exclude_patterns: ["README.md",".pytest_cache/*"]

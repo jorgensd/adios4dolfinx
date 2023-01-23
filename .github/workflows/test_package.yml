@@ -1,0 +1,31 @@
+name: Test package
+
+on:
+  push:
+    # The CI is executed on every push on every branch
+    branches:
+      - main
+  pull_request:
+    # The CI is executed on every pull request to the main branch
+    branches:
+      - main
+
+  schedule:
+    # The CI is executed every day at 8am
+    - cron: "0 8 * * *"
+jobs:
+
+  test-code:
+    # This code depends on the result of check-code
+    runs-on: "ubuntu-22.04"
+    container: "dolfinx/dolfinx:nightly"
+
+    steps:
+
+      - uses: actions/checkout@v3
+
+      - name: Install package
+        run: python3 -m pip install .[test]
+
+      - name: Run tests
+        run: python3 -m pytest
