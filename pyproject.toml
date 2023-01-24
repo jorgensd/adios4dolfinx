@@ -17,12 +17,16 @@ test = [
 dev = [
     "pdbpp",
     "ipython",
-"mypy",
+    "mypy",
     "flake8",
+]
+docs = [
+    "jupyter-book"
 ]
 all = [
    "adios4dolfinx[test]",
    "adios4dolfinx[dev]",
+   "adios4dolfinx["docs]"
 ]
 
 [tool.pytest.ini_options]
