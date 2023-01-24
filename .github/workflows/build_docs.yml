@@ -24,6 +24,7 @@ concurrency:
 env:
   # Directory that will be published on github pages
   PUBLISH_DIR: ./_build/html
+  DEB_PYTHON_INSTALL_LAYOUT: deb_system
 
 jobs:
 
@@ -34,6 +35,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+
+      - name: Update pip
+        run: python3 -m pip install --upgrade pip setuptools
 
       - name: Install dependencies
         run: python3 -m pip install ".[docs]"

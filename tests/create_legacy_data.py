@@ -44,7 +44,7 @@ def verify_hdf5(u_ref: dolfin.Function, h5_file: pathlib.Path, mesh_name: str, f
     assert np.allclose(w.vector().get_local(), u_ref.vector().get_local())
 
 
-def verify_xdmf(u_ref: dolfin.Function, xdmf_file: pathlib, function_name: str,
+def verify_xdmf(u_ref: dolfin.Function, xdmf_file: pathlib.Path, function_name: str,
                 family: str, degree: int):
     mesh = dolfin.Mesh()
     with dolfin.XDMFFile(mesh.mpi_comm(), str(xdmf_file)) as xdmf:

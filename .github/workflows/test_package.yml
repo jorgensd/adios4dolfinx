@@ -31,16 +31,21 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: legacy_data
-          path: ./$data_dir
+          path: ./${{ env.data_dir }}
 
   test-code:
     runs-on: "ubuntu-22.04"
     needs: create-datasets
     container: "dolfinx/dolfinx:nightly"
 
+    env: 
+      DEB_PYTHON_INSTALL_LAYOUT: deb_system
+
     steps:
       - uses: actions/checkout@v3
 
+      - name: Update pip
+        run: python3 -m pip install --upgrade pip setuptools
 
       - uses: actions/download-artifact@v3
         with:
