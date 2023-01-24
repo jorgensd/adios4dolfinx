@@ -10,7 +10,7 @@ from mpi4py import MPI
 
 def compute_local_range(comm: MPI.Comm, N: int):
     """
-    Divide a set of `N` objects into `M` partitions, where `M` is 
+    Divide a set of `N` objects into `M` partitions, where `M` is
     the size of the MPI communicator `comm`.
 
     Returns the local range of values

@@ -4,9 +4,9 @@
 #
 # SPDX-License-Identifier:    MIT
 
-import dolfinx
-import argparse
-from adios4dolfinx import read_mesh_from_legacy_checkpoint, write_mesh
+# import dolfinx
+# import argparse
+# from adios4dolfinx import read_mesh_from_legacy_checkpoint, write_mesh
 
 
 def test_1():
