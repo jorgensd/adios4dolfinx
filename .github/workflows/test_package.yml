@@ -30,7 +30,7 @@ jobs:
 
       - uses: actions/upload-artifact@v3
         with:
-          name: legacy_data
+          name: ${{ env.datadir }}
           path: ./${{ env.data_dir }}
 
   test-code:
@@ -49,7 +49,7 @@ jobs:
 
       - uses: actions/download-artifact@v3
         with:
-          name: legacy_data
+          name: ${{ env.data_dir }}
           path: tests/
 
       - name: Install package
