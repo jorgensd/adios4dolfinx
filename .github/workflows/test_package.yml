@@ -15,17 +15,43 @@ on:
     - cron: "0 8 * * *"
 jobs:
 
-  test-code:
-    # This code depends on the result of check-code
+  create-datasets:
     runs-on: "ubuntu-22.04"
+    container: ghcr.io/scientificcomputing/fenics:test_2023.1.0
+
+    ENV:
+      data_dir: "legacy"
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Create datasets
+        run: python3 ./tests/create_legacy_data.py --out-dir=$data_dir
+
+      - uses: actions/upload-artifact@v3
+        with:
+        name: legacy_data
+        path: ./$data_dir
+
+  test-code:
+    runs-on: "ubuntu-22.04"
+    needs: create-datasets
     container: "dolfinx/dolfinx:nightly"
 
     steps:
-
       - uses: actions/checkout@v3
+
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: legacy_data
+          path: tests/
 
       - name: Install package
         run: python3 -m pip install .[test]
 
       - name: Run tests
         run: python3 -m pytest
+
+      - name: 
+        run: ls tests/
