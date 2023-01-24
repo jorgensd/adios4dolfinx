@@ -19,7 +19,7 @@ jobs:
   check-code:
 
     env: 
-      PYTHONPATH: /usr/local/lib/python3/dist-packages:/usr/local/lib
+      PYTHONPATH: /usr/local/lib/python3/dist-packages:/usr/local/lib:/usr/local/dolfinx-real/lib/python3.10/dist-packages
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
 
     runs-on: ubuntu-22.04
@@ -38,6 +38,4 @@ jobs:
         run: python3 -m flake8 -v
 
       - name: Mypy check
-        run: |
-          source dolfinx-real-mode
-          python3 -m mypy -v
+        run: python3 -m mypy -v

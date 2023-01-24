@@ -40,7 +40,7 @@ jobs:
 
     env: 
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
-      PYTHONPATH: /usr/local/lib/python3/dist-packages:/usr/local/lib
+      PYTHONPATH: /usr/local/lib/python3/dist-packages:/usr/local/lib:/usr/local/dolfinx-real/lib/python3.10/dist-packages
     steps:
       - uses: actions/checkout@v3
 
@@ -56,9 +56,7 @@ jobs:
         run: python3 -m pip install .[test]
 
       - name: Run tests
-        run: |
-          source dolfinx-real-mode
-          python3 -m pytest
+        run: python3 -m pytest
 
       - name: 
         run: ls tests/
