@@ -27,14 +27,19 @@ env:
   DEB_PYTHON_INSTALL_LAYOUT: deb_system
 
 jobs:
+  build-docs:
+    env: 
+      PYTHONPATH: /usr/local/lib/python3/dist-packages:/usr/local/lib
+      DEB_PYTHON_INSTALL_LAYOUT: deb_system
 
-  build:
     runs-on: ubuntu-22.04
     container: dolfinx/dolfinx:nightly
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      # This action sets the current path to the root of your github repo
+      - uses: actions/checkout@v3
+      
+      - name: Update pip
+        run: python3 -m pip install --upgrade pip setuptools
 
       - name: Update pip
         run: python3 -m pip install --upgrade pip setuptools
