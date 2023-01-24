@@ -30,8 +30,8 @@ jobs:
 
       - uses: actions/upload-artifact@v3
         with:
-        name: legacy_data
-        path: ./$data_dir
+          name: legacy_data
+          path: ./$data_dir
 
   test-code:
     runs-on: "ubuntu-22.04"
