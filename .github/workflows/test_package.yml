@@ -26,7 +26,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Create datasets
-        run: python3 ./tests/create_legacy_data.py --out-dir=$data_dir
+        run: python3 ./tests/create_legacy_data.py --output-dir=$data_dir
 
       - uses: actions/upload-artifact@v3
         with:
