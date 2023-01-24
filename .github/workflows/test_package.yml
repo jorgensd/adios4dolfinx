@@ -40,7 +40,7 @@ jobs:
 
     env: 
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
-
+      PYTHONPATH: /usr/local/lib/python3/dist-packages:/usr/local/lib
     steps:
       - uses: actions/checkout@v3
 
