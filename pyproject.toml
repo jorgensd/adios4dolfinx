@@ -26,7 +26,7 @@ docs = [
 all = [
    "adios4dolfinx[test]",
    "adios4dolfinx[dev]",
-   "adios4dolfinx["docs]"
+   "adios4dolfinx[docs]"
 ]
 
 [tool.pytest.ini_options]
