@@ -21,7 +21,7 @@ dev = [
     "flake8",
 ]
 docs = [
-    "jupyter-book"
+    "jupyter-book @ git+https://github.com/executablebooks/jupyter-book@master"
 ]
 all = [
    "adios4dolfinx[test]",
