@@ -56,7 +56,9 @@ jobs:
         run: python3 -m pip install .[test]
 
       - name: Run tests
-        run: python3 -m pytest
+        run: |
+          source dolfinx-real-mode
+          python3 -m pytest
 
       - name: 
         run: ls tests/

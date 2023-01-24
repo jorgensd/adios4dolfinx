@@ -38,4 +38,6 @@ jobs:
         run: python3 -m flake8 -v
 
       - name: Mypy check
-        run: python3 -m mypy -v
+        run: |
+          source dolfinx-real-mode
+          python3 -m mypy -v
