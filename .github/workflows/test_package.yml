@@ -52,10 +52,7 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: ${{ env.data_dir }}
-          path: tests/
-
-      - name: 
-        run: ls tests/$data_dir
+          path: .
 
       - name: Install package
         run: python3 -m pip install .[test]
