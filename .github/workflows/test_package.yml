@@ -54,11 +54,11 @@ jobs:
           name: ${{ env.data_dir }}
           path: tests/
 
+      - name: 
+        run: ls tests/$data_dir
+
       - name: Install package
         run: python3 -m pip install .[test]
 
       - name: Run tests
         run: python3 -m pytest
-
-      - name: 
-        run: ls tests/
