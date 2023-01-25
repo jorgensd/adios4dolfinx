@@ -15,7 +15,7 @@ import numpy as np
 
 def test_legacy_readers():
     comm = MPI.COMM_WORLD
-    path = pathlib.Path("legacy").joinpath("mesh.h5").absolute()
+    path = (pathlib.Path("legacy")/"mesh.h5").absolute()
     print(str(path))
     mesh = read_mesh_from_legacy_h5(comm, path, "/mesh")
     assert (mesh.topology.dim == 3)

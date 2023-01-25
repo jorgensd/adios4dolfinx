@@ -68,8 +68,8 @@ if __name__ == "__main__":
     path = pathlib.Path(inputs.dir)
     if not os.path.exists(path):
         os.mkdir(path)
-    h5_filename = path.joinpath(f"{inputs.f_name}.h5")
-    xdmf_filename = path.joinpath(f"{inputs.f_name}_checkpoint.xdmf")
+    h5_filename = path/f"{inputs.name}.h5"
+    xdmf_filename = path/f"{inputs.name}_checkpoint.xdmf"
 
     u_ref = create_reference_data(h5_filename, xdmf_filename, inputs.name, inputs.f_name,
                                   inputs.family, inputs.degree)

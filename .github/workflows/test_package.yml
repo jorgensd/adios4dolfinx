@@ -53,7 +53,10 @@ jobs:
         with:
           name: ${{ env.data_dir }}
           path: .
-
+      - name: DEBUG
+        run: |
+          ls .
+          ls legacy
       - name: Install package
         run: python3 -m pip install .[test]
 
