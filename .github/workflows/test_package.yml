@@ -13,14 +13,16 @@ on:
   schedule:
     # The CI is executed every day at 8am
     - cron: "0 8 * * *"
+
+
+env:
+  data_dir: "legacy"
+
 jobs:
 
   create-datasets:
     runs-on: "ubuntu-22.04"
     container: ghcr.io/scientificcomputing/fenics:test_2023.1.0
-
-    env:
-      data_dir: "legacy"
 
     steps:
       - uses: actions/checkout@v3
