@@ -53,10 +53,10 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: pathlib.Path, engine: str = "B
     # Write basix properties
     io.DefineAttribute("Degree", np.array([mesh.geometry.cmap.degree], dtype=np.int32))
     io.DefineAttribute("LagrangeVariant",  np.array([mesh.geometry.cmap.variant], dtype=np.int32))
+
     # Write topology
     g_imap = mesh.geometry.index_map()
     g_dmap = mesh.geometry.dofmap
-    l_start = g_imap.local_range[0]
     num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
     num_cells_global = mesh.topology.index_map(
         mesh.topology.dim).size_global
@@ -83,29 +83,29 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: pathlib.Path, engine: str = "B
 
 def read_mesh(comm: MPI.Comm, file: pathlib.Path, engine: str):
     adios = adios2.ADIOS(comm)
-    io = adios.DeclareIO("MeshWriter")
+    io = adios.DeclareIO("MeshReader")
     io.SetEngine(engine)
     infile = io.Open(str(file), adios2.Mode.Read)
+    infile.BeginStep()
 
     # Get mesh cell type
-    if f"CellType" not in io.AvailableAttributes().keys():
-        raise KeyError(f"Mesh cell type not found at CellType")
+    if "CellType" not in io.AvailableAttributes().keys():
+        raise KeyError("Mesh cell type not found at CellType")
     celltype = io.InquireAttribute("CellType")
     cell_type = celltype.DataString()[0]
 
     # Get basix info
-    if f"LagrangeVariant" not in io.AvailableAttributes().keys():
-        raise KeyError(f"Mesh LagrangeVariant not found")
+    if "LagrangeVariant" not in io.AvailableAttributes().keys():
+        raise KeyError("Mesh LagrangeVariant not found")
     lvar = io.InquireAttribute("LagrangeVariant").Data()[0]
-    if f"Degree" not in io.AvailableAttributes().keys():
-        raise KeyError(f"Mesh degree not found")
+    if "Degree" not in io.AvailableAttributes().keys():
+        raise KeyError("Mesh degree not found")
     degree = io.InquireAttribute("Degree").Data()[0]
 
     # Get mesh geometry
-    if f"Points" not in io.AvailableVariables().keys():
-        raise KeyError(
-            f"Mesh coordiantes not found at Points")
-    geometry = io.InquireVariable(f"Points")
+    if "Points" not in io.AvailableVariables().keys():
+        raise KeyError("Mesh coordinates not found at Points")
+    geometry = io.InquireVariable("Points")
     x_shape = geometry.Shape()
     geometry_range = compute_local_range(comm, x_shape[0])
     geometry.SetSelection([[geometry_range[0], 0], [
@@ -115,9 +115,9 @@ def read_mesh(comm: MPI.Comm, file: pathlib.Path, engine: str):
     infile.Get(geometry, mesh_geometry, adios2.Mode.Deferred)
 
     # Get mesh topology (distributed)
-    if f"Topology" not in io.AvailableVariables().keys():
-        raise KeyError(f"Mesh topology not found at Topology'")
-    topology = io.InquireVariable(f"Topology")
+    if "Topology" not in io.AvailableVariables().keys():
+        raise KeyError("Mesh topology not found at Topology'")
+    topology = io.InquireVariable("Topology")
     shape = topology.Shape()
     local_range = compute_local_range(comm, shape[0])
     topology.SetSelection([[local_range[0], 0], [
@@ -127,10 +127,13 @@ def read_mesh(comm: MPI.Comm, file: pathlib.Path, engine: str):
     infile.Get(topology, mesh_topology, adios2.Mode.Deferred)
 
     infile.PerformGets()
+    infile.EndStep()
+    assert adios.RemoveIO("MeshReader")
 
     # Create DOLFINx mesh
     element = basix.ufl_wrapper.create_vector_element(
         basix.ElementFamily.P, cell_type, degree, basix.LagrangeVariant(lvar),
         dim=mesh_geometry.shape[1], gdim=mesh_geometry.shape[1])
     domain = ufl.Mesh(element)
+
     return dolfinx.mesh.create_mesh(MPI.COMM_WORLD, mesh_topology, mesh_geometry, domain)
