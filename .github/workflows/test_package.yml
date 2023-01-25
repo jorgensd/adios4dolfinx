@@ -30,7 +30,7 @@ jobs:
 
       - uses: actions/upload-artifact@v3
         with:
-          name: ${{ env.datadir }}
+          name: ${{ env.data_dir }}
           path: ./${{ env.data_dir }}
 
   test-code:
