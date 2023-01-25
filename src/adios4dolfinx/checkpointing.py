@@ -82,7 +82,18 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: pathlib.Path, engine: str = "B
 
 
 def read_mesh(comm: MPI.Comm, file: pathlib.Path, engine: str,
-              ghost_mode: dolfinx.mesh.GhostMode):
+              ghost_mode: dolfinx.mesh.GhostMode) -> dolfinx.mesh.Mesh:
+    """
+    Read a ADIOS2 mesh into DOLFINx.
+
+    Args:
+        comm: The MPI communciator to distribute the mesh over
+        file: Path to input file
+        engine: ADIOS engine to use for reading (BP4, BP5 or HDF5)
+        ghost_mode: Ghost mode to use for mesh
+    Returns:
+        The distributed mesh
+    """
     adios = adios2.ADIOS(comm)
     io = adios.DeclareIO("MeshReader")
     io.SetEngine(engine)
