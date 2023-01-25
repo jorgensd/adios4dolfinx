@@ -52,7 +52,7 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: ${{ env.data_dir }}
-          path: .
+          path: ./${{ env.data_dir }}
       - name: DEBUG
         run: |
           ls .
