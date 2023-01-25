@@ -58,7 +58,7 @@ jobs:
   # Single deploy job since we're just deploying
   deploy:
     if: github.ref == 'refs/heads/main'
-    needs: build
+    needs: build-docs
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

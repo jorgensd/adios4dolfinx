@@ -81,7 +81,8 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: pathlib.Path, engine: str = "B
     assert adios.RemoveIO("MeshWriter")
 
 
-def read_mesh(comm: MPI.Comm, file: pathlib.Path, engine: str):
+def read_mesh(comm: MPI.Comm, file: pathlib.Path, engine: str,
+              ghost_mode: dolfinx.mesh.GhostMode):
     adios = adios2.ADIOS(comm)
     io = adios.DeclareIO("MeshReader")
     io.SetEngine(engine)
@@ -135,5 +136,5 @@ def read_mesh(comm: MPI.Comm, file: pathlib.Path, engine: str):
         basix.ElementFamily.P, cell_type, degree, basix.LagrangeVariant(lvar),
         dim=mesh_geometry.shape[1], gdim=mesh_geometry.shape[1])
     domain = ufl.Mesh(element)
-
-    return dolfinx.mesh.create_mesh(MPI.COMM_WORLD, mesh_topology, mesh_geometry, domain)
+    partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)
+    return dolfinx.mesh.create_mesh(MPI.COMM_WORLD, mesh_topology, mesh_geometry, domain, partitioner)
