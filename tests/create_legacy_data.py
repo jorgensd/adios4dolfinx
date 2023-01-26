@@ -19,7 +19,7 @@ import argparse
 def create_reference_data(h5_file: pathlib.Path, xdmf_file: pathlib.Path,
                           mesh_name: str, function_name: str,
                           family: str, degree: int) -> dolfin.Function:
-    mesh = dolfin.UnitCubeMesh(1, 1, 1)
+    mesh = dolfin.UnitSquareMesh(3, 1)
     V = dolfin.FunctionSpace(mesh, family, degree)
     u = dolfin.Function(V)
     u.interpolate(dolfin.Expression("x[0]+3*x[1]", degree=degree))
@@ -29,6 +29,9 @@ def create_reference_data(h5_file: pathlib.Path, xdmf_file: pathlib.Path,
     with dolfin.XDMFFile(mesh.mpi_comm(), str(xdmf_file)) as xdmf:
         xdmf.write(mesh)
         xdmf.write_checkpoint(u, function_name, 0, dolfin.XDMFFile.Encoding.HDF5, append=True)
+
+    with dolfin.XDMFFile(mesh.mpi_comm(), "test.xdmf") as xdmf:
+        xdmf.write(mesh)
     return u
 
 
