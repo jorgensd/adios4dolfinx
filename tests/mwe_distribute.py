@@ -90,6 +90,27 @@ s_msg = [out_org_pos, out_size, MPI.INT32_T]
 r_msg = [pos_from_mesh, recv_size, MPI.INT32_T]
 mesh_to_data_comm.Neighbor_alltoallv(s_msg, r_msg)
 
+# 2 Get global input dof numbering from Input dofmap and return to owner
+# 2.1 Read in dofmap from infile
+
+# 2.2 Extract dofmap data
+
+# 2.3 Send global to number to dof owner
+
+# 3 Compute owner of global dof on distributed mesh
+
+# 3.1 Create MPI neigh comm to owner.
+
+# 3.2 Send global dof number to proc
+
+# 3.3 Compute local dof input dof number (using local_range)
+# and create reverse comm and send back
+
+# 4 Populate local vector
+
+# 5 Scatter forward
+
+
 print(mesh.comm.rank, dof_pos, owners, "Sending:", out_org_cell, out_org_pos, "to", dest, out_size,
       "\nRecv from", source, "amount:", recv_size, cells_from_mesh, pos_from_mesh)
 
