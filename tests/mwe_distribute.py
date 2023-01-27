@@ -44,7 +44,7 @@ input_cells = mesh.topology.original_cell_index[local_cell]
 unique_input_cells = np.unique(input_cells)
 owners = index_owner(mesh.comm, input_cells, num_cells_global)
 unique_owners = np.unique(owners)
-#print(f"Rank {mesh.comm.rank} send to {unique_owners}")
+# print(f"Rank {mesh.comm.rank} send to {unique_owners}")
 mesh_to_data_comm = mesh.comm.Create_dist_graph(
     [mesh.comm.rank], [len(unique_owners)], list(unique_owners), reorder=False)
 source, dest, _ = mesh_to_data_comm.Get_dist_neighbors()
@@ -89,32 +89,11 @@ mesh_to_data_comm.Neighbor_alltoallv(s_msg, r_msg)
 s_msg = [out_org_pos, out_size, MPI.INT32_T]
 r_msg = [pos_from_mesh, recv_size, MPI.INT32_T]
 mesh_to_data_comm.Neighbor_alltoallv(s_msg, r_msg)
+# print(f"{mesh.comm.rank} first send a total of {sum(out_size)} to {dest} distributed as {out_size}\n" +
+#       f"and recieves {sum(recv_size)} distributed as {recv_size} from {source}")
 
 # 2 Get global input dof numbering from Input dofmap and return to owner
 # 2.1 Read in dofmap from infile
-
-# 2.2 Extract dofmap data
-
-# 2.3 Send global to number to dof owner
-
-# 3 Compute owner of global dof on distributed mesh
-
-# 3.1 Create MPI neigh comm to owner.
-
-# 3.2 Send global dof number to proc
-
-# 3.3 Compute local dof input dof number (using local_range)
-# and create reverse comm and send back
-
-# 4 Populate local vector
-
-# 5 Scatter forward
-
-
-print(mesh.comm.rank, dof_pos, owners, "Sending:", out_org_cell, out_org_pos, "to", dest, out_size,
-      "\nRecv from", source, "amount:", recv_size, cells_from_mesh, pos_from_mesh)
-
-exit()
 adios = adios2.ADIOS(comm)
 io = adios.DeclareIO("Function reader")
 io.SetEngine("HDF5")
@@ -123,7 +102,6 @@ infile = io.Open(str(path), adios2.Mode.Read)
 # Compute how the cells has been partitioned when read from file
 local_cell_range = compute_local_range(
     comm, mesh.topology.index_map(mesh.topology.dim).size_global)
-
 
 if f"{meshname}/x_cell_dofs" not in io.AvailableVariables().keys():
     raise KeyError(f"Dof offsets not found at '{meshname}/x_cell_dofs'")
@@ -134,7 +112,6 @@ assert len(shape) == 1
 offsets.SetSelection([[local_cell_range[0]], [local_cell_range[1]+1-local_cell_range[0]]])
 dofmap_offsets = np.empty(local_cell_range[1]+1-local_cell_range[0], dtype=np.dtype(offsets.Type().strip("_t")))
 infile.Get(offsets, dofmap_offsets, adios2.Mode.Sync)
-
 # Get the relevant part of the dofmap
 if f"{meshname}/cell_dofs" not in io.AvailableVariables().keys():
     raise KeyError(f"Dof offsets not found at '{meshname}/cell_dofs'")
@@ -143,6 +120,52 @@ cell_dofs.SetSelection([[dofmap_offsets[0]], [dofmap_offsets[-1]-dofmap_offsets[
 in_dofmap = np.empty(dofmap_offsets[-1]-dofmap_offsets[0], dtype=np.dtype(cell_dofs.Type().strip("_t")))
 infile.Get(cell_dofs, in_dofmap, adios2.Mode.Sync)
 in_dofmap = in_dofmap.astype(np.int64)
+
+# 2.2 Extract dofmap data
+global_dofs = np.zeros_like(cells_from_mesh, dtype=np.int64)
+for i, (cell, pos) in enumerate(zip(cells_from_mesh, pos_from_mesh.astype(np.uint64))):
+    input_cell_pos = cell-local_cell_range[0]
+    dofmap_pos = dofmap_offsets[input_cell_pos] + pos - dofmap_offsets[0]
+    global_dofs[i] = in_dofmap[dofmap_pos]
+
+# 2.3 Send global to number to dof owner
+data_to_mesh_comm = mesh.comm.Create_dist_graph_adjacent(dest, source, reorder=False)
+source2, dest2, _ = data_to_mesh_comm.Get_dist_neighbors()
+
+incoming_global_dofs = np.zeros(sum(out_size), dtype=np.int64)
+s_msg = [global_dofs, recv_size, MPI.INT64_T]
+r_msg = [incoming_global_dofs, out_size, MPI.INT64_T]
+# print(f"{mesh.comm.rank} then send a total of {sum(recv_size)} distributed as {recv_size} to {dest2}\n"
+#       + f"and recieves a total of {sum(out_size)} distributed as{out_size} from {source2}")
+data_to_mesh_comm.Neighbor_alltoallv(s_msg, r_msg)
+
+# 3 Compute owner of global dof on distributed mesh
+num_dof_global = V.dofmap.index_map_bs * V.dofmap.index_map.size_global
+owned_dof_input_owner = index_owner(mesh.comm, incoming_global_dofs, num_dof_global)
+print(mesh.comm.rank, incoming_global_dofs, owned_dof_input_owner)
+
+# 3.1 Create MPI neigh comm to owner.
+
+# 3.2 Send global dof number to proc
+
+# 3.3 Compute local dof input dof number (using local_range)
+# and create reverse comm and send back
+if f"{meshname}/vector_0" not in io.AvailableVariables().keys():
+    raise KeyError(f"Dof offsets not found at '{meshname}/vector_0'")
+func = io.InquireVariable(f"{meshname}/vector_0")
+func_shape = func.Shape()
+assert len(func_shape) == 1
+func_range = compute_local_range(comm, func_shape[0])
+func.SetSelection([[func_range[0]], [func_range[1]-func_range[0]]])
+vals = np.empty(func_range[1]-func_range[0], dtype=np.dtype(func.Type().strip("_t")))
+infile.Get(func, vals, adios2.Mode.Sync)
+
+# 4 Populate local vector
+
+# 5 Scatter forward
+
+
+exit()
 
 
 # Partition input function values
@@ -165,12 +188,12 @@ source, dest, _ = mesh_to_data_comm.Get_dist_neighbors()
 
 # Create neighborhood comm from input owner to distributed mesh
 data_to_mesh_comm = mesh.comm.Create_dist_graph_adjacent(dest, source, reorder=False)
-#print(mesh.comm.rank, data_to_mesh_comm.Get_dist_neighbors())
+# print(mesh.comm.rank, data_to_mesh_comm.Get_dist_neighbors())
 
 
 out_data = np.full(len(unique_owners), mesh.comm.rank, dtype=np.int32)
 
-#print("MESH INDICES", mesh.comm.rank, mesh.topology.original_cell_index)
+# print("MESH INDICES", mesh.comm.rank, mesh.topology.original_cell_index)
 # USE NBX tell rank with data that it should send something here.
 #
 # Create neighborhood communicator
