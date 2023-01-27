@@ -37,9 +37,8 @@ def index_owner(comm: MPI.Comm, indices: npt.NDArray[np.int64], N: int) -> npt.N
     data of size `N` has been split equally among the ranks.
 
     NOTE: If `N` is not divisible by the number of ranks, the first `r`
-    processes gets an extra value.   
+    processes gets an extra value.
     """
-    rank = comm.rank
     size = comm.size
     assert (indices < N).all()
     n = N // size

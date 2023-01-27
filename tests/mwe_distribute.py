@@ -1,16 +1,11 @@
-from IPython import embed
-import numpy.typing as npt
-import argparse
 import pathlib
 
 import adios2
 import dolfinx
-import h5py
-import numpy as np
-import ufl
-from IPython import embed
-from mpi4py import MPI
 import numba
+import numpy as np
+import numpy.typing as npt
+from mpi4py import MPI
 
 from adios4dolfinx import (compute_local_range, index_owner,
                            read_mesh_from_legacy_h5)
@@ -19,7 +14,7 @@ comm = MPI.COMM_WORLD
 path = (pathlib.Path("legacy")/"mesh.h5").absolute()
 meshname = "/mesh"
 mesh = read_mesh_from_legacy_h5(comm, path, meshname)
-V = dolfinx.fem.FunctionSpace(mesh, ("Lagrange", 2))
+V = dolfinx.fem.FunctionSpace(mesh, ("DG", 2))
 u = dolfinx.fem.Function(V)
 
 
@@ -216,7 +211,6 @@ for i in range(len(dof_dest)):
     pos = np.cumsum(dof_out_size[:i])
     for j in range(dof_out_size[i]):
         arr[proc_to_local[dofs_offsets[i] + j]] = incoming_vals[dofs_offsets[i] + j]
-
 
 # 5 Scatter forward
 u.x.scatter_forward()
