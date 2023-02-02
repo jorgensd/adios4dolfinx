@@ -4,10 +4,14 @@
 #
 # SPDX-License-Identifier:    MIT
 
-__all__ = ["compute_local_range", "index_owner"]
-from mpi4py import MPI
+__all__ = ["compute_local_range", "index_owner", "compute_dofmap_pos", "find_first"]
+from typing import Tuple
+
+import dolfinx
+import numba
 import numpy as np
 import numpy.typing as npt
+from mpi4py import MPI
 
 
 def compute_local_range(comm: MPI.Comm, N: int):
@@ -49,3 +53,58 @@ def index_owner(comm: MPI.Comm, indices: npt.NDArray[np.int64], N: int) -> npt.N
     owner[indices >= r*n+1] = r + (indices[indices >= r*n+1] - r*(n+1)) // n
 
     return owner
+
+
+def compute_dofmap_pos(V: dolfinx.fem.FunctionSpace) -> Tuple[
+        npt.NDArray[np.int32], npt.NDArray[np.int32]]:
+    """
+    Compute a map from each owned dof in the dofmap to a single cell owned by the
+    process, and the relative position of the dof.
+
+    :param V: The function space
+    :returns: The tuple (`cells`, `dof_pos`) where each array is the size of the 
+        number of owned dofs (unrolled for block size)
+    """
+    dof_adj = V.dofmap.list
+    dofs = dof_adj.array
+    offsets = dof_adj.offsets
+
+    mesh = V.mesh
+    num_owned_cells = mesh.topology.index_map(mesh.topology.dim).size_local
+    dofmap_bs = V.dofmap.bs
+    num_owned_dofs = V.dofmap.index_map.size_local * V.dofmap.index_map_bs
+    local_cell = np.empty(num_owned_dofs, dtype=np.int32)  # Local cell index for each dof owned by process
+    dof_pos = np.empty(num_owned_dofs, dtype=np.int32)  # Position in dofmap for said dof
+
+    @numba.njit(cache=True)
+    def compute_positions(local_cell: npt.NDArray[np.int32], dof_pos: npt.NDArray[np.int32],
+                          dofs: npt.NDArray[np.int32],
+                          offsets: npt.NDArray[np.int32], dofmap_bs: int, num_owned_dofs: int,
+                          num_owned_cells: int):
+        """
+        Loop through each owned cell and every dof in that cell, and for all cells owned by the process
+        attach a cell and a position in the dofmap to it
+        """
+        assert len(local_cell) == num_owned_dofs
+        assert len(dof_pos) == num_owned_dofs
+
+        for c in range(num_owned_cells):
+            for i, dof in enumerate(dofs[offsets[c]:offsets[c+1]]):
+                for b in range(dofmap_bs):
+                    local_dof = dof*dofmap_bs + b
+                    if local_dof < num_owned_dofs:
+                        local_cell[local_dof] = c
+                        dof_pos[local_dof] = i*dofmap_bs + b
+
+    compute_positions(local_cell, dof_pos, dofs, offsets, dofmap_bs, num_owned_dofs, num_owned_cells)
+    return local_cell, dof_pos
+
+
+@numba.jit
+def find_first(b: int, a: npt.NDArray[np.int32]):
+    """
+    Given a numpy array `a` return the first entry equal to `b`
+    """
+    for i, ai in enumerate(a):
+        if ai == b:
+            return i
