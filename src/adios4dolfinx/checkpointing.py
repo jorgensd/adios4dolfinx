@@ -44,7 +44,7 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: pathlib.Path, engine: str = "B
         "Points", local_points, shape=[num_xdofs_global, gdim],
         start=[local_range[0], 0], count=[num_xdofs_local, gdim])
     outfile.Put(pointvar, local_points, adios2.Mode.Sync)
-    print(local_points.reshape(-1))
+
     # Write celltype
     io.DefineAttribute("CellType", mesh.topology.cell_name())
 
@@ -147,7 +147,7 @@ def read_mesh(comm: MPI.Intracomm, file: pathlib.Path, engine: str,
         dim=mesh_geometry.shape[1], gdim=mesh_geometry.shape[1])
     domain = ufl.Mesh(element)
     partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)
-    return dolfinx.mesh.create_mesh(MPI.COMM_WORLD, mesh_topology, mesh_geometry, domain, partitioner)
+    return dolfinx.mesh.create_mesh(comm, mesh_topology, mesh_geometry, domain, partitioner)
 
 
 def write_function(u: dolfinx.fem.Function, filename: pathlib.Path, engine: str = "BP4"):
@@ -261,7 +261,7 @@ def read_function(u: dolfinx.fem.Function, filename: pathlib.Path, engine: str =
     local_values = send_dofs_and_receive_values(filename, "Values", engine,
                                                 comm,   np.asarray(dof_source, dtype=np.int32),
                                                 np.asarray(dof_dest, dtype=np.int32), dofmap_indices, dof_owner)
-    print(local_values)
+
     # ----------------------Step 4---------------------------------
     # Populate local part of array and scatter forward
     u.x.array[:len(local_values)] = local_values

@@ -33,7 +33,7 @@ def send_cells_and_receive_dofmap_index(filename: pathlib.Path, comm: MPI.Intrac
     for owner in output_owners:
         proc_pos = find_first(owner, dest_ranks)
         out_size[proc_pos] += 1
-    del proc_pos
+        del proc_pos
     recv_size = np.zeros(len(source_ranks), dtype=np.int32)
     mesh_to_data_comm = comm.Create_dist_graph_adjacent(source_ranks.tolist(), dest_ranks.tolist(), reorder=False)
     # Send sizes to create data structures for receiving from NeighAlltoAllv
@@ -58,7 +58,8 @@ def send_cells_and_receive_dofmap_index(filename: pathlib.Path, comm: MPI.Intrac
         # Compute map from global out position to relative position in proc
         proc_to_dof[offsets[proc_pos]+count[proc_pos]] = i
         count[proc_pos] += 1
-    del count, proc_pos
+        del proc_pos
+    del count
 
     # Prepare data-structures for receiving
     total_incoming = sum(recv_size)

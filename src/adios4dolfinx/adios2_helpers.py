@@ -61,7 +61,7 @@ def read_dofmap(comm: MPI.Intracomm, filename: pathlib.Path,
         input_cell_pos = cell-local_cell_range[0]
         read_pos = np.int32(in_offsets[input_cell_pos] + pos - in_offsets[0])
         global_dofs[i] = in_dofmap[read_pos]
-
+        del input_cell_pos, read_pos
     infile.EndStep()
     adios.RemoveIO("DofmapReader")
     return global_dofs
