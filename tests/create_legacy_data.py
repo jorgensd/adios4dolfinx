@@ -14,6 +14,7 @@ import numpy as np
 import os
 import pathlib
 import argparse
+import ufl
 
 
 def create_reference_data(h5_file: pathlib.Path, xdmf_file: pathlib.Path,
@@ -21,14 +22,18 @@ def create_reference_data(h5_file: pathlib.Path, xdmf_file: pathlib.Path,
                           family: str, degree: int) -> dolfin.Function:
     mesh = dolfin.UnitCubeMesh(1, 1, 1)
     V = dolfin.FunctionSpace(mesh, family, degree)
-    u = dolfin.Function(V)
-    u.interpolate(dolfin.Expression("x[0]+3*x[1]", degree=degree))
+    x = dolfin.SpatialCoordinate(mesh)
+    f = ufl.conditional(ufl.gt(x[0], 0.5), x[1], 2*x[0])
+    u = dolfin.project(f, V)
     with dolfin.HDF5File(mesh.mpi_comm(), str(h5_file), "w") as hdf:
         hdf.write(mesh, mesh_name)
         hdf.write(u, function_name)
     with dolfin.XDMFFile(mesh.mpi_comm(), str(xdmf_file)) as xdmf:
         xdmf.write(mesh)
         xdmf.write_checkpoint(u, function_name, 0, dolfin.XDMFFile.Encoding.HDF5, append=True)
+
+    with dolfin.XDMFFile(mesh.mpi_comm(), "test.xdmf") as xdmf:
+        xdmf.write(mesh)
     return u
 
 
@@ -58,7 +63,7 @@ def verify_xdmf(u_ref: dolfin.Function, xdmf_file: pathlib.Path, function_name: 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--family", type=str, default="Lagrange")
+    parser.add_argument("--family", type=str, default="DG")
     parser.add_argument("--degree", type=int, default=2)
     parser.add_argument("--output-dir", type=str, default="legacy", dest="dir")
     parser.add_argument("--mesh-name", type=str, default="mesh", dest="name")

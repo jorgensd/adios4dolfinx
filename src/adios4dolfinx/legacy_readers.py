@@ -13,12 +13,14 @@ import numpy as np
 import ufl
 from mpi4py import MPI
 
-from .utils import compute_local_range
+from .utils import compute_dofmap_pos, compute_local_range, index_owner
+from .comm_helpers import send_cells_and_receive_dofmap_index, send_dofs_and_receive_values
 
-__all__ = ["read_mesh_from_legacy_checkpoint", "read_mesh_from_legacy_h5"]
+__all__ = ["read_mesh_from_legacy_checkpoint", "read_mesh_from_legacy_h5",
+           "read_function_from_legacy_h5"]
 
 
-def read_mesh_from_legacy_h5(comm: MPI.Comm,
+def read_mesh_from_legacy_h5(comm: MPI.Intracomm,
                              filename: pathlib.Path,
                              meshname: str) -> dolfinx.mesh.Mesh:
     """
@@ -134,3 +136,52 @@ def read_mesh_from_legacy_checkpoint(
 
     return dolfinx.mesh.create_mesh(
         MPI.COMM_WORLD, mesh_topology, mesh_geometry, domain)
+
+
+def read_function_from_legacy_h5(comm: MPI.Intracomm, filename: pathlib.Path,
+                                 u: dolfinx.fem.Function):
+    V = u.function_space
+    mesh = u.function_space.mesh
+
+    # ----------------------Step 1---------------------------------
+    # Compute index of input cells, and position in input dofmap
+    local_cells, dof_pos = compute_dofmap_pos(u.function_space)
+    input_cells = mesh.topology.original_cell_index[local_cells]
+
+    # Compute mesh->input communicator
+    # 1.1 Compute mesh->input communicator
+    num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
+    owners = index_owner(mesh.comm, input_cells, num_cells_global)
+    unique_owners = np.unique(owners)
+    # FIXME: In C++ use NBX to find neighbourhood
+    _tmp_comm = mesh.comm.Create_dist_graph(
+        [mesh.comm.rank], [len(unique_owners)], unique_owners, reorder=False)
+    source, dest, _ = _tmp_comm.Get_dist_neighbors()
+
+    # ----------------------Step 2---------------------------------
+    # Get global dofmap indices from input process
+    num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
+    dofmap_indices = send_cells_and_receive_dofmap_index(
+        filename, comm, np.asarray(source, dtype=np.int32), np.asarray(
+            dest, dtype=np.int32), owners, input_cells, dof_pos,
+        num_cells_global)
+
+    # ----------------------Step 3---------------------------------
+    # Compute owner of global dof on distributed mesh
+    num_dof_global = V.dofmap.index_map_bs * V.dofmap.index_map.size_global
+    dof_owner = index_owner(mesh.comm, dofmap_indices, num_dof_global)
+    # Create MPI neigh comm to owner.
+    # NOTE: USE NBX in C++
+    unique_dof_owners = np.unique(dof_owner)
+    mesh_to_dof_comm = mesh.comm.Create_dist_graph(
+        [mesh.comm.rank], [len(unique_dof_owners)], unique_dof_owners, reorder=False)
+    dof_source, dof_dest, _ = mesh_to_dof_comm.Get_dist_neighbors()
+
+    # Send global dof indices to correct input process, and recieve value of given dof
+    local_values = send_dofs_and_receive_values(filename, "/mesh/vector_0", "HDF5",
+                                                comm,   np.asarray(dof_source, dtype=np.int32),
+                                                np.asarray(dof_dest, dtype=np.int32), dofmap_indices, dof_owner)
+    # ----------------------Step 4---------------------------------
+    # Populate local part of array and scatter forward
+    u.x.array[:len(local_values)] = local_values
+    u.x.scatter_forward()

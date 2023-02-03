@@ -81,7 +81,7 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: pathlib.Path, engine: str = "B
     assert adios.RemoveIO("MeshWriter")
 
 
-def read_mesh(comm: MPI.Comm, file: pathlib.Path, engine: str,
+def read_mesh(comm: MPI.Intracomm, file: pathlib.Path, engine: str,
               ghost_mode: dolfinx.mesh.GhostMode) -> dolfinx.mesh.Mesh:
     """
     Read a ADIOS2 mesh into DOLFINx.
