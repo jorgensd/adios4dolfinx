@@ -164,7 +164,7 @@ def read_function_from_legacy_h5(comm: MPI.Intracomm, filename: pathlib.Path,
     dofmap_indices = send_cells_and_receive_dofmap_index(
         filename, comm, np.asarray(source, dtype=np.int32), np.asarray(
             dest, dtype=np.int32), owners, input_cells, dof_pos,
-        num_cells_global)
+        num_cells_global, "/mesh/cell_dofs", "/mesh/x_cell_dofs", "HDF5")
 
     # ----------------------Step 3---------------------------------
     # Compute owner of global dof on distributed mesh

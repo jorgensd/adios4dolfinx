@@ -19,7 +19,10 @@ def send_cells_and_receive_dofmap_index(filename: pathlib.Path, comm: MPI.Intrac
                                         output_owners: npt.NDArray[np.int32],
                                         input_cells: npt.NDArray[np.int64],
                                         dofmap_pos: npt.NDArray[np.int32],
-                                        num_cells_global: np.int64) -> npt.NDArray[np.int64]:
+                                        num_cells_global: np.int64,
+                                        dofmap_path: str,
+                                        xdofmap_path: str,
+                                        engine: str) -> npt.NDArray[np.int64]:
     """
     Given a set of positions in input dofmap, give the global input index of this dofmap entry
     in input file.
@@ -76,8 +79,8 @@ def send_cells_and_receive_dofmap_index(filename: pathlib.Path, comm: MPI.Intrac
     mesh_to_data_comm.Neighbor_alltoallv(s_msg, r_msg)
 
     # Read dofmap from file
-    input_dofs = read_dofmap(comm, filename, "/mesh/cell_dofs", "/mesh/x_cell_dofs",
-                             num_cells_global, "HDF5",
+    input_dofs = read_dofmap(comm, filename, dofmap_path, xdofmap_path,
+                             num_cells_global, engine,
                              inc_cells, inc_pos)
     # Send input dofs back to owning process
     data_to_mesh_comm = comm.Create_dist_graph_adjacent(dest_ranks.tolist(), source_ranks.tolist(),
@@ -99,7 +102,7 @@ def send_cells_and_receive_dofmap_index(filename: pathlib.Path, comm: MPI.Intrac
 
 
 def send_dofs_and_receive_values(
-        filename: pathlib.Path, vector: str, engine: str,
+        filename: pathlib.Path, vector_path: str, engine: str,
         comm: MPI.Intracomm, source_ranks: npt.NDArray[np.int32],
         dest_ranks: npt.NDArray[np.int32], dofs: npt.NDArray[np.int64],
         dof_owner: npt.NDArray[np.int32]):
@@ -132,7 +135,7 @@ def send_dofs_and_receive_values(
     r_msg = [input_dofs, dof_recv_size, MPI.INT64_T]
     mesh_to_data_comm.Neighbor_alltoallv(s_msg, r_msg)
 
-    vals, start_pos = read_array(filename, vector, engine, comm)
+    vals, start_pos = read_array(filename, vector_path, engine, comm)
     # Compute local dof input dof number (using local_range)
     input_vals = np.zeros(sum(dof_recv_size), dtype=np.float64)
     for i, dof in enumerate(input_dofs):

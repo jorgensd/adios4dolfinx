@@ -57,9 +57,9 @@ def read_dofmap(comm: MPI.Intracomm, filename: pathlib.Path,
 
     # Extract dofmap data
     global_dofs = np.zeros_like(cells, dtype=np.int64)
-    for i, (cell, pos) in enumerate(zip(cells, dof_pos.astype(np.uint64))):
+    for i, (cell, pos) in enumerate(zip(cells, dof_pos.astype(np.int64))):
         input_cell_pos = cell-local_cell_range[0]
-        read_pos = in_offsets[input_cell_pos] + pos - in_offsets[0]
+        read_pos = np.int32(in_offsets[input_cell_pos] + pos - in_offsets[0])
         global_dofs[i] = in_dofmap[read_pos]
 
     infile.EndStep()
