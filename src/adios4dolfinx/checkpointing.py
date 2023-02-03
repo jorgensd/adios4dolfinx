@@ -14,7 +14,7 @@ import ufl
 from mpi4py import MPI
 from .comm_helpers import send_cells_and_receive_dofmap_index, send_dofs_and_receive_values
 from .utils import compute_local_range, compute_dofmap_pos, index_owner
-import numpy.typing as npt
+
 __all__ = ["write_mesh", "read_mesh", "write_function", "read_function"]
 
 
