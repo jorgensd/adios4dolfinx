@@ -12,10 +12,10 @@ import dolfinx
 import numpy as np
 import ufl
 from mpi4py import MPI
+from .comm_helpers import send_cells_and_receive_dofmap_index, send_dofs_and_receive_values
+from .utils import compute_local_range, compute_dofmap_pos, index_owner
 
-from .utils import compute_local_range
-
-__all__ = ["write_mesh", "read_mesh"]
+__all__ = ["write_mesh", "read_mesh", "write_function", "read_function"]
 
 
 def write_mesh(mesh: dolfinx.mesh.Mesh, filename: pathlib.Path, engine: str = "BP4"):
@@ -29,23 +29,21 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: pathlib.Path, engine: str = "B
         filename: Path to save mesh (without file-extension)
         engine: Adios2 Engine
     """
-    local_points = mesh.geometry.x
     num_xdofs_local = mesh.geometry.index_map().size_local
     num_xdofs_global = mesh.geometry.index_map().size_global
     local_range = mesh.geometry.index_map().local_range
-
     gdim = mesh.geometry.dim
 
+    local_points = mesh.geometry.x[:num_xdofs_local, :gdim].copy()
     adios = adios2.ADIOS(mesh.comm)
     io = adios.DeclareIO("MeshWriter")
     io.SetEngine(engine)
     outfile = io.Open(str(filename), adios2.Mode.Write)
-
     # Write geometry
     pointvar = io.DefineVariable(
-        "Points", np.zeros((num_xdofs_local, gdim), dtype=np.float64), shape=[num_xdofs_global, gdim],
+        "Points", local_points, shape=[num_xdofs_global, gdim],
         start=[local_range[0], 0], count=[num_xdofs_local, gdim])
-    outfile.Put(pointvar, local_points[:num_xdofs_local, :gdim])
+    outfile.Put(pointvar, local_points, adios2.Mode.Sync)
 
     # Write celltype
     io.DefineAttribute("CellType", mesh.topology.cell_name())
@@ -76,6 +74,7 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: pathlib.Path, engine: str = "B
         "Topology", dofs_out, shape=[num_cells_global, num_dofs_per_cell],
         start=[start_cell, 0], count=[num_cells_local, num_dofs_per_cell])
     outfile.Put(dvar, dofs_out)
+
     outfile.PerformPuts()
     outfile.EndStep()
     assert adios.RemoveIO("MeshWriter")
@@ -148,4 +147,122 @@ def read_mesh(comm: MPI.Intracomm, file: pathlib.Path, engine: str,
         dim=mesh_geometry.shape[1], gdim=mesh_geometry.shape[1])
     domain = ufl.Mesh(element)
     partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)
-    return dolfinx.mesh.create_mesh(MPI.COMM_WORLD, mesh_topology, mesh_geometry, domain, partitioner)
+    return dolfinx.mesh.create_mesh(comm, mesh_topology, mesh_geometry, domain, partitioner)
+
+
+def write_function(u: dolfinx.fem.Function, filename: pathlib.Path, engine: str = "BP4"):
+    """
+    """
+    dofmap = u.function_space.dofmap
+    values = u.x.array
+    mesh = u.function_space.mesh
+    comm = mesh.comm
+
+    adios = adios2.ADIOS(comm)
+    io = adios.DeclareIO("FunctionWriter")
+    io.SetEngine(engine)
+    outfile = io.Open(str(filename), adios2.Mode.Write)
+
+    # Write local part of vector
+    num_dofs_local = dofmap.index_map.size_local * dofmap.index_map_bs
+    num_dofs_global = dofmap.index_map.size_global * dofmap.index_map_bs
+    local_start = dofmap.index_map.local_range[0] * dofmap.index_map_bs
+    val_var = io.DefineVariable(
+        "Values", np.zeros(num_dofs_local, dtype=np.float64), shape=[num_dofs_global],
+        start=[local_start], count=[num_dofs_local])
+    outfile.Put(val_var, values[:num_dofs_local])
+
+    # Convert local dofmap into global_dofmap
+    dmap = dofmap.list.array
+    off = dofmap.list.offsets
+    dofmap_bs = dofmap.bs
+    num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
+    num_dofs_local_dmap = dofmap.list.offsets[num_cells_local]*dofmap_bs
+    dmap_loc = np.empty(num_dofs_local_dmap, dtype=np.int32)
+    dmap_rem = np.empty(num_dofs_local_dmap, dtype=np.int32)
+    index_map_bs = dofmap.index_map_bs
+    # Unroll local dofmap and convert into index map index
+    num_dofs_per_cell = np.empty(num_cells_local, dtype=np.int64)
+    for c in range(num_cells_local):
+        dofs = dmap[off[c]:off[c+1]]
+        num_dofs_per_cell[c] = len(dofs)*dofmap_bs
+        for i, dof in enumerate(dofs):
+            for b in range(dofmap_bs):
+                dmap_loc[(off[c]+i)*dofmap_bs+b] = (dof*dofmap_bs+b)//index_map_bs
+                dmap_rem[(off[c]+i)*dofmap_bs+b] = (dof*dofmap_bs+b) % index_map_bs
+    local_dofmap_offsets = np.zeros(num_cells_local+1, dtype=np.int64)
+    local_dofmap_offsets[1:] = np.cumsum(num_dofs_per_cell)
+    # Convert imap index to global index
+    imap_global = dofmap.index_map.local_to_global(dmap_loc)
+    dofmap_global = np.empty_like(dmap_loc, dtype=np.int64)
+    for i in range(num_dofs_local_dmap):
+        dofmap_global[i] = imap_global[i]*index_map_bs+dmap_rem[i]
+
+    # Get offsets of dofmap
+    dofmap_imap = dolfinx.common.IndexMap(mesh.comm, num_dofs_local_dmap)
+    dofmap_var = io.DefineVariable(
+        "Dofmap", np.zeros(num_dofs_local_dmap, dtype=np.int64), shape=[dofmap_imap.size_global],
+        start=[dofmap_imap.local_range[0]], count=[dofmap_imap.size_local])
+    outfile.Put(dofmap_var, dofmap_global)
+
+    num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
+    cell_start = mesh.topology.index_map(mesh.topology.dim).local_range[0]
+    local_dofmap_offsets += dofmap_imap.local_range[0]
+    xdofmap_var = io.DefineVariable(
+        "XDofmap", np.zeros(num_cells_local+1, dtype=np.int64), shape=[num_cells_global+1],
+        start=[cell_start], count=[num_cells_local+1])
+    outfile.Put(xdofmap_var, local_dofmap_offsets)
+
+    outfile.PerformPuts()
+    outfile.EndStep()
+    assert adios.RemoveIO("FunctionWriter")
+
+
+def read_function(u: dolfinx.fem.Function, filename: pathlib.Path, engine: str = "BP4"):
+    V = u.function_space
+    mesh = u.function_space.mesh
+    comm = mesh.comm
+
+    # ----------------------Step 1---------------------------------
+    # Compute index of input cells, and position in input dofmap
+    local_cells, dof_pos = compute_dofmap_pos(u.function_space)
+    input_cells = mesh.topology.original_cell_index[local_cells]
+
+    # Compute mesh->input communicator
+    # 1.1 Compute mesh->input communicator
+    num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
+    owners = index_owner(mesh.comm, input_cells, num_cells_global)
+    unique_owners = np.unique(owners)
+    # FIXME: In C++ use NBX to find neighbourhood
+    _tmp_comm = mesh.comm.Create_dist_graph(
+        [mesh.comm.rank], [len(unique_owners)], unique_owners, reorder=False)
+    source, dest, _ = _tmp_comm.Get_dist_neighbors()
+
+    # ----------------------Step 2---------------------------------
+    # Get global dofmap indices from input process
+    num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
+    dofmap_indices = send_cells_and_receive_dofmap_index(
+        filename, comm, np.asarray(source, dtype=np.int32), np.asarray(
+            dest, dtype=np.int32), owners, input_cells, dof_pos,
+        num_cells_global, "Dofmap", "XDofmap", engine)
+    # ----------------------Step 3---------------------------------
+
+    # Compute owner of global dof on distributed mesh
+    num_dof_global = V.dofmap.index_map_bs * V.dofmap.index_map.size_global
+    dof_owner = index_owner(mesh.comm, dofmap_indices, num_dof_global)
+    # Create MPI neigh comm to owner.
+    # NOTE: USE NBX in C++
+    unique_dof_owners = np.unique(dof_owner)
+    mesh_to_dof_comm = mesh.comm.Create_dist_graph(
+        [mesh.comm.rank], [len(unique_dof_owners)], unique_dof_owners, reorder=False)
+    dof_source, dof_dest, _ = mesh_to_dof_comm.Get_dist_neighbors()
+
+    # Send global dof indices to correct input process, and recieve value of given dof
+    local_values = send_dofs_and_receive_values(filename, "Values", engine,
+                                                comm,   np.asarray(dof_source, dtype=np.int32),
+                                                np.asarray(dof_dest, dtype=np.int32), dofmap_indices, dof_owner)
+
+    # ----------------------Step 4---------------------------------
+    # Populate local part of array and scatter forward
+    u.x.array[:len(local_values)] = local_values
+    u.x.scatter_forward()
