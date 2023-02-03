@@ -14,7 +14,7 @@ import numpy.typing as npt
 from mpi4py import MPI
 
 
-def compute_local_range(comm: MPI.Comm, N: int):
+def compute_local_range(comm: MPI.Intracomm, N: np.int64):
     """
     Divide a set of `N` objects into `M` partitions, where `M` is
     the size of the MPI communicator `comm`.
@@ -35,7 +35,7 @@ def compute_local_range(comm: MPI.Comm, N: int):
         return [rank*n+r, (rank+1)*n + r]
 
 
-def index_owner(comm: MPI.Comm, indices: npt.NDArray[np.int64], N: int) -> npt.NDArray[np.int64]:
+def index_owner(comm: MPI.Intracomm, indices: npt.NDArray[np.int64], N: int) -> npt.NDArray[np.int32]:
     """
     Find which rank (local to comm) which owns an `index`, given that
     data of size `N` has been split equally among the ranks.
@@ -48,7 +48,7 @@ def index_owner(comm: MPI.Comm, indices: npt.NDArray[np.int64], N: int) -> npt.N
     n = N // size
     r = N % size
 
-    owner = np.empty_like(indices)
+    owner = np.empty_like(indices, dtype=np.int32)
     owner[indices < r * n + 1] = indices[indices < r * n + 1] // (n+1)
     owner[indices >= r*n+1] = r + (indices[indices >= r*n+1] - r*(n+1)) // n
 
@@ -62,7 +62,7 @@ def compute_dofmap_pos(V: dolfinx.fem.FunctionSpace) -> Tuple[
     process, and the relative position of the dof.
 
     :param V: The function space
-    :returns: The tuple (`cells`, `dof_pos`) where each array is the size of the 
+    :returns: The tuple (`cells`, `dof_pos`) where each array is the size of the
         number of owned dofs (unrolled for block size)
     """
     dof_adj = V.dofmap.list

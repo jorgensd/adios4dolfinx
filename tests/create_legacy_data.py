@@ -20,7 +20,7 @@ import ufl
 def create_reference_data(h5_file: pathlib.Path, xdmf_file: pathlib.Path,
                           mesh_name: str, function_name: str,
                           family: str, degree: int) -> dolfin.Function:
-    mesh = dolfin.UnitCubeMesh(30, 30, 30)
+    mesh = dolfin.UnitCubeMesh(1, 1, 1)
     V = dolfin.FunctionSpace(mesh, family, degree)
     x = dolfin.SpatialCoordinate(mesh)
     f = ufl.conditional(ufl.gt(x[0], 0.5), x[1], 2*x[0])

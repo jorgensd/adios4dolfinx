@@ -14,8 +14,8 @@ Helpers reading/writing data with ADIOS2
 __all__ = ["read_dofmap", "read_array"]
 
 
-def read_dofmap(comm: MPI.Comm, filename: pathlib.Path,
-                dofmap: str, dofmap_offsets: str, num_cells_global: int,
+def read_dofmap(comm: MPI.Intracomm, filename: pathlib.Path,
+                dofmap: str, dofmap_offsets: str, num_cells_global: np.int64,
                 engine: str,
                 cells: npt.NDArray[np.int64],
                 dof_pos: npt.NDArray[np.int32]) -> npt.NDArray[np.int64]:
@@ -43,14 +43,14 @@ def read_dofmap(comm: MPI.Comm, filename: pathlib.Path,
     assert len(shape) == 1
     # As the offsets are one longer than the number of cells, we need to read in with an overlap
     d_offsets.SetSelection([[local_cell_range[0]], [local_cell_range[1]+1-local_cell_range[0]]])
-    dofmap_offsets = np.empty(local_cell_range[1]+1-local_cell_range[0], dtype=np.dtype(d_offsets.Type().strip("_t")))
-    infile.Get(d_offsets, dofmap_offsets, adios2.Mode.Sync)
+    in_offsets = np.empty(local_cell_range[1]+1-local_cell_range[0], dtype=d_offsets.Type().strip("_t"))
+    infile.Get(d_offsets, in_offsets, adios2.Mode.Sync)
     # Get the relevant part of the dofmap
     if dofmap not in io.AvailableVariables().keys():
         raise KeyError(f"Dof offsets not found at {dofmap}")
     cell_dofs = io.InquireVariable(dofmap)
-    cell_dofs.SetSelection([[dofmap_offsets[0]], [dofmap_offsets[-1]-dofmap_offsets[0]]])
-    in_dofmap = np.empty(dofmap_offsets[-1]-dofmap_offsets[0], dtype=np.dtype(cell_dofs.Type().strip("_t")))
+    cell_dofs.SetSelection([[in_offsets[0]], [in_offsets[-1]-in_offsets[0]]])
+    in_dofmap = np.empty(in_offsets[-1]-in_offsets[0], dtype=cell_dofs.Type().strip("_t"))
     infile.Get(cell_dofs, in_dofmap, adios2.Mode.Sync)
 
     in_dofmap = in_dofmap.astype(np.int64)
@@ -59,10 +59,8 @@ def read_dofmap(comm: MPI.Comm, filename: pathlib.Path,
     global_dofs = np.zeros_like(cells, dtype=np.int64)
     for i, (cell, pos) in enumerate(zip(cells, dof_pos.astype(np.uint64))):
         input_cell_pos = cell-local_cell_range[0]
-        read_pos = dofmap_offsets[input_cell_pos] + pos - dofmap_offsets[0]
-        #print(input_cell_pos, i, read_pos)
+        read_pos = in_offsets[input_cell_pos] + pos - in_offsets[0]
         global_dofs[i] = in_dofmap[read_pos]
-    #print("Second", global_dofs, in_dofmap)
 
     infile.EndStep()
     adios.RemoveIO("DofmapReader")
@@ -70,7 +68,7 @@ def read_dofmap(comm: MPI.Comm, filename: pathlib.Path,
 
 
 def read_array(filename: pathlib.Path, path: str, engine: str,
-               comm: MPI.Comm) -> Tuple[npt.NDArray[np.float64], int]:
+               comm: MPI.Intracomm) -> Tuple[npt.NDArray[np.float64], int]:
 
     adios = adios2.ADIOS(comm)
     io = adios.DeclareIO("ArrayReader")

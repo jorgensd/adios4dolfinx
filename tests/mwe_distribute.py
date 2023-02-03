@@ -1,6 +1,4 @@
-import time
 from adios4dolfinx import compute_dofmap_pos
-from IPython import embed
 import pathlib
 
 import adios2

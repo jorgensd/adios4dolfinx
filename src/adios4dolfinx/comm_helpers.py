@@ -13,7 +13,7 @@ Helpers for sending and receiving values for checkpointing
 """
 
 
-def send_cells_and_receive_dofmap_index(filename: pathlib.Path, comm: MPI.Comm,
+def send_cells_and_receive_dofmap_index(filename: pathlib.Path, comm: MPI.Intracomm,
                                         source_ranks: npt.NDArray[np.int32],
                                         dest_ranks: npt.NDArray[np.int32],
                                         output_owners: npt.NDArray[np.int32],
@@ -32,7 +32,7 @@ def send_cells_and_receive_dofmap_index(filename: pathlib.Path, comm: MPI.Comm,
         out_size[proc_pos] += 1
     del proc_pos
     recv_size = np.zeros(len(source_ranks), dtype=np.int32)
-    mesh_to_data_comm = comm.Create_dist_graph_adjacent(source_ranks, dest_ranks, reorder=False)
+    mesh_to_data_comm = comm.Create_dist_graph_adjacent(source_ranks.tolist(), dest_ranks.tolist(), reorder=False)
     # Send sizes to create data structures for receiving from NeighAlltoAllv
     mesh_to_data_comm.Neighbor_alltoall(out_size, recv_size)
 
@@ -80,7 +80,8 @@ def send_cells_and_receive_dofmap_index(filename: pathlib.Path, comm: MPI.Comm,
                              num_cells_global, "HDF5",
                              inc_cells, inc_pos)
     # Send input dofs back to owning process
-    data_to_mesh_comm = comm.Create_dist_graph_adjacent(dest_ranks, source_ranks, reorder=False)
+    data_to_mesh_comm = comm.Create_dist_graph_adjacent(dest_ranks.tolist(), source_ranks.tolist(),
+                                                        reorder=False)
 
     incoming_global_dofs = np.zeros(sum(out_size), dtype=np.int64)
     s_msg = [input_dofs, recv_size, MPI.INT64_T]
@@ -91,7 +92,6 @@ def send_cells_and_receive_dofmap_index(filename: pathlib.Path, comm: MPI.Comm,
     sorted_global_dofs = np.zeros_like(incoming_global_dofs, dtype=np.int64)
     assert len(incoming_global_dofs) == len(input_cells)
     for i in range(len(dest_ranks)):
-        pos = np.cumsum(out_size[:i])
         for j in range(out_size[i]):
             input_pos = offsets[i] + j
             sorted_global_dofs[proc_to_dof[input_pos]] = incoming_global_dofs[input_pos]
@@ -100,11 +100,12 @@ def send_cells_and_receive_dofmap_index(filename: pathlib.Path, comm: MPI.Comm,
 
 def send_dofs_and_receive_values(
         filename: pathlib.Path, vector: str, engine: str,
-        comm: MPI.Comm, source_ranks: npt.NDArray[np.int32],
+        comm: MPI.Intracomm, source_ranks: npt.NDArray[np.int32],
         dest_ranks: npt.NDArray[np.int32], dofs: npt.NDArray[np.int64],
         dof_owner: npt.NDArray[np.int32]):
 
-    mesh_to_data_comm = comm.Create_dist_graph_adjacent(source_ranks, dest_ranks, reorder=False)
+    mesh_to_data_comm = comm.Create_dist_graph_adjacent(source_ranks.tolist(),
+                                                        dest_ranks.tolist(), reorder=False)
 
     # Send global dof number to input process
     dof_out_size = np.zeros_like(dest_ranks, dtype=np.int32)
@@ -138,7 +139,8 @@ def send_dofs_and_receive_values(
         input_vals[i] = vals[dof - start_pos]
 
     # Create reverse comm and send back
-    dof_to_mesh_comm = comm.Create_dist_graph_adjacent(dest_ranks, source_ranks, reorder=False)
+    dof_to_mesh_comm = comm.Create_dist_graph_adjacent(dest_ranks.tolist(),
+                                                       source_ranks.tolist(), reorder=False)
     incoming_vals = np.zeros(sum(dof_out_size), dtype=np.float64)
     s_msg = [input_vals, dof_recv_size, MPI.DOUBLE]
     r_msg = [incoming_vals, dof_out_size, MPI.DOUBLE]
