@@ -4,6 +4,7 @@
 #
 # SPDX-License-Identifier:    MIT
 
+from IPython import embed
 import pathlib
 
 import adios2
@@ -12,10 +13,133 @@ import dolfinx
 import numpy as np
 import ufl
 from mpi4py import MPI
-from .comm_helpers import send_cells_and_receive_dofmap_index, send_dofs_and_receive_values
+from .comm_helpers import send_cells_and_receive_dofmap_index, send_dofs_and_receive_values, send_cells_and_cell_perms
 from .utils import compute_local_range, compute_dofmap_pos, index_owner
 
-__all__ = ["write_mesh", "read_mesh", "write_function", "read_function"]
+__all__ = ["write_mesh", "read_mesh", "write_function", "read_function",
+           "write_mesh_perm", "read_function_perm"]
+
+
+def write_mesh_perm(mesh: dolfinx.mesh.Mesh, filename: pathlib.Path, engine: str = "BP4"):
+    """
+    Write a mesh to specified ADIOS2 format, see:
+    https://adios2.readthedocs.io/en/stable/engines/engines.html
+    for possible formats.
+
+    Args:
+        mesh: The mesh to write to file
+        filename: Path to save mesh (without file-extension)
+        engine: Adios2 Engine
+    """
+    num_xdofs_local = mesh.geometry.index_map().size_local
+    num_xdofs_global = mesh.geometry.index_map().size_global
+    local_range = mesh.geometry.index_map().local_range
+    gdim = mesh.geometry.dim
+
+    local_points = mesh.geometry.x[:num_xdofs_local, :gdim].copy()
+    adios = adios2.ADIOS(mesh.comm)
+    io = adios.DeclareIO("MeshWriter")
+    io.SetEngine(engine)
+    outfile = io.Open(str(filename), adios2.Mode.Write)
+    # Write geometry
+    pointvar = io.DefineVariable(
+        "Points", local_points, shape=[num_xdofs_global, gdim],
+        start=[local_range[0], 0], count=[num_xdofs_local, gdim])
+    outfile.Put(pointvar, local_points, adios2.Mode.Sync)
+
+    # Write celltype
+    io.DefineAttribute("CellType", mesh.topology.cell_name())
+
+    # Write basix properties
+    io.DefineAttribute("Degree", np.array([mesh.geometry.cmap.degree], dtype=np.int32))
+    io.DefineAttribute("LagrangeVariant",  np.array([mesh.geometry.cmap.variant], dtype=np.int32))
+
+    # Write topology
+    g_imap = mesh.geometry.index_map()
+    g_dmap = mesh.geometry.dofmap
+    num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
+    num_cells_global = mesh.topology.index_map(
+        mesh.topology.dim).size_global
+    start_cell = mesh.topology.index_map(mesh.topology.dim).local_range[0]
+    geom_layout = mesh.geometry.cmap.create_dof_layout()
+    num_dofs_per_cell = geom_layout.num_entity_closure_dofs(
+        mesh.geometry.dim)
+
+    dofs_out = np.zeros(
+        (num_cells_local, num_dofs_per_cell), dtype=np.int64)
+
+    dofs_out[:, :] = g_imap.local_to_global(
+        g_dmap.array[:num_cells_local * num_dofs_per_cell
+                     ]).reshape(num_cells_local, num_dofs_per_cell)
+
+    dvar = io.DefineVariable(
+        "Topology", dofs_out, shape=[num_cells_global, num_dofs_per_cell],
+        start=[start_cell, 0], count=[num_cells_local, num_dofs_per_cell])
+    outfile.Put(dvar, dofs_out)
+
+    # Add mesh permutations
+    mesh.topology.create_entity_permutations()
+    cell_perm = mesh.topology.get_cell_permutation_info()
+    pvar = io.DefineVariable("CellPermutations", cell_perm, shape=[num_cells_global],
+                             start=[start_cell], count=[num_cells_local])
+    outfile.Put(pvar, cell_perm)
+    outfile.PerformPuts()
+    outfile.EndStep()
+    assert adios.RemoveIO("MeshWriter")
+
+
+def read_function_perm(u: dolfinx.fem.Function, filename: pathlib.Path, engine: str = "BP4"):
+    V = u.function_space
+    mesh = u.function_space.mesh
+    comm = mesh.comm
+
+    # ----------------------Step 1---------------------------------
+    # Compute index of input cells and get cell permutation
+    num_owned_cells = mesh.topology.index_map(mesh.topology.dim).size_local
+    input_cells = mesh.topology.original_cell_index[:num_owned_cells]
+    mesh.topology.create_entity_permutations()
+    cell_perm = mesh.topology.get_cell_permutation_info()[:num_owned_cells]
+
+    # Compute mesh->input communicator
+    # 1.1 Compute mesh->input communicator
+    num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
+    owners = index_owner(mesh.comm, input_cells, num_cells_global)
+    unique_owners = np.unique(owners)
+    # FIXME: In C++ use NBX to find neighbourhood
+    _tmp_comm = mesh.comm.Create_dist_graph(
+        [mesh.comm.rank], [len(unique_owners)], unique_owners, reorder=False)
+    source, dest, _ = _tmp_comm.Get_dist_neighbors()
+
+    # ----------------------Step 2---------------------------------
+    # Read input dofmap and cell-perms
+    num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
+    num_dofs_global = u.function_space.dofmap.index_map.size_global * u.function_space.dofmap.index_map_bs
+    send_cells_and_cell_perms(
+        filename, comm, np.asarray(source, dtype=np.int32), np.asarray(
+            dest, dtype=np.int32), owners, input_cells, cell_perm,
+        num_cells_global, "Dofmap", "XDofmap", engine, num_dofs_global, u.function_space.element, u.function_space.dofmap.bs)
+    return
+    # ----------------------Step 3---------------------------------
+
+    # Compute owner of global dof on distributed mesh
+    num_dof_global = V.dofmap.index_map_bs * V.dofmap.index_map.size_global
+    dof_owner = index_owner(mesh.comm, dofmap_indices, num_dof_global)
+    # Create MPI neigh comm to owner.
+    # NOTE: USE NBX in C++
+    unique_dof_owners = np.unique(dof_owner)
+    mesh_to_dof_comm = mesh.comm.Create_dist_graph(
+        [mesh.comm.rank], [len(unique_dof_owners)], unique_dof_owners, reorder=False)
+    dof_source, dof_dest, _ = mesh_to_dof_comm.Get_dist_neighbors()
+
+    # Send global dof indices to correct input process, and recieve value of given dof
+    local_values = send_dofs_and_receive_values(filename, "Values", engine,
+                                                comm,   np.asarray(dof_source, dtype=np.int32),
+                                                np.asarray(dof_dest, dtype=np.int32), dofmap_indices, dof_owner)
+
+    # ----------------------Step 4---------------------------------
+    # Populate local part of array and scatter forward
+    u.x.array[:len(local_values)] = local_values
+    u.x.scatter_forward()
 
 
 def write_mesh(mesh: dolfinx.mesh.Mesh, filename: pathlib.Path, engine: str = "BP4"):
@@ -150,7 +274,8 @@ def read_mesh(comm: MPI.Intracomm, file: pathlib.Path, engine: str,
     return dolfinx.mesh.create_mesh(comm, mesh_topology, mesh_geometry, domain, partitioner)
 
 
-def write_function(u: dolfinx.fem.Function, filename: pathlib.Path, engine: str = "BP4"):
+def write_function(u: dolfinx.fem.Function, filename: pathlib.Path, engine: str = "BP4",
+                   mode: adios2.Mode = adios2.Mode.Append):
     """
     """
     dofmap = u.function_space.dofmap
@@ -161,12 +286,12 @@ def write_function(u: dolfinx.fem.Function, filename: pathlib.Path, engine: str 
     adios = adios2.ADIOS(comm)
     io = adios.DeclareIO("FunctionWriter")
     io.SetEngine(engine)
-    outfile = io.Open(str(filename), adios2.Mode.Write)
-
+    outfile = io.Open(str(filename), adios2.Mode.Append)
     # Write local part of vector
     num_dofs_local = dofmap.index_map.size_local * dofmap.index_map_bs
     num_dofs_global = dofmap.index_map.size_global * dofmap.index_map_bs
     local_start = dofmap.index_map.local_range[0] * dofmap.index_map_bs
+    outfile.BeginStep()
     val_var = io.DefineVariable(
         "Values", np.zeros(num_dofs_local, dtype=np.float64), shape=[num_dofs_global],
         start=[local_start], count=[num_dofs_local])
@@ -212,7 +337,6 @@ def write_function(u: dolfinx.fem.Function, filename: pathlib.Path, engine: str 
         "XDofmap", np.zeros(num_cells_local+1, dtype=np.int64), shape=[num_cells_global+1],
         start=[cell_start], count=[num_cells_local+1])
     outfile.Put(xdofmap_var, local_dofmap_offsets)
-
     outfile.PerformPuts()
     outfile.EndStep()
     assert adios.RemoveIO("FunctionWriter")
