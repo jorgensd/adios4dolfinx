@@ -7,15 +7,16 @@ import pytest
 import ufl
 import numpy as np
 
+# Current test with 3 procs gives index error. To investigate
+
 
 @pytest.mark.parametrize("encoder, suffix", [("BP4", ".bp")])  # , ("HDF5", ".h5"), ("BP5", ".bp")])
 @pytest.mark.parametrize("ghost_mode", [dolfinx.mesh.GhostMode.shared_facet])
 def test_mesh_read_writer(encoder, suffix, ghost_mode):
 
-    N = 2
     file = pathlib.Path(f"output/adios_mesh_{encoder}")
     if MPI.COMM_WORLD.rank == 0:
-        mesh_loc = dolfinx.mesh.create_unit_square(MPI.COMM_SELF, N, N, ghost_mode=ghost_mode)
+        mesh_loc = dolfinx.mesh.create_unit_square(MPI.COMM_SELF, 4, 2, ghost_mode=ghost_mode)
         write_mesh_perm(mesh_loc, file.with_suffix(suffix), encoder)
         V = dolfinx.fem.FunctionSpace(mesh_loc, ("N1curl", 1))
         u = dolfinx.fem.Function(V)
@@ -30,4 +31,6 @@ def test_mesh_read_writer(encoder, suffix, ghost_mode):
     # read_function(u, file.with_suffix(suffix), encoder)
     w = dolfinx.fem.Function(V)
     w.interpolate(lambda x: (x[0], x[1]))
+    if not np.allclose(w.x.array, u.x.array):
+        print(MPI.COMM_WORLD.rank, w.x.array, u.x.array)
     assert np.allclose(w.x.array, u.x.array)
