@@ -163,7 +163,7 @@ def send_cells_and_cell_perms(filename: pathlib.Path, comm: MPI.Intracomm,
     # Prepare data-structures for receiving
     total_incoming = sum(recv_size)
     inc_cells = np.zeros(total_incoming, dtype=np.int64)
-    inc_perm = np.zeros(total_incoming, dtype=np.intc)
+    inc_perm = np.zeros(total_incoming, dtype=np.uint32)
 
     # Compute incoming offset
     inc_offsets = np.zeros(len(recv_size)+1, dtype=np.intc)
@@ -177,6 +177,9 @@ def send_cells_and_cell_perms(filename: pathlib.Path, comm: MPI.Intracomm,
     s_msg = [out_perm, out_size, MPI.UINT32_T]
     r_msg = [inc_perm, recv_size, MPI.UINT32_T]
     mesh_to_data_comm.Neighbor_alltoallv(s_msg, r_msg)
+    # Something happens when source ranks is note [0,1] (but [1,0]). Have to look at this tomorrow
+    print(MPI.COMM_WORLD.rank, "SENDING:", out_perm, out_size, "Receiving", inc_perm, recv_size, "\n",
+          source_ranks, dest_ranks)
 
     # Read dofmap from file
     input_dofmap = read_dofmap_new(comm, filename, dofmap_path, xdofmap_path,
@@ -201,12 +204,16 @@ def send_cells_and_cell_perms(filename: pathlib.Path, comm: MPI.Intracomm,
     # Read input cell permutations
     input_perms = read_cell_perms(comm, filename, "CellPermutations", num_cells_global, engine)
 
+    # print(MPI.COMM_WORLD.rank, inc_perm, input_perms, input_local_cell_index)
+
+    # Permute perms coming from other process to match local ordering
+    inc_perm = inc_perm[input_local_cell_index]
+
     # First invert input data to reference element then transform to current mesh
     for local_cell in input_local_cell_index:
         start, end = input_dofmap.offsets[local_cell], input_dofmap.offsets[local_cell+1]
         element.apply_inverse_dof_transformation(local_values[start:end], input_perms[local_cell], bs)
         element.apply_dof_transformation(local_values[start:end], inc_perm[local_cell], bs)
-
     # For each dof owned by a process, find the local position in the dofmap.
     V = u.function_space
     local_cells, dof_pos = compute_dofmap_pos(V)
