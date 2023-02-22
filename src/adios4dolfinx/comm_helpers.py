@@ -205,7 +205,7 @@ def send_cells_and_cell_perms(filename: pathlib.Path, comm: MPI.Intracomm,
     for local_cell in input_local_cell_index:
         start, end = input_dofmap.offsets[local_cell], input_dofmap.offsets[local_cell+1]
         element.apply_inverse_dof_transformation(local_values[start:end], input_perms[local_cell], bs)
-        element.apply_dof_transformation(local_values[start:end], cell_perms[local_cell], bs)
+        element.apply_dof_transformation(local_values[start:end], inc_perm[local_cell], bs)
 
     # For each dof owned by a process, find the local position in the dofmap.
     V = u.function_space

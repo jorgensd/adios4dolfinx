@@ -16,7 +16,7 @@ def test_mesh_read_writer(encoder, suffix, ghost_mode):
 
     file = pathlib.Path(f"output/adios_mesh_{encoder}")
     if MPI.COMM_WORLD.rank == 0:
-        mesh_loc = dolfinx.mesh.create_unit_square(MPI.COMM_SELF, 4, 2, ghost_mode=ghost_mode)
+        mesh_loc = dolfinx.mesh.create_unit_square(MPI.COMM_SELF, 2, 2, ghost_mode=ghost_mode)
         write_mesh_perm(mesh_loc, file.with_suffix(suffix), encoder)
         V = dolfinx.fem.FunctionSpace(mesh_loc, ("N1curl", 1))
         u = dolfinx.fem.Function(V)
