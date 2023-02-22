@@ -111,35 +111,11 @@ def read_function_perm(u: dolfinx.fem.Function, filename: pathlib.Path, engine: 
     source, dest, _ = _tmp_comm.Get_dist_neighbors()
 
     # ----------------------Step 2---------------------------------
-    # Read input dofmap and cell-perms
     num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
-    num_dofs_global = u.function_space.dofmap.index_map.size_global * u.function_space.dofmap.index_map_bs
     send_cells_and_cell_perms(
         filename, comm, np.asarray(source, dtype=np.int32), np.asarray(
             dest, dtype=np.int32), owners, input_cells, cell_perm,
-        num_cells_global, "Dofmap", "XDofmap", engine, num_dofs_global, u.function_space.element, u.function_space.dofmap.bs)
-    return
-    # ----------------------Step 3---------------------------------
-
-    # Compute owner of global dof on distributed mesh
-    num_dof_global = V.dofmap.index_map_bs * V.dofmap.index_map.size_global
-    dof_owner = index_owner(mesh.comm, dofmap_indices, num_dof_global)
-    # Create MPI neigh comm to owner.
-    # NOTE: USE NBX in C++
-    unique_dof_owners = np.unique(dof_owner)
-    mesh_to_dof_comm = mesh.comm.Create_dist_graph(
-        [mesh.comm.rank], [len(unique_dof_owners)], unique_dof_owners, reorder=False)
-    dof_source, dof_dest, _ = mesh_to_dof_comm.Get_dist_neighbors()
-
-    # Send global dof indices to correct input process, and recieve value of given dof
-    local_values = send_dofs_and_receive_values(filename, "Values", engine,
-                                                comm,   np.asarray(dof_source, dtype=np.int32),
-                                                np.asarray(dof_dest, dtype=np.int32), dofmap_indices, dof_owner)
-
-    # ----------------------Step 4---------------------------------
-    # Populate local part of array and scatter forward
-    u.x.array[:len(local_values)] = local_values
-    u.x.scatter_forward()
+        num_cells_global, "Dofmap", "XDofmap", engine, u)
 
 
 def write_mesh(mesh: dolfinx.mesh.Mesh, filename: pathlib.Path, engine: str = "BP4"):

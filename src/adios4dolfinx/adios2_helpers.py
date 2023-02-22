@@ -114,19 +114,20 @@ def read_dofmap(comm: MPI.Intracomm, filename: pathlib.Path,
     .. note::
         No MPI communication is done during this call
     """
+    local_cell_range = compute_local_range(comm, num_cells_global)
+
     # Open ADIOS engine
     adios = adios2.ADIOS(comm)
     io = adios.DeclareIO("DofmapReader")
     io.SetEngine(engine)
     infile = io.Open(str(filename), adios2.Mode.Read)
 
-    infile.BeginStep()
+    for i in range(infile.Steps()):
+        infile.BeginStep()
+        if dofmap_offsets in io.AvailableVariables().keys():
+            break
+        infile.EndStep()
 
-    local_cell_range = compute_local_range(comm, num_cells_global)
-
-    # Get dofmap offsets from file
-    if dofmap_offsets not in io.AvailableVariables().keys():
-        raise KeyError(f"Dof offsets not found at '{dofmap_offsets}'")
     d_offsets = io.InquireVariable(dofmap_offsets)
     shape = d_offsets.Shape()
     assert len(shape) == 1

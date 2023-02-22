@@ -2,7 +2,7 @@
 import numpy as np
 import numpy.typing as npt
 import pathlib
-from .utils import find_first, index_owner, compute_local_range
+from .utils import find_first, index_owner, compute_local_range, compute_dofmap_pos
 from .adios2_helpers import read_array, read_dofmap, read_dofmap_new, read_cell_perms
 from mpi4py import MPI
 from typing import Tuple
@@ -15,6 +15,96 @@ Helpers for sending and receiving values for checkpointing
 """
 
 
+def send_dofmap_get_vals(comm: MPI.Intracomm,
+                         source_ranks: npt.NDArray[np.int32],
+                         dest_ranks: npt.NDArray[np.int32],
+                         output_owners: npt.NDArray[np.int32],
+                         input_cells: npt.NDArray[np.int64],
+                         dofmap_pos: npt.NDArray[np.int32],
+                         num_cells_global: np.int64,
+                         values: npt.NDArray[np.float64],
+                         dofmap_offsets: npt.NDArray[np.int32]) -> npt.NDArray[np.float64]:
+    """
+    Given a set of positions in input dofmap, give the global input index of this dofmap entry
+    in input file.
+    """
+
+    # Compute amount of data to send to each process
+    out_size = np.zeros(len(dest_ranks), dtype=np.int32)
+    for owner in output_owners:
+        proc_pos = find_first(owner, dest_ranks)
+        out_size[proc_pos] += 1
+        del proc_pos
+    recv_size = np.zeros(len(source_ranks), dtype=np.int32)
+    mesh_to_data_comm = comm.Create_dist_graph_adjacent(source_ranks.tolist(), dest_ranks.tolist(), reorder=False)
+    # Send sizes to create data structures for receiving from NeighAlltoAllv
+    mesh_to_data_comm.Neighbor_alltoall(out_size, recv_size)
+
+    # Sort output for sending
+    offsets = np.zeros(len(out_size)+1, dtype=np.intc)
+    offsets[1:] = np.cumsum(out_size)
+    out_cells = np.zeros(offsets[-1], dtype=np.int64)
+    out_pos = np.zeros(offsets[-1], dtype=np.int32)
+    count = np.zeros_like(out_size, dtype=np.int32)
+    proc_to_dof = np.zeros_like(input_cells, dtype=np.int32)
+    for i, owner in enumerate(output_owners):
+        # Find relative position of owner in MPI communicator
+        # Could be cached from previous run
+        proc_pos = find_first(owner, dest_ranks)
+
+        # Fill output data
+        out_cells[offsets[proc_pos]+count[proc_pos]] = input_cells[i]
+        out_pos[offsets[proc_pos]+count[proc_pos]] = dofmap_pos[i]
+
+        # Compute map from global out position to relative position in proc
+        proc_to_dof[offsets[proc_pos]+count[proc_pos]] = i
+        count[proc_pos] += 1
+        del proc_pos
+    del count
+
+    # Prepare data-structures for receiving
+    total_incoming = sum(recv_size)
+    inc_cells = np.zeros(total_incoming, dtype=np.int64)
+    inc_pos = np.zeros(total_incoming, dtype=np.intc)
+
+    # Compute incoming offset
+    inc_offsets = np.zeros(len(recv_size)+1, dtype=np.intc)
+    inc_offsets[1:] = np.cumsum(recv_size)
+
+    # Send data
+    s_msg = [out_cells, out_size, MPI.INT64_T]
+    r_msg = [inc_cells, recv_size, MPI.INT64_T]
+    mesh_to_data_comm.Neighbor_alltoallv(s_msg, r_msg)
+
+    s_msg = [out_pos, out_size, MPI.INT32_T]
+    r_msg = [inc_pos, recv_size, MPI.INT32_T]
+    mesh_to_data_comm.Neighbor_alltoallv(s_msg, r_msg)
+
+    local_input_range = compute_local_range(comm, num_cells_global)
+    values_to_distribute = np.zeros_like(inc_pos, dtype=np.float64)
+    for i, (cell, pos) in enumerate(zip(inc_cells, inc_pos)):
+        l_cell = cell - local_input_range[0]
+        values_to_distribute[i] = values[dofmap_offsets[l_cell]+pos]
+
+    # Send input dofs back to owning process
+    data_to_mesh_comm = comm.Create_dist_graph_adjacent(dest_ranks.tolist(), source_ranks.tolist(),
+                                                        reorder=False)
+
+    incoming_global_dofs = np.zeros(sum(out_size), dtype=np.float64)
+    s_msg = [values_to_distribute, recv_size, MPI.DOUBLE]
+    r_msg = [incoming_global_dofs, out_size, MPI.DOUBLE]
+    data_to_mesh_comm.Neighbor_alltoallv(s_msg, r_msg)
+
+    # Sort incoming global dofs as they were inputted
+    sorted_global_dofs = np.zeros_like(incoming_global_dofs, dtype=np.float64)
+    assert len(incoming_global_dofs) == len(input_cells)
+    for i in range(len(dest_ranks)):
+        for j in range(out_size[i]):
+            input_pos = offsets[i] + j
+            sorted_global_dofs[proc_to_dof[input_pos]] = incoming_global_dofs[input_pos]
+    return sorted_global_dofs
+
+
 def send_cells_and_cell_perms(filename: pathlib.Path, comm: MPI.Intracomm,
                               source_ranks: npt.NDArray[np.int32],
                               dest_ranks: npt.NDArray[np.int32],
@@ -25,11 +115,7 @@ def send_cells_and_cell_perms(filename: pathlib.Path, comm: MPI.Intracomm,
                               dofmap_path: str,
                               xdofmap_path: str,
                               engine: str,
-                              num_dofs_global: np.int64,
-                              element: dolfinx.cpp.fem.FiniteElement,
-                              bs: int) -> Tuple[dolfinx.cpp.graph.AdjacencyList_int32,
-                                                npt.NDArray[np.uint32],
-                                                npt.NDArray[np.uint32]]:
+                              u: dolfinx.fem.Function):
     """
     Send original cell indices + cell permutation for owned cells on current process
     to the one that has the input.
@@ -38,7 +124,9 @@ def send_cells_and_cell_perms(filename: pathlib.Path, comm: MPI.Intracomm,
         A tuple (input_dofmap, cell_perm, input_perm, input_to_output), where `input_dofmap` is the
         part of the dofmap read in on the input process. `cell_perm` is the permutation for 
     """
-
+    bs = u.function_space.dofmap.bs
+    num_dofs_global = u.function_space.dofmap.index_map.size_global * u.function_space.dofmap.index_map_bs
+    element = u.function_space.element
     # Compute amount of data to send to each process
     out_size = np.zeros(len(dest_ranks), dtype=np.int32)
     for owner in output_owners:
@@ -119,23 +207,23 @@ def send_cells_and_cell_perms(filename: pathlib.Path, comm: MPI.Intracomm,
         element.apply_inverse_dof_transformation(local_values[start:end], input_perms[local_cell], bs)
         element.apply_dof_transformation(local_values[start:end], cell_perms[local_cell], bs)
 
-    # Send input dofs back to owning process
-    data_to_mesh_comm = comm.Create_dist_graph_adjacent(dest_ranks.tolist(), source_ranks.tolist(),
-                                                        reorder=False)
+    # For each dof owned by a process, find the local position in the dofmap.
+    V = u.function_space
+    local_cells, dof_pos = compute_dofmap_pos(V)
+    input_cells = V.mesh.topology.original_cell_index[local_cells]
+    num_cells_global = V.mesh.topology.index_map(V.mesh.topology.dim).size_global
+    owners = index_owner(V.mesh.comm, input_cells, num_cells_global)
+    unique_owners = np.unique(owners)
+    # FIXME: In C++ use NBX to find neighbourhood
+    sub_comm = V.mesh.comm.Create_dist_graph(
+        [V.mesh.comm.rank], [len(unique_owners)], unique_owners, reorder=False)
+    source, dest, _ = sub_comm.Get_dist_neighbors()
 
-    # incoming_global_dofs = np.zeros(sum(out_size), dtype=np.int64)
-    # s_msg = [input_dofs, recv_size, MPI.INT64_T]
-    # r_msg = [incoming_global_dofs, out_size, MPI.INT64_T]
-    # data_to_mesh_comm.Neighbor_alltoallv(s_msg, r_msg)
+    owned_values = send_dofmap_get_vals(comm, np.asarray(source, dtype=np.int32), np.asarray(dest, dtype=np.int32), owners, input_cells, dof_pos,
+                                        num_cells_global, local_values, input_dofmap.offsets)
 
-    # # Sort incoming global dofs as they were inputted
-    # sorted_global_dofs = np.zeros_like(incoming_global_dofs, dtype=np.int64)
-    # assert len(incoming_global_dofs) == len(input_cells)
-    # for i in range(len(dest_ranks)):
-    #     for j in range(out_size[i]):
-    #         input_pos = offsets[i] + j
-    #         sorted_global_dofs[proc_to_dof[input_pos]] = incoming_global_dofs[input_pos]
-    # return sorted_global_dofs
+    u.x.array[:len(owned_values)] = owned_values
+    u.x.scatter_forward()
 
 
 def send_cells_and_receive_dofmap_index(filename: pathlib.Path, comm: MPI.Intracomm,

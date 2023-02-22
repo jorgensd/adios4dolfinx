@@ -1,4 +1,4 @@
-from adios4dolfinx import write_mesh_perm, write_function, read_mesh, read_function_perm
+from adios4dolfinx import write_mesh_perm, write_function, read_mesh, read_function_perm, read_function
 import dolfinx
 from mpi4py import MPI
 import pathlib
@@ -27,4 +27,7 @@ def test_mesh_read_writer(encoder, suffix, ghost_mode):
     V = dolfinx.fem.FunctionSpace(mesh, ("N1curl", 1))
     u = dolfinx.fem.Function(V)
     read_function_perm(u, file.with_suffix(suffix), encoder)
-    exit()
+    # read_function(u, file.with_suffix(suffix), encoder)
+    w = dolfinx.fem.Function(V)
+    w.interpolate(lambda x: (x[0], x[1]))
+    assert np.allclose(w.x.array, u.x.array)
