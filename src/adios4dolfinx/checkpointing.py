@@ -4,7 +4,6 @@
 #
 # SPDX-License-Identifier:    MIT
 
-from IPython import embed
 import pathlib
 
 import adios2
@@ -89,7 +88,6 @@ def write_mesh_perm(mesh: dolfinx.mesh.Mesh, filename: pathlib.Path, engine: str
 
 
 def read_function_perm(u: dolfinx.fem.Function, filename: pathlib.Path, engine: str = "BP4"):
-    V = u.function_space
     mesh = u.function_space.mesh
     comm = mesh.comm
 

@@ -1,13 +1,9 @@
-from adios4dolfinx import write_mesh_perm, write_function, read_mesh, read_function_perm, read_function
+from adios4dolfinx import write_mesh_perm, write_function, read_mesh, read_function_perm
 import dolfinx
 from mpi4py import MPI
 import pathlib
-import time
 import pytest
-import ufl
 import numpy as np
-
-# Current test with 3 procs gives index error. To investigate
 
 
 @pytest.mark.parametrize("encoder, suffix", [("BP4", ".bp"), ("HDF5", ".h5"), ("BP5", ".bp")])
@@ -34,8 +30,4 @@ def test_mesh_read_writer(encoder, suffix, ghost_mode):
     read_function_perm(u, file.with_suffix(suffix), encoder)
     w = dolfinx.fem.Function(V)
     w.interpolate(lambda x: (x[0], 100*x[1]+3))
-
-    num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
-    bs = V.dofmap.bs
-    output = f"Rank {MPI.COMM_WORLD.rank}\n"
     assert np.allclose(w.x.array, u.x.array)

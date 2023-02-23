@@ -5,7 +5,6 @@ import pathlib
 from .utils import find_first, index_owner, compute_local_range, compute_dofmap_pos
 from .adios2_helpers import read_array, read_dofmap, read_dofmap_new, read_cell_perms
 from mpi4py import MPI
-from typing import Tuple
 import dolfinx.cpp
 import dolfinx
 __all__ = ["send_cells_and_receive_dofmap_index",
@@ -122,7 +121,7 @@ def send_cells_and_cell_perms(filename: pathlib.Path, comm: MPI.Intracomm,
 
     Returns:
         A tuple (input_dofmap, cell_perm, input_perm, input_to_output), where `input_dofmap` is the
-        part of the dofmap read in on the input process. `cell_perm` is the permutation for 
+        part of the dofmap read in on the input process. `cell_perm` is the permutation for
     """
     bs = u.function_space.dofmap.bs
     num_dofs_global = u.function_space.dofmap.index_map.size_global * u.function_space.dofmap.index_map_bs
@@ -224,7 +223,8 @@ def send_cells_and_cell_perms(filename: pathlib.Path, comm: MPI.Intracomm,
         [V.mesh.comm.rank], [len(unique_owners)], unique_owners, reorder=False)
     source, dest, _ = sub_comm.Get_dist_neighbors()
 
-    owned_values = send_dofmap_get_vals(comm, np.asarray(source, dtype=np.int32), np.asarray(dest, dtype=np.int32), owners, input_cells, dof_pos,
+    owned_values = send_dofmap_get_vals(comm, np.asarray(source, dtype=np.int32), np.asarray(dest, dtype=np.int32),
+                                        owners, input_cells, dof_pos,
                                         num_cells_global, local_values, input_dofmap.offsets)
 
     u.x.array[:len(owned_values)] = owned_values
