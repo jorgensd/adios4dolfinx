@@ -176,9 +176,6 @@ def send_cells_and_cell_perms(filename: pathlib.Path, comm: MPI.Intracomm,
     s_msg = [out_perm, out_size, MPI.UINT32_T]
     r_msg = [inc_perm, recv_size, MPI.UINT32_T]
     mesh_to_data_comm.Neighbor_alltoallv(s_msg, r_msg)
-    # Something happens when source ranks is note [0,1] (but [1,0]). Have to look at this tomorrow
-    print(MPI.COMM_WORLD.rank, "SENDING:", out_perm, out_size, "Receiving", inc_perm, recv_size, "\n",
-          source_ranks, dest_ranks)
 
     # Read dofmap from file
     input_dofmap = read_dofmap_new(comm, filename, dofmap_path, xdofmap_path,
@@ -203,14 +200,12 @@ def send_cells_and_cell_perms(filename: pathlib.Path, comm: MPI.Intracomm,
     # Read input cell permutations
     input_perms = read_cell_perms(comm, filename, "CellPermutations", num_cells_global, engine)
 
-    # print(MPI.COMM_WORLD.rank, inc_perm, inc_cells, input_perms, local_input_range,  inc_perm[input_local_cell_index])
-
     # First invert input data to reference element then transform to current mesh
     for i, l_cell in enumerate(input_local_cell_index):
         start, end = input_dofmap.offsets[l_cell], input_dofmap.offsets[l_cell+1]
         element.apply_inverse_dof_transformation(local_values[start:end], input_perms[l_cell], bs)
         element.apply_dof_transformation(local_values[start:end], inc_perm[i], bs)
-        # print(l_cell, input_perms[l_cell], inc_perm[i])
+
     # For each dof owned by a process, find the local position in the dofmap.
     V = u.function_space
     local_cells, dof_pos = compute_dofmap_pos(V)

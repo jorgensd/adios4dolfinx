@@ -13,12 +13,13 @@ def write_function(mesh, el, f) -> str:
     u.interpolate(f)
     el_hash = V.element.signature().replace(' ', '').replace(',', '').replace("(", "").replace(')', "")
     if mesh.comm.size != 1:
-        adios4dolfinx.write_function(u, pathlib.Path(f"output/u{el_hash}.bp"))
         adios4dolfinx.write_mesh(mesh, pathlib.Path(f"output/mesh{el_hash}.bp"))
+        adios4dolfinx.write_function(u, pathlib.Path(f"output/mesh{el_hash}.bp",))
+
     else:
         if MPI.COMM_WORLD.rank == 0:
-            adios4dolfinx.write_function(u, pathlib.Path(f"output/u{el_hash}.bp"))
             adios4dolfinx.write_mesh(mesh, pathlib.Path(f"output/mesh{el_hash}.bp"))
+            adios4dolfinx.write_function(u, pathlib.Path(f"output/mesh{el_hash}.bp"))
     return el_hash
 
 
@@ -26,7 +27,7 @@ def read_function(comm, el, f, hash):
     mesh = adios4dolfinx.read_mesh(comm, f"output/mesh{hash}.bp", "BP4", dolfinx.mesh.GhostMode.shared_facet)
     V = dolfinx.fem.FunctionSpace(mesh, el)
     v = dolfinx.fem.Function(V)
-    adios4dolfinx.read_function(v, f"output/u{hash}.bp")
+    adios4dolfinx.read_function(v, f"output/mesh{hash}.bp")
     v_ex = dolfinx.fem.Function(V)
     v_ex.interpolate(f)
     assert np.allclose(v.x.array, v_ex.x.array)
