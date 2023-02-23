@@ -204,16 +204,14 @@ def send_cells_and_cell_perms(filename: pathlib.Path, comm: MPI.Intracomm,
     # Read input cell permutations
     input_perms = read_cell_perms(comm, filename, "CellPermutations", num_cells_global, engine)
 
-    # print(MPI.COMM_WORLD.rank, inc_perm, input_perms, input_local_cell_index)
-
-    # Permute perms coming from other process to match local ordering
-    inc_perm = inc_perm[input_local_cell_index]
+    # print(MPI.COMM_WORLD.rank, inc_perm, inc_cells, input_perms, local_input_range,  inc_perm[input_local_cell_index])
 
     # First invert input data to reference element then transform to current mesh
-    for local_cell in input_local_cell_index:
-        start, end = input_dofmap.offsets[local_cell], input_dofmap.offsets[local_cell+1]
-        element.apply_inverse_dof_transformation(local_values[start:end], input_perms[local_cell], bs)
-        element.apply_dof_transformation(local_values[start:end], inc_perm[local_cell], bs)
+    for i, l_cell in enumerate(input_local_cell_index):
+        start, end = input_dofmap.offsets[l_cell], input_dofmap.offsets[l_cell+1]
+        element.apply_inverse_dof_transformation(local_values[start:end], input_perms[l_cell], bs)
+        element.apply_dof_transformation(local_values[start:end], inc_perm[i], bs)
+        # print(l_cell, input_perms[l_cell], inc_perm[i])
     # For each dof owned by a process, find the local position in the dofmap.
     V = u.function_space
     local_cells, dof_pos = compute_dofmap_pos(V)
