@@ -5,6 +5,7 @@
 # SPDX-License-Identifier:    MIT
 
 import pathlib
+from warnings import warn
 
 import adios2
 import basix
@@ -12,8 +13,11 @@ import dolfinx
 import numpy as np
 import ufl
 from mpi4py import MPI
-from .comm_helpers import send_cells_and_receive_dofmap_index, send_dofs_and_receive_values, send_cells_and_cell_perms
-from .utils import compute_local_range, compute_dofmap_pos, index_owner
+
+from .comm_helpers import (send_cells_and_cell_perms,
+                           send_cells_and_receive_dofmap_index,
+                           send_dofs_and_receive_values)
+from .utils import compute_dofmap_pos, compute_local_range, index_owner
 
 __all__ = ["write_mesh", "read_mesh", "write_function", "read_function",
            "write_mesh_perm", "read_function_perm"]
@@ -127,6 +131,7 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: pathlib.Path, engine: str = "B
         filename: Path to save mesh (without file-extension)
         engine: Adios2 Engine
     """
+    warn("This function will be removed in the next release", DeprecationWarning)
     num_xdofs_local = mesh.geometry.index_map().size_local
     num_xdofs_global = mesh.geometry.index_map().size_global
     local_range = mesh.geometry.index_map().local_range
@@ -317,6 +322,7 @@ def write_function(u: dolfinx.fem.Function, filename: pathlib.Path, engine: str 
 
 
 def read_function(u: dolfinx.fem.Function, filename: pathlib.Path, engine: str = "BP4"):
+    warn("This function will be depcrecated in the next release", DeprecationWarning)
     V = u.function_space
     mesh = u.function_space.mesh
     comm = mesh.comm
