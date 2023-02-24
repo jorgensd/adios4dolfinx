@@ -198,13 +198,13 @@ def send_cells_and_cell_perms(filename: pathlib.Path, comm: MPI.Intracomm,
     input_local_cell_index = inc_cells - local_input_range[0]
 
     # Read input cell permutations
-    input_perms = read_cell_perms(comm, filename, "CellPermutations", num_cells_global, engine)
-
-    # First invert input data to reference element then transform to current mesh
-    for i, l_cell in enumerate(input_local_cell_index):
-        start, end = input_dofmap.offsets[l_cell], input_dofmap.offsets[l_cell+1]
-        element.apply_inverse_dof_transformation(local_values[start:end], input_perms[l_cell], bs)
-        element.apply_dof_transformation(local_values[start:end], inc_perm[i], bs)
+    if element.needs_dof_transformations:
+        input_perms = read_cell_perms(comm, filename, "CellPermutations", num_cells_global, engine)
+        # First invert input data to reference element then transform to current mesh
+        for i, l_cell in enumerate(input_local_cell_index):
+            start, end = input_dofmap.offsets[l_cell], input_dofmap.offsets[l_cell+1]
+            element.apply_inverse_dof_transformation(local_values[start:end], input_perms[l_cell], bs)
+            element.apply_dof_transformation(local_values[start:end], inc_perm[i], bs)
 
     # For each dof owned by a process, find the local position in the dofmap.
     V = u.function_space
