@@ -188,7 +188,7 @@ def send_cells_and_cell_perms(filename: pathlib.Path, comm: MPI.Intracomm,
     # NOTE: USE NBX in C++
     unique_dof_owners = np.unique(dof_owner)
     mesh_to_dof_comm = comm.Create_dist_graph(
-        [comm.rank], [len(unique_dof_owners)], unique_dof_owners, reorder=False)
+        [comm.rank], [len(unique_dof_owners)], unique_dof_owners.tolist(), reorder=False)
     dof_source, dof_dest, _ = mesh_to_dof_comm.Get_dist_neighbors()
 
     local_values = send_dofs_and_receive_values(filename, "Values", engine,
