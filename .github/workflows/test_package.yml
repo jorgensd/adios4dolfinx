@@ -49,7 +49,7 @@ jobs:
       BASIX_BRANCH: "main"
       UFL_BRANCH:  "main"
       FFCX_BRANCH: "main"
- 
+      PETSC_ARCH: "linux-gnu-real-32"
     steps:
       - uses: actions/checkout@v3
 
