@@ -35,7 +35,7 @@ def compute_local_range(comm: MPI.Intracomm, N: np.int64):
         return [rank*n+r, (rank+1)*n + r]
 
 
-def index_owner(comm: MPI.Intracomm, indices: npt.NDArray[np.int64], N: int) -> npt.NDArray[np.int32]:
+def index_owner(comm: MPI.Intracomm, indices: npt.NDArray[np.int64], N: np.int64) -> npt.NDArray[np.int32]:
     """
     Find which rank (local to comm) which owns an `index`, given that
     data of size `N` has been split equally among the ranks.

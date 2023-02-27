@@ -1,10 +1,12 @@
-import pytest
-import dolfinx
-import adios4dolfinx
-import numpy as np
-from mpi4py import MPI
-import ufl
 import pathlib
+
+import dolfinx
+import numpy as np
+import pytest
+import ufl
+from mpi4py import MPI
+
+import adios4dolfinx
 
 
 def write_function(mesh, el, f) -> str:
@@ -12,22 +14,25 @@ def write_function(mesh, el, f) -> str:
     u = dolfinx.fem.Function(V)
     u.interpolate(f)
     el_hash = V.element.signature().replace(' ', '').replace(',', '').replace("(", "").replace(')', "")
+    filename = pathlib.Path(f"output/mesh{el_hash}.bp")
     if mesh.comm.size != 1:
-        adios4dolfinx.write_mesh(mesh, pathlib.Path(f"output/mesh{el_hash}.bp"))
-        adios4dolfinx.write_function(u, pathlib.Path(f"output/mesh{el_hash}.bp",))
+        adios4dolfinx.write_mesh_perm(mesh, filename)
+        adios4dolfinx.write_function(u, filename)
 
     else:
         if MPI.COMM_WORLD.rank == 0:
-            adios4dolfinx.write_mesh(mesh, pathlib.Path(f"output/mesh{el_hash}.bp"))
-            adios4dolfinx.write_function(u, pathlib.Path(f"output/mesh{el_hash}.bp"))
+            adios4dolfinx.write_mesh_perm(mesh, filename)
+            adios4dolfinx.write_function(u, filename)
     return el_hash
 
 
 def read_function(comm, el, f, hash):
-    mesh = adios4dolfinx.read_mesh(comm, f"output/mesh{hash}.bp", "BP4", dolfinx.mesh.GhostMode.shared_facet)
+    filename = f"output/mesh{hash}.bp"
+    engine = "BP4"
+    mesh = adios4dolfinx.read_mesh(comm, filename, engine, dolfinx.mesh.GhostMode.shared_facet)
     V = dolfinx.fem.FunctionSpace(mesh, el)
     v = dolfinx.fem.Function(V)
-    adios4dolfinx.read_function(v, f"output/mesh{hash}.bp")
+    adios4dolfinx.read_function_perm(v, filename, engine)
     v_ex = dolfinx.fem.Function(V)
     v_ex.interpolate(f)
     assert np.allclose(v.x.array, v_ex.x.array)
@@ -40,7 +45,7 @@ def read_function(comm, el, f, hash):
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
 @pytest.mark.parametrize("write_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
 def test_read_write_P_2D(read_comm, write_comm, family, degree, cell_type):
-    mesh = dolfinx.mesh.create_unit_square(write_comm, 10, 10, cell_type=cell_type)
+    mesh = dolfinx.mesh.create_unit_square(write_comm, 5, 5, cell_type=cell_type)
     el = ufl.VectorElement(family, mesh.ufl_cell(), degree)
 
     def f(x):
@@ -75,9 +80,7 @@ def test_read_write_P_3D(read_comm, write_comm, family, degree, cell_type):
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
 @pytest.mark.parametrize("write_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
 def test_read_write_2D(read_comm, write_comm, family, degree, cell_type):
-    if read_comm.size > 1 or write_comm.size > 1:
-        pytest.xfail("Edge based elements not supported in parallel")
-    mesh = dolfinx.mesh.create_unit_square(write_comm, 1, 1, cell_type=cell_type)
+    mesh = dolfinx.mesh.create_unit_square(write_comm, 10, 10, cell_type=cell_type)
     el = ufl.FiniteElement(family, mesh.ufl_cell(), degree)
 
     def f(x):
@@ -93,9 +96,7 @@ def test_read_write_2D(read_comm, write_comm, family, degree, cell_type):
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
 @pytest.mark.parametrize("write_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
 def test_read_write_3D(read_comm, write_comm, family, degree):
-    if read_comm.size > 1 or write_comm.size > 1:
-        pytest.xfail("Edge based elements not supported in parallel")
-    mesh = dolfinx.mesh.create_unit_cube(write_comm, 1, 1, 1)
+    mesh = dolfinx.mesh.create_unit_cube(write_comm, 3, 5, 7)
     el = ufl.FiniteElement(family, mesh.ufl_cell(), degree)
 
     def f(x):
@@ -112,9 +113,7 @@ def test_read_write_3D(read_comm, write_comm, family, degree):
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
 @pytest.mark.parametrize("write_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
 def test_read_write_2D_quad(read_comm, write_comm, family, degree, cell_type):
-    if read_comm.size > 1 or write_comm.size > 1:
-        pytest.xfail("Edge based elements not supported in parallel")
-    mesh = dolfinx.mesh.create_unit_square(write_comm, 3, 3, cell_type=cell_type)
+    mesh = dolfinx.mesh.create_unit_square(write_comm, 5, 7, cell_type=cell_type)
     el = ufl.FiniteElement(family, mesh.ufl_cell(), degree)
 
     def f(x):
@@ -130,9 +129,7 @@ def test_read_write_2D_quad(read_comm, write_comm, family, degree, cell_type):
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
 @pytest.mark.parametrize("write_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
 def test_read_write_hex(read_comm, write_comm, family, degree):
-    if read_comm.size > 1 or write_comm.size > 1:
-        pytest.xfail("Edge based elements not supported in parallel")
-    mesh = dolfinx.mesh.create_unit_cube(write_comm, 1, 1, 1, cell_type=dolfinx.mesh.CellType.hexahedron)
+    mesh = dolfinx.mesh.create_unit_cube(write_comm, 3, 7, 5, cell_type=dolfinx.mesh.CellType.hexahedron)
     el = ufl.FiniteElement(family, mesh.ufl_cell(), degree)
 
     def f(x):

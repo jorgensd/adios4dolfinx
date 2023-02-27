@@ -28,6 +28,5 @@ Only checkpoints for `Lagrange` or `DG` functions are supported from legacy DOLF
 
 ### DOLFINx
 - Reading and writing meshes
-- Reading checkpoints for Lagrange/DG elements (serial and parallel, one checkpoint per file)
-- Reading checkpoints for edge based elements (serial only, one checkpoint per file)
+- Reading checkpoints for any element (serial and parallel, one checkpoint per file). Use `write_mesh_perm` and `read_function_perm` if you work with elements that need dof transformations.
 _________________
