@@ -45,7 +45,7 @@ jobs:
     env: 
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
       PYTHONPATH: /usr/local/lib/python3/dist-packages:/usr/local/lib:/usr/local/dolfinx-real/lib/python3.10/dist-packages
-      DOLFINX_BRANCH: "dokken/inverse_transform_python"
+      DOLFINX_BRANCH: "main"
       BASIX_BRANCH: "main"
       UFL_BRANCH:  "main"
       FFCX_BRANCH: "main"
