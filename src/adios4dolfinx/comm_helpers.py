@@ -7,7 +7,7 @@ from mpi4py import MPI
 
 from .utils import compute_local_range, find_first
 
-__all__ = ["send_dofs_and_receive_values", "send_and_recv_cell_perm", "send_dofs_and_recv_values"]
+__all__ = ["send_dofmap_and_recv_values", "send_and_recv_cell_perm", "send_dofs_and_recv_values"]
 """
 Helpers for sending and receiving values for checkpointing
 """

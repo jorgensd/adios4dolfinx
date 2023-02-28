@@ -5,7 +5,6 @@
 # SPDX-License-Identifier:    MIT
 
 import pathlib
-from warnings import warn
 
 import adios2
 import basix
@@ -144,7 +143,7 @@ def read_function(u: dolfinx.fem.Function, filename: pathlib.Path, engine: str =
             element.apply_inverse_transpose_dof_transformation(recv_array[start:end], inc_perms[i], bs)
 
     # ------------------Step 6----------------------------------------
-     # For each dof owned by a process, find the local position in the dofmap.
+    # For each dof owned by a process, find the local position in the dofmap.
     V = u.function_space
     local_cells, dof_pos = compute_dofmap_pos(V)
     input_cells = V.mesh.topology.original_cell_index[local_cells]
@@ -156,7 +155,9 @@ def read_function(u: dolfinx.fem.Function, filename: pathlib.Path, engine: str =
         [V.mesh.comm.rank], [len(unique_owners)], unique_owners, reorder=False)
     source, dest, _ = sub_comm.Get_dist_neighbors()
 
-    owned_values = send_dofmap_and_recv_values(comm, np.asarray(source, dtype=np.int32), np.asarray(dest, dtype=np.int32),
+    owned_values = send_dofmap_and_recv_values(comm,
+                                               np.asarray(source, dtype=np.int32),
+                                               np.asarray(dest, dtype=np.int32),
                                                owners, input_cells, dof_pos,
                                                num_cells_global, recv_array, input_dofmap.offsets)
 
