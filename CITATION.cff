@@ -5,5 +5,5 @@ authors:
   given-names: "Jørgen S."
   orcid: "0000-0001-6489-8858"
 title: "ADIOS2Wrappers"
-version: "0.1.0"
+version: "0.2.1"
 date-released: 2023-03-02
