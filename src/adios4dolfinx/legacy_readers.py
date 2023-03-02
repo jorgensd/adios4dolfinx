@@ -39,7 +39,8 @@ def read_dofmap_legacy(comm: MPI.Intracomm, filename: pathlib.Path,
         num_cells_global: Number of cells in the global mesh
         engine: ADIOS2 engine type
         cells: Cells (global index) that contain a degree of freedom
-        dof_pos: Each entry `dof_pos[i]` corresponds to the local position in the `input_dofmap.links(cells[i])[dof_pos[i]]`
+        dof_pos: Each entry `dof_pos[i]` corresponds to the local position in the
+        `input_dofmap.links(cells[i])[dof_pos[i]]`
 
     Returns:
         The global dof index in the input data for each dof described by the (cells[i], dof_pos[i]) tuples.

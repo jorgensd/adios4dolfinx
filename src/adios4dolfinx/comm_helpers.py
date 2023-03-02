@@ -35,7 +35,8 @@ def send_dofmap_and_recv_values(comm: MPI.Intracomm,
         input_cells: A cell associated with the degree of freedom sent (global index).
         dofmap_pos: The local position in the dofmap. I.e. `dof = dofmap.links(input_cells)[dofmap_pos]`
         num_cells_global: Number of global cells
-        values: Values currently held by this process. These are ordered (num_cells_local, num_dofs_per_cell), flattened row-major.
+        values: Values currently held by this process. These are ordered (num_cells_local, num_dofs_per_cell),
+            flattened row-major.
         dofmap_offsets: Local dofmap offsets to access the correct `values`.
 
     Returns:
@@ -190,7 +191,7 @@ def send_dofs_and_recv_values(input_dofmap: npt.NDArray[np.int64],
                               dofmap_owners: npt.NDArray[np.int32],
                               comm: MPI.Intracomm,
                               input_array: npt.NDArray[np.float64],
-                              array_start: np.int64):
+                              array_start: int):
     """
     Send a set of dofs (global index) to the process holding the DOF values to retrieve them.
 
