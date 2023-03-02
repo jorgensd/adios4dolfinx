@@ -89,6 +89,14 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: pathlib.Path, engine: str = "B
 
 
 def read_function(u: dolfinx.fem.Function, filename: pathlib.Path, engine: str = "BP4"):
+    """
+    Read checkpoint from file and fill it into `u`.
+
+    Args:
+        u: Function to fill
+        filename: Path to checkpoint
+        engine: ADIOS engine type used for reading
+    """
     mesh = u.function_space.mesh
     comm = mesh.comm
 
@@ -168,7 +176,7 @@ def read_function(u: dolfinx.fem.Function, filename: pathlib.Path, engine: str =
 def read_mesh(comm: MPI.Intracomm, file: pathlib.Path, engine: str,
               ghost_mode: dolfinx.mesh.GhostMode) -> dolfinx.mesh.Mesh:
     """
-    Read a ADIOS2 mesh into DOLFINx.
+    Read an ADIOS2 mesh into DOLFINx.
 
     Args:
         comm: The MPI communciator to distribute the mesh over
@@ -238,6 +246,13 @@ def read_mesh(comm: MPI.Intracomm, file: pathlib.Path, engine: str,
 def write_function(u: dolfinx.fem.Function, filename: pathlib.Path, engine: str = "BP4",
                    mode: adios2.Mode = adios2.Mode.Append):
     """
+    Write function checkpoint to file.
+
+    Args:
+        u: Function to write to file
+        filename: Path to write to
+        egine: ADIOS2 engine
+        mode: Write or append.
     """
     dofmap = u.function_space.dofmap
     values = u.x.array

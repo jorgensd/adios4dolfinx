@@ -32,6 +32,18 @@ def read_dofmap_legacy(comm: MPI.Intracomm, filename: pathlib.Path,
     Read dofmap with given communicator, split in continuous chunks based on number of
     cells in the mesh (global).
 
+    Args:
+        comm: MPI communicator
+        filename: Path to input file
+        dofmap: Variable name for dofmap
+        num_cells_global: Number of cells in the global mesh
+        engine: ADIOS2 engine type
+        cells: Cells (global index) that contain a degree of freedom
+        dof_pos: Each entry `dof_pos[i]` corresponds to the local position in the `input_dofmap.links(cells[i])[dof_pos[i]]`
+
+    Returns:
+        The global dof index in the input data for each dof described by the (cells[i], dof_pos[i]) tuples.
+
     .. note::
         No MPI communication is done during this call
     """
@@ -239,7 +251,6 @@ def read_mesh_from_legacy_checkpoint(
         filename: Path to `h5` file (with extension)
         celltype: String describing cell-type
     """
-
     adios = adios2.ADIOS(MPI.COMM_WORLD)
     io = adios.DeclareIO("Mesh reader")
     io.SetEngine("HDF5")
@@ -289,7 +300,8 @@ def read_function_from_legacy_h5(comm: MPI.Intracomm, filename: pathlib.Path,
                                  u: dolfinx.fem.Function):
     V = u.function_space
     mesh = u.function_space.mesh
-
+    if u.function_space.element.needs_dof_transformations:
+        raise RuntimeError("Function-spaces requiring dof permutations are not compatible with legacy data")
     # ----------------------Step 1---------------------------------
     # Compute index of input cells, and position in input dofmap
     local_cells, dof_pos = compute_dofmap_pos(u.function_space)

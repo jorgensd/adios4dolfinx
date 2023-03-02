@@ -25,6 +25,21 @@ def send_dofmap_and_recv_values(comm: MPI.Intracomm,
     """
     Given a set of positions in input dofmap, give the global input index of this dofmap entry
     in input file.
+
+    Args:
+        comm: The MPI communicator to create the Neighbourhood-communicator from
+        source_ranks: Ranks that will send dofmap indices to current process
+        dest_ranks: Ranks that will receive dofmap indices from current process
+        output_owners: The owners of each dofmap entry on this process. The unique set of these entries
+            should be the same as the dest_ranks.
+        input_cells: A cell associated with the degree of freedom sent (global index).
+        dofmap_pos: The local position in the dofmap. I.e. `dof = dofmap.links(input_cells)[dofmap_pos]`
+        num_cells_global: Number of global cells
+        values: Values currently held by this process. These are ordered (num_cells_local, num_dofs_per_cell), flattened row-major.
+        dofmap_offsets: Local dofmap offsets to access the correct `values`.
+
+    Returns:
+        Values corresponding to the dofs owned by this process.
     """
 
     # Compute amount of data to send to each process
@@ -171,7 +186,21 @@ def send_and_recv_cell_perm(cells: npt.NDArray[np.int64],
     return inc_cells, inc_perm
 
 
-def send_dofs_and_recv_values(input_dofmap, dofmap_owners, comm, input_array, array_start):
+def send_dofs_and_recv_values(input_dofmap: npt.NDArray[np.int64],
+                              dofmap_owners: npt.NDArray[np.int32],
+                              comm: MPI.Intracomm,
+                              input_array: npt.NDArray[np.float64],
+                              array_start: np.int64):
+    """
+    Send a set of dofs (global index) to the process holding the DOF values to retrieve them.
+
+    Args:
+        input_dofmap: List of dofs (global index) that this process wants values for
+        dofmap_owners: The process currently holding the values this process want to get.
+        comm: MPI communicator
+        input_array: Values for dofs
+        array_start: The global starting index of `input_array`.
+    """
     dest_ranks = np.unique(dofmap_owners)
     dofmap_to_values = comm.Create_dist_graph([comm.rank], [len(dest_ranks)], dest_ranks.tolist(), reorder=False)
 
