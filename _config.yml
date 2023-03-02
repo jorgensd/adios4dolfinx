@@ -33,4 +33,7 @@ sphinx:
   - 'sphinx.ext.napoleon'
   - 'sphinx.ext.viewcode'
 
+  config:
+    html_last_updated_fmt: "%b %d, %Y"
+
 exclude_patterns: [".pytest_cache/*"]
