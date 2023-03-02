@@ -8,12 +8,10 @@
 from importlib.metadata import metadata
 
 from .checkpointing import (read_function, read_mesh, write_function,
-                            write_mesh, write_mesh_perm, read_function_perm)
+                            write_mesh)
 from .legacy_readers import (read_function_from_legacy_h5,
                              read_mesh_from_legacy_checkpoint,
                              read_mesh_from_legacy_h5)
-from .utils import (compute_dofmap_pos, compute_local_range, find_first,
-                    index_owner)
 
 meta = metadata("adios4dolfinx")
 __version__ = meta["Version"]
@@ -24,6 +22,4 @@ __program_name__ = meta["Name"]
 
 __all__ = ["read_mesh", "write_mesh", "read_function_from_legacy_h5",
            "read_mesh_from_legacy_checkpoint", "read_mesh_from_legacy_h5",
-           "compute_local_range", "index_owner", "compute_dofmap_pos", "find_first",
-           "read_function_from_legacy_h5", "write_function", "read_function", "write_mesh_perm",
-           "read_function_perm"]
+           "read_function_from_legacy_h5", "write_function", "read_function"]

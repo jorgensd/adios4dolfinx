@@ -16,12 +16,12 @@ def write_function(mesh, el, f) -> str:
     el_hash = V.element.signature().replace(' ', '').replace(',', '').replace("(", "").replace(')', "")
     filename = pathlib.Path(f"output/mesh{el_hash}.bp")
     if mesh.comm.size != 1:
-        adios4dolfinx.write_mesh_perm(mesh, filename)
+        adios4dolfinx.write_mesh(mesh, filename)
         adios4dolfinx.write_function(u, filename)
 
     else:
         if MPI.COMM_WORLD.rank == 0:
-            adios4dolfinx.write_mesh_perm(mesh, filename)
+            adios4dolfinx.write_mesh(mesh, filename)
             adios4dolfinx.write_function(u, filename)
     return el_hash
 
@@ -32,7 +32,7 @@ def read_function(comm, el, f, hash):
     mesh = adios4dolfinx.read_mesh(comm, filename, engine, dolfinx.mesh.GhostMode.shared_facet)
     V = dolfinx.fem.FunctionSpace(mesh, el)
     v = dolfinx.fem.Function(V)
-    adios4dolfinx.read_function_perm(v, filename, engine)
+    adios4dolfinx.read_function(v, filename, engine)
     v_ex = dolfinx.fem.Function(V)
     v_ex.interpolate(f)
     assert np.allclose(v.x.array, v_ex.x.array)
