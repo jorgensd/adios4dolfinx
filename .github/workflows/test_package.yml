@@ -10,97 +10,59 @@ on:
     branches:
       - main
 
+  workflow_call:
+  workflow_dispatch:
   schedule:
     # The CI is executed every day at 8am
     - cron: "0 8 * * *"
 
-
-env:
-  data_dir: "legacy"
-
 jobs:
 
   create-datasets:
-    runs-on: "ubuntu-22.04"
-    container: ghcr.io/scientificcomputing/fenics:test_2023.1.0
+    uses: ./.github/workflows/create_legacy_data.yml
 
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Create datasets
-        run: python3 ./tests/create_legacy_data.py --output-dir=$data_dir
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: ${{ env.data_dir }}
-          path: ./${{ env.data_dir }}
-
-
+  check-formatting:
+    uses: ./.github/workflows/check_formatting.yml
 
   test-code:
     runs-on: "ubuntu-22.04"
-    needs: create-datasets
-    container: ghcr.io/fenics/test-env:nightly-mpich
-    # ghcr.io/fenics/dolfinx/dolfinx:nightly
+    needs: [create-datasets, check-formatting]
+    container: ghcr.io/fenics/dolfinx/dolfinx:nightly
     env: 
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
       PYTHONPATH: /usr/local/lib/python3/dist-packages:/usr/local/lib:/usr/local/dolfinx-real/lib/python3.10/dist-packages
-      DOLFINX_BRANCH: "main"
-      BASIX_BRANCH: "main"
-      UFL_BRANCH:  "main"
-      FFCX_BRANCH: "main"
-      PETSC_ARCH: "linux-gnu-real-32"
+
     steps:
       - uses: actions/checkout@v3
 
       - name: Update pip
         run: python3 -m pip install --upgrade pip setuptools
 
-      - name: Get Basix
-        uses: actions/checkout@v3
-        with:
-          path: ./basix
-          repository: FEniCS/basix
-          ref: ${{ env.BASIX_BRANCH }}
-
-      - name: Install UFL, Basix, FFCx
-        run: |
-          cmake -G Ninja -B build-basix -DCMAKE_BUILD_TYPE="Release" -S ./basix/cpp/
-          cmake --build build-basix --parallel 3
-          cmake --install build-basix
-          BUILD_TYPE="Release" python3 -m pip install ./basix/python
-          python3 -m pip install git+https://github.com/FEniCS/ufl.git@${{ env.UFL_BRANCH }}
-          python3 -m pip install git+https://github.com/FEniCS/ffcx.git@${{ env.FFCX_BRANCH }}
-
-      - name: Get DOLFINx
-        uses: actions/checkout@v3
-        with:
-          path: ./dolfinx
-          repository: FEniCS/dolfinx
-          ref: ${{ env.DOLFINX_BRANCH }}
-
-      - name: Configure C++ (DOLFINx)
-        run:
-          cmake -G Ninja -DCMAKE_BUILD_TYPE="Release" -B build-dolfinx -S ./dolfinx/cpp/
-
-      - name: Build and install C++ library (DOLFINx)
-        run: |
-          cmake --build build-dolfinx
-          cmake --install build-dolfinx
-      - name: Build Python interface (dolfinx)
-        run: BUILD_TYPE="Release" python3 -m pip -v install ./dolfinx/python/
-
       - name: Download legacy data
         uses: actions/download-artifact@v3
         with:
-          name: ${{ env.data_dir }}
-          path: ./${{ env.data_dir }}
+          name: legacy
+          path: ./legacy
   
       - name: Install package
         run: python3 -m pip install .[test]
 
       - name: Run tests
-        run: python3 -m pytest
+        run: coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
 
       - name: Run tests in parallel
-        run: mpirun -n 2 python3 -m pytest
+        run: mpirun -n 2 coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
+
+       
+      - name: Combine coverage reports
+        run: |
+          coverage combine
+          coverage report -m
+          coverage html
+
+      - name: Upload coverage report as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: code-coverage-report
+          path: htmlcov
+          if-no-files-found: error

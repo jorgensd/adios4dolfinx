@@ -131,3 +131,10 @@ dmypy.json
 _build/
 
 output/
+
+*.h5
+.coverage.*
+.coverage
+*.h5
+*.xdmf
+*.bp/

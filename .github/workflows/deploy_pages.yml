@@ -1,0 +1,61 @@
+name: Github Pages
+
+on:
+  push:
+    branches: [main]
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:  
+  build-docs:
+    uses: ./.github/workflows/build_docs.yml
+
+  run-coverage:
+    uses: ./.github/workflows/test_package.yml
+
+  deploy:
+    needs: [run-coverage, build-docs]
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download docs artifact
+        # docs artifact is uploaded by build-docs job
+        uses: actions/download-artifact@v3
+        with:
+          name: documentation
+          path: "./public"
+
+      - name: Download docs artifact
+        # docs artifact is uploaded by build-docs job
+        uses: actions/download-artifact@v3
+        with:
+          name: code-coverage-report
+          path: "./public/code-coverage-report"
+  
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: "./public"
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v2
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1
