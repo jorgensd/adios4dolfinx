@@ -2,24 +2,10 @@
 name: Deploy static content to Pages
 
 on:
-  # Runs on pushes targeting the default branch
-  push:
-    branches:
-    - "**"
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-# Allow one concurrent deployment
-concurrency:
-  group: "pages"
-  cancel-in-progress: true
+  workflow_call:
 
 env:
   # Directory that will be published on github pages
@@ -41,38 +27,18 @@ jobs:
       - name: Update pip
         run: python3 -m pip install --upgrade pip setuptools
 
-      - name: Update pip
-        run: python3 -m pip install --upgrade pip setuptools
-
       - name: Install dependencies
-        run: python3 -m pip install ".[docs]"
+        run: python3 -m pip install -e ".[docs]"
 
       - name: Build docs
         run: jupyter book build -W .
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
+      - name: Upload documentation as artifact
+        uses: actions/upload-artifact@v3
         with:
+          name: documentation
           path: ${{ env.PUBLISH_DIR }}
-
-  # Single deploy job since we're just deploying
-  deploy:
-    if: github.ref == 'refs/heads/main'
-    needs: build-docs
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v2
+          if-no-files-found: error
 
 
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v1
+ 
