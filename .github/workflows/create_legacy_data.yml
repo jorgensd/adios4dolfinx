@@ -8,10 +8,9 @@ env:
 
 
 jobs:
-
-  runs-on: "ubuntu-22.04"
-  container: ghcr.io/scientificcomputing/fenics:test_2023.1.0
   create-data:
+    runs-on: "ubuntu-22.04"
+    container: ghcr.io/scientificcomputing/fenics:test_2023.1.0
     steps:
       - uses: actions/checkout@v3
 
