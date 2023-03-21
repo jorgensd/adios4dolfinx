@@ -15,6 +15,7 @@ on:
   schedule:
     # The CI is executed every day at 8am
     - cron: "0 8 * * *"
+
 jobs:
 
   create-datasets:

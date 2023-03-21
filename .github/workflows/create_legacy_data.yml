@@ -9,13 +9,15 @@ env:
 runs-on: "ubuntu-22.04"
 container: ghcr.io/scientificcomputing/fenics:test_2023.1.0
 
-steps:
-  - uses: actions/checkout@v3
+jobs:
+  create-data:
+    steps:
+      - uses: actions/checkout@v3
 
-  - name: Create datasets
-    run: python3 ./tests/create_legacy_data.py --output-dir=$data_dir
+      - name: Create datasets
+        run: python3 ./tests/create_legacy_data.py --output-dir=$data_dir
 
-  - uses: actions/upload-artifact@v3
-    with:
-      name: ${{ env.data_dir }}
-      path: ./${{ env.data_dir }}
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.data_dir }}
+          path: ./${{ env.data_dir }}
