@@ -8,7 +8,8 @@ import ufl
 import numpy as np
 
 
-@pytest.mark.parametrize("encoder, suffix", [("BP4", ".bp"), ("HDF5", ".h5"), ("BP5", ".bp")])
+@pytest.mark.parametrize("encoder, suffix", [("BP4", ".bp"), ("HDF5", ".h5")])
+# , ("BP5", ".bp")]) # Deactivated, see: https://github.com/jorgensd/adios4dolfinx/issues/7
 @pytest.mark.parametrize("ghost_mode", [dolfinx.mesh.GhostMode.shared_facet])
 def test_mesh_read_writer(encoder, suffix, ghost_mode):
 
@@ -16,26 +17,25 @@ def test_mesh_read_writer(encoder, suffix, ghost_mode):
     file = pathlib.Path(f"output/adios_mesh_{encoder}")
     xdmf_file = pathlib.Path("output/xdmf_mesh")
     mesh = dolfinx.mesh.create_unit_cube(MPI.COMM_WORLD, N, N, N, ghost_mode=ghost_mode)
-    MPI.COMM_WORLD.Barrier()
 
     start = time.perf_counter()
     write_mesh(mesh, file.with_suffix(suffix), encoder)
     end = time.perf_counter()
     print(f"Write ADIOS2 mesh: {end-start}")
 
-    MPI.COMM_WORLD.Barrier()
+    mesh.comm.Barrier()
     start = time.perf_counter()
     with dolfinx.io.XDMFFile(mesh.comm, xdmf_file.with_suffix(".xdmf"), "w") as xdmf:
         xdmf.write_mesh(mesh)
     end = time.perf_counter()
     print(f"Write XDMF mesh: {end-start}")
-    MPI.COMM_WORLD.Barrier()
+    mesh.comm.Barrier()
 
     start = time.perf_counter()
     mesh_adios = read_mesh(MPI.COMM_WORLD, file.with_suffix(suffix), encoder, ghost_mode)
     end = time.perf_counter()
     print(f"Read ADIOS2 mesh: {end-start}")
-    MPI.COMM_WORLD.Barrier()
+    mesh.comm.Barrier()
 
     start = time.perf_counter()
     with dolfinx.io.XDMFFile(mesh.comm, xdmf_file.with_suffix(".xdmf"), "r") as xdmf:
