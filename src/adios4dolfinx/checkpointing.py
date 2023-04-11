@@ -51,8 +51,10 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: pathlib.Path, engine: str = "B
     io.DefineAttribute("CellType", mesh.topology.cell_name())
 
     # Write basix properties
-    io.DefineAttribute("Degree", np.array([mesh.geometry.cmap.degree], dtype=np.int32))
-    io.DefineAttribute("LagrangeVariant",  np.array([mesh.geometry.cmap.variant], dtype=np.int32))
+    cmaps = mesh.geometry.cmaps
+    assert len(cmaps) == 1, "Does not support mixed cell type"
+    io.DefineAttribute("Degree", np.array([mesh.geometry.cmaps[0].degree], dtype=np.int32))
+    io.DefineAttribute("LagrangeVariant",  np.array([mesh.geometry.cmaps[0].variant], dtype=np.int32))
 
     # Write topology
     g_imap = mesh.geometry.index_map()
@@ -61,7 +63,7 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: pathlib.Path, engine: str = "B
     num_cells_global = mesh.topology.index_map(
         mesh.topology.dim).size_global
     start_cell = mesh.topology.index_map(mesh.topology.dim).local_range[0]
-    geom_layout = mesh.geometry.cmap.create_dof_layout()
+    geom_layout = mesh.geometry.cmaps[0].create_dof_layout()
     num_dofs_per_cell = geom_layout.num_entity_closure_dofs(
         mesh.geometry.dim)
 
