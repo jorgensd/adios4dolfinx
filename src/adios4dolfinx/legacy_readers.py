@@ -234,9 +234,9 @@ def read_mesh_from_legacy_h5(comm: MPI.Intracomm,
     assert adios.RemoveIO("Mesh reader")
 
     # Create DOLFINx mesh
-    element = basix.ufl_wrapper.create_vector_element(
+    element = basix.ufl.element(
         basix.ElementFamily.P, cell_type, 1, basix.LagrangeVariant.equispaced,
-        dim=mesh_geometry.shape[1], gdim=mesh_geometry.shape[1])
+        shape=(mesh_geometry.shape[1],), gdim=mesh_geometry.shape[1])
     domain = ufl.Mesh(element)
     return dolfinx.mesh.create_mesh(MPI.COMM_WORLD, mesh_topology, mesh_geometry, domain)
 
@@ -288,9 +288,9 @@ def read_mesh_from_legacy_checkpoint(
     assert adios.RemoveIO("Mesh reader")
 
     # Create DOLFINx mesh
-    element = basix.ufl_wrapper.create_vector_element(
+    element = basix.ufl.element(
         basix.ElementFamily.P, cell_type, 1, basix.LagrangeVariant.equispaced,
-        dim=mesh_geometry.shape[1], gdim=mesh_geometry.shape[1])
+        shape=(mesh_geometry.shape[1],), gdim=mesh_geometry.shape[1])
     domain = ufl.Mesh(element)
 
     return dolfinx.mesh.create_mesh(
