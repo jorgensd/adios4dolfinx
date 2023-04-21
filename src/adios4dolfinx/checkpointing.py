@@ -237,9 +237,9 @@ def read_mesh(comm: MPI.Intracomm, file: pathlib.Path, engine: str,
     assert adios.RemoveIO("MeshReader")
 
     # Create DOLFINx mesh
-    element = basix.ufl_wrapper.create_vector_element(
+    element = basix.ufl.element(
         basix.ElementFamily.P, cell_type, degree, basix.LagrangeVariant(lvar),
-        dim=mesh_geometry.shape[1], gdim=mesh_geometry.shape[1])
+        shape=(mesh_geometry.shape[1], ), gdim=mesh_geometry.shape[1])
     domain = ufl.Mesh(element)
     partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)
     return dolfinx.mesh.create_mesh(comm, mesh_topology, mesh_geometry, domain, partitioner)
