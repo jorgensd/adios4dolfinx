@@ -65,10 +65,7 @@ def compute_dofmap_pos(V: dolfinx.fem.FunctionSpace) -> Tuple[
     :returns: The tuple (`cells`, `dof_pos`) where each array is the size of the
         number of owned dofs (unrolled for block size)
     """
-    dof_adj = V.dofmap.list
-    dofs = dof_adj.array
-    offsets = dof_adj.offsets
-
+    dofs = V.dofmap.list
     mesh = V.mesh
     num_owned_cells = mesh.topology.index_map(mesh.topology.dim).size_local
     dofmap_bs = V.dofmap.bs
@@ -79,7 +76,7 @@ def compute_dofmap_pos(V: dolfinx.fem.FunctionSpace) -> Tuple[
     @numba.njit(cache=True)
     def compute_positions(local_cell: npt.NDArray[np.int32], dof_pos: npt.NDArray[np.int32],
                           dofs: npt.NDArray[np.int32],
-                          offsets: npt.NDArray[np.int32], dofmap_bs: int, num_owned_dofs: int,
+                          dofmap_bs: int, num_owned_dofs: int,
                           num_owned_cells: int):
         """
         Loop through each owned cell and every dof in that cell, and for all cells owned by the process
@@ -89,14 +86,14 @@ def compute_dofmap_pos(V: dolfinx.fem.FunctionSpace) -> Tuple[
         assert len(dof_pos) == num_owned_dofs
 
         for c in range(num_owned_cells):
-            for i, dof in enumerate(dofs[offsets[c]:offsets[c+1]]):
+            for i, dof in enumerate(dofs[c]):
                 for b in range(dofmap_bs):
                     local_dof = dof*dofmap_bs + b
                     if local_dof < num_owned_dofs:
                         local_cell[local_dof] = c
                         dof_pos[local_dof] = i*dofmap_bs + b
 
-    compute_positions(local_cell, dof_pos, dofs, offsets, dofmap_bs, num_owned_dofs, num_owned_cells)
+    compute_positions(local_cell, dof_pos, dofs, dofmap_bs, num_owned_dofs, num_owned_cells)
     return local_cell, dof_pos
 
 

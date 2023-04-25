@@ -65,14 +65,13 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: pathlib.Path, engine: str = "B
     start_cell = mesh.topology.index_map(mesh.topology.dim).local_range[0]
     geom_layout = mesh.geometry.cmaps[0].create_dof_layout()
     num_dofs_per_cell = geom_layout.num_entity_closure_dofs(
-        mesh.geometry.dim)
+        mesh.topology.dim)
 
     dofs_out = np.zeros(
         (num_cells_local, num_dofs_per_cell), dtype=np.int64)
-
+    assert g_dmap.shape[1] == num_dofs_per_cell
     dofs_out[:, :] = g_imap.local_to_global(
-        g_dmap.array[:num_cells_local * num_dofs_per_cell
-                     ]).reshape(num_cells_local, num_dofs_per_cell)
+        g_dmap[:num_cells_local, :].reshape(-1)).reshape(dofs_out.shape)
 
     dvar = io.DefineVariable(
         "Topology", dofs_out, shape=[num_cells_global, num_dofs_per_cell],
@@ -276,25 +275,22 @@ def write_function(u: dolfinx.fem.Function, filename: pathlib.Path, engine: str 
     outfile.Put(val_var, values[:num_dofs_local])
 
     # Convert local dofmap into global_dofmap
-    dmap = dofmap.list.array
-    off = dofmap.list.offsets
+    dmap = dofmap.list
+    num_dofs_per_cell = dmap.shape[1]
     dofmap_bs = dofmap.bs
     num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
-    num_dofs_local_dmap = dofmap.list.offsets[num_cells_local]*dofmap_bs
+    num_dofs_local_dmap = num_cells_local*num_dofs_per_cell*dofmap_bs
     dmap_loc = np.empty(num_dofs_local_dmap, dtype=np.int32)
     dmap_rem = np.empty(num_dofs_local_dmap, dtype=np.int32)
     index_map_bs = dofmap.index_map_bs
     # Unroll local dofmap and convert into index map index
-    num_dofs_per_cell = np.empty(num_cells_local, dtype=np.int64)
     for c in range(num_cells_local):
-        dofs = dmap[off[c]:off[c+1]]
-        num_dofs_per_cell[c] = len(dofs)*dofmap_bs
-        for i, dof in enumerate(dofs):
+        for i, dof in enumerate(dmap[c]):
             for b in range(dofmap_bs):
-                dmap_loc[(off[c]+i)*dofmap_bs+b] = (dof*dofmap_bs+b)//index_map_bs
-                dmap_rem[(off[c]+i)*dofmap_bs+b] = (dof*dofmap_bs+b) % index_map_bs
-    local_dofmap_offsets = np.zeros(num_cells_local+1, dtype=np.int64)
-    local_dofmap_offsets[1:] = np.cumsum(num_dofs_per_cell)
+                dmap_loc[(num_dofs_per_cell*c+i)*dofmap_bs+b] = (dof*dofmap_bs+b)//index_map_bs
+                dmap_rem[(num_dofs_per_cell*c+i)*dofmap_bs+b] = (dof*dofmap_bs+b) % index_map_bs
+    local_dofmap_offsets = np.arange(num_cells_local+1, dtype=np.int64)
+    local_dofmap_offsets[:] *= num_dofs_per_cell * dofmap_bs
     # Convert imap index to global index
     imap_global = dofmap.index_map.local_to_global(dmap_loc)
     dofmap_global = np.empty_like(dmap_loc, dtype=np.int64)
