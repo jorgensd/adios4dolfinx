@@ -32,14 +32,14 @@ jobs:
             password: ${{ secrets.GITHUB_TOKEN }}
   
     
-      - name: Echo branch name
-        if: ${{github.event_name}} == 'push'
+      - name: Echo branch name on push
+        if: ${{ github.event_name }} == 'push'
         run: |
           echo ${{ github.ref }} 
           echo ${{ github.event_name }}
 
       - name: Echo branch name
-        if: ${{github.event_name}} == 'pull_request'
+        if: ${{ github.event_name }} == 'pull_request'
         run: |
           echo ${{ github.ref }} 
           echo ${{ github.event_name }}
