@@ -33,9 +33,17 @@ jobs:
   
     
       - name: Echo branch name
+        if: ${{github.event_name}} == 'push'
         run: |
           echo ${{ github.ref }} 
           echo ${{ github.event_name }}
+
+      - name: Echo branch name
+        if: ${{github.event_name}} == 'pull_request'
+        run: |
+          echo ${{ github.ref }} 
+          echo ${{ github.event_name }}
+
     #   -
     #     name: Build and export to Docker
     #     uses: docker/build-push-action@v4
