@@ -68,7 +68,7 @@ def snapshot_checkpoint(uh: dolfinx.fem.Function, file: Path, mode: adios2.Mode)
         uh.x.scatter_forward()
 
     # Remove IO
-    adios.RemoveIO("shallow_cp_writer")
+    adios.RemoveIO(io_name)
 
 
 def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
