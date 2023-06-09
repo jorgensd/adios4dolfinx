@@ -15,9 +15,13 @@ Helpers reading/writing data with ADIOS2
 __all__ = ["read_array", "read_dofmap", "read_cell_perms"]
 
 
-def read_cell_perms(comm: MPI.Intracomm, filename: pathlib.Path,
-                    variable: str, num_cells_global: np.int64,
-                    engine: str) -> npt.NDArray[np.uint32]:
+def read_cell_perms(
+    comm: MPI.Intracomm,
+    filename: pathlib.Path,
+    variable: str,
+    num_cells_global: np.int64,
+    engine: str,
+) -> npt.NDArray[np.uint32]:
     """
     Read cell permutation from file with given communicator,
     Split in continuous chunks based on number of cells in the mesh (global).
@@ -59,8 +63,12 @@ def read_cell_perms(comm: MPI.Intracomm, filename: pathlib.Path,
 
     # Get local selection
     local_cell_range = compute_local_range(comm, num_cells_global)
-    perm_var.SetSelection([[local_cell_range[0]], [local_cell_range[1]-local_cell_range[0]]])
-    in_perm = np.empty(local_cell_range[1]-local_cell_range[0], dtype=perm_var.Type().strip("_t"))
+    perm_var.SetSelection(
+        [[local_cell_range[0]], [local_cell_range[1] - local_cell_range[0]]]
+    )
+    in_perm = np.empty(
+        local_cell_range[1] - local_cell_range[0], dtype=perm_var.Type().strip("_t")
+    )
     infile.Get(perm_var, in_perm, adios2.Mode.Sync)
     infile.EndStep()
 
@@ -69,9 +77,14 @@ def read_cell_perms(comm: MPI.Intracomm, filename: pathlib.Path,
     return in_perm
 
 
-def read_dofmap(comm: MPI.Intracomm, filename: pathlib.Path,
-                dofmap: str, dofmap_offsets: str, num_cells_global: np.int64,
-                engine: str) -> dolfinx.cpp.graph.AdjacencyList_int64:
+def read_dofmap(
+    comm: MPI.Intracomm,
+    filename: pathlib.Path,
+    dofmap: str,
+    dofmap_offsets: str,
+    num_cells_global: np.int64,
+    engine: str,
+) -> dolfinx.cpp.graph.AdjacencyList_int64:
     """
     Read dofmap with given communicator,
     split in continuous chunks based on number of cells in the mesh (global).
@@ -113,8 +126,13 @@ def read_dofmap(comm: MPI.Intracomm, filename: pathlib.Path,
     shape = d_offsets.Shape()
     assert len(shape) == 1
     # As the offsets are one longer than the number of cells, we need to read in with an overlap
-    d_offsets.SetSelection([[local_cell_range[0]], [local_cell_range[1]+1-local_cell_range[0]]])
-    in_offsets = np.empty(local_cell_range[1]+1-local_cell_range[0], dtype=d_offsets.Type().strip("_t"))
+    d_offsets.SetSelection(
+        [[local_cell_range[0]], [local_cell_range[1] + 1 - local_cell_range[0]]]
+    )
+    in_offsets = np.empty(
+        local_cell_range[1] + 1 - local_cell_range[0],
+        dtype=d_offsets.Type().strip("_t"),
+    )
     infile.Get(d_offsets, in_offsets, adios2.Mode.Sync)
 
     # Assuming dofmap is saved in stame step
@@ -122,8 +140,10 @@ def read_dofmap(comm: MPI.Intracomm, filename: pathlib.Path,
     if dofmap not in io.AvailableVariables().keys():
         raise KeyError(f"Dof offsets not found at {dofmap}")
     cell_dofs = io.InquireVariable(dofmap)
-    cell_dofs.SetSelection([[in_offsets[0]], [in_offsets[-1]-in_offsets[0]]])
-    in_dofmap = np.empty(in_offsets[-1]-in_offsets[0], dtype=cell_dofs.Type().strip("_t"))
+    cell_dofs.SetSelection([[in_offsets[0]], [in_offsets[-1] - in_offsets[0]]])
+    in_dofmap = np.empty(
+        in_offsets[-1] - in_offsets[0], dtype=cell_dofs.Type().strip("_t")
+    )
     infile.Get(cell_dofs, in_dofmap, adios2.Mode.Sync)
 
     in_dofmap = in_dofmap.astype(np.int64)
@@ -135,8 +155,9 @@ def read_dofmap(comm: MPI.Intracomm, filename: pathlib.Path,
     return dolfinx.graph.create_adjacencylist(in_dofmap, in_offsets.astype(np.int32))
 
 
-def read_array(filename: pathlib.Path, array_name: str, engine: str,
-               comm: MPI.Intracomm) -> Tuple[npt.NDArray[np.float64], int]:
+def read_array(
+    filename: pathlib.Path, array_name: str, engine: str, comm: MPI.Intracomm
+) -> Tuple[npt.NDArray[np.float64], int]:
     """
     Read an array from file, return the global starting position of the local array
 
@@ -165,9 +186,9 @@ def read_array(filename: pathlib.Path, array_name: str, engine: str,
     arr_shape = arr.Shape()
     assert len(arr_shape) == 1
     arr_range = compute_local_range(comm, arr_shape[0])
-    assert (arr_range[0] == arr_range[0])
-    arr.SetSelection([[arr_range[0]], [arr_range[1]-arr_range[0]]])
-    vals = np.empty(arr_range[1]-arr_range[0], dtype=np.dtype(arr.Type().strip("_t")))
+    assert arr_range[0] == arr_range[0]
+    arr.SetSelection([[arr_range[0]], [arr_range[1] - arr_range[0]]])
+    vals = np.empty(arr_range[1] - arr_range[0], dtype=np.dtype(arr.Type().strip("_t")))
     infile.Get(arr, vals, adios2.Mode.Sync)
     infile.EndStep()
     adios.RemoveIO("ArrayReader")

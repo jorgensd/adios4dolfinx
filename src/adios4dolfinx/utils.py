@@ -30,12 +30,14 @@ def compute_local_range(comm: MPI.Intracomm, N: np.int64):
     r = N % size
     # First r processes has one extra value
     if rank < r:
-        return [rank*(n+1), (rank+1)*(n+1)]
+        return [rank * (n + 1), (rank + 1) * (n + 1)]
     else:
-        return [rank*n+r, (rank+1)*n + r]
+        return [rank * n + r, (rank + 1) * n + r]
 
 
-def index_owner(comm: MPI.Intracomm, indices: npt.NDArray[np.int64], N: np.int64) -> npt.NDArray[np.int32]:
+def index_owner(
+    comm: MPI.Intracomm, indices: npt.NDArray[np.int64], N: np.int64
+) -> npt.NDArray[np.int32]:
     """
     Find which rank (local to comm) which owns an `index`, given that
     data of size `N` has been split equally among the ranks.
@@ -49,14 +51,15 @@ def index_owner(comm: MPI.Intracomm, indices: npt.NDArray[np.int64], N: np.int64
     r = N % size
 
     owner = np.empty_like(indices, dtype=np.int32)
-    owner[indices < r * n + 1] = indices[indices < r * n + 1] // (n+1)
-    owner[indices >= r*n+1] = r + (indices[indices >= r*n+1] - r*(n+1)) // n
+    owner[indices < r * n + 1] = indices[indices < r * n + 1] // (n + 1)
+    owner[indices >= r * n + 1] = r + (indices[indices >= r * n + 1] - r * (n + 1)) // n
 
     return owner
 
 
-def compute_dofmap_pos(V: dolfinx.fem.FunctionSpace) -> Tuple[
-        npt.NDArray[np.int32], npt.NDArray[np.int32]]:
+def compute_dofmap_pos(
+    V: dolfinx.fem.FunctionSpace,
+) -> Tuple[npt.NDArray[np.int32], npt.NDArray[np.int32]]:
     """
     Compute a map from each owned dof in the dofmap to a single cell owned by the
     process, and the relative position of the dof.
@@ -70,14 +73,22 @@ def compute_dofmap_pos(V: dolfinx.fem.FunctionSpace) -> Tuple[
     num_owned_cells = mesh.topology.index_map(mesh.topology.dim).size_local
     dofmap_bs = V.dofmap.bs
     num_owned_dofs = V.dofmap.index_map.size_local * V.dofmap.index_map_bs
-    local_cell = np.empty(num_owned_dofs, dtype=np.int32)  # Local cell index for each dof owned by process
-    dof_pos = np.empty(num_owned_dofs, dtype=np.int32)  # Position in dofmap for said dof
+    local_cell = np.empty(
+        num_owned_dofs, dtype=np.int32
+    )  # Local cell index for each dof owned by process
+    dof_pos = np.empty(
+        num_owned_dofs, dtype=np.int32
+    )  # Position in dofmap for said dof
 
     @numba.njit(cache=True)
-    def compute_positions(local_cell: npt.NDArray[np.int32], dof_pos: npt.NDArray[np.int32],
-                          dofs: npt.NDArray[np.int32],
-                          dofmap_bs: int, num_owned_dofs: int,
-                          num_owned_cells: int):
+    def compute_positions(
+        local_cell: npt.NDArray[np.int32],
+        dof_pos: npt.NDArray[np.int32],
+        dofs: npt.NDArray[np.int32],
+        dofmap_bs: int,
+        num_owned_dofs: int,
+        num_owned_cells: int,
+    ):
         """
         Loop through each owned cell and every dof in that cell, and for all cells owned by the process
         attach a cell and a position in the dofmap to it
@@ -88,12 +99,14 @@ def compute_dofmap_pos(V: dolfinx.fem.FunctionSpace) -> Tuple[
         for c in range(num_owned_cells):
             for i, dof in enumerate(dofs[c]):
                 for b in range(dofmap_bs):
-                    local_dof = dof*dofmap_bs + b
+                    local_dof = dof * dofmap_bs + b
                     if local_dof < num_owned_dofs:
                         local_cell[local_dof] = c
-                        dof_pos[local_dof] = i*dofmap_bs + b
+                        dof_pos[local_dof] = i * dofmap_bs + b
 
-    compute_positions(local_cell, dof_pos, dofs, dofmap_bs, num_owned_dofs, num_owned_cells)
+    compute_positions(
+        local_cell, dof_pos, dofs, dofmap_bs, num_owned_dofs, num_owned_cells
+    )
     return local_cell, dof_pos
 
 
