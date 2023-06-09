@@ -26,7 +26,6 @@ __all__ = [
     "read_function",
     "write_mesh",
     "snapshot_checkpoint",
-    "FileMode",
 ]
 
 
