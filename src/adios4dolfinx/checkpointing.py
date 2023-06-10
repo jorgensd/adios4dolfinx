@@ -47,11 +47,9 @@ def snapshot_checkpoint(uh: dolfinx.fem.Function, file: Path, mode: adios2.Mode)
         raise ValueError("Got invalid mode {mode}")
     adios_file = io.Open(str(file), mode)
 
-    dofmap = uh.function_space.dofmap
-    num_dofs_local = dofmap.index_map.size_local * dofmap.index_map_bs
-
     if mode == adios2.Mode.Write:
-        # Extract local function data
+        dofmap = uh.function_space.dofmap
+        num_dofs_local = dofmap.index_map.size_local * dofmap.index_map_bs
         local_dofs = uh.x.array[:num_dofs_local].copy()
 
         # Write to file
@@ -66,8 +64,7 @@ def snapshot_checkpoint(uh: dolfinx.fem.Function, file: Path, mode: adios2.Mode)
         adios_file.Get(in_variable, uh.x.array, adios2.Mode.Sync)
         adios_file.EndStep()
         uh.x.scatter_forward()
-
-    # Remove IO
+    adios_file.Close()
     adios.RemoveIO(io_name)
 
 
@@ -152,6 +149,7 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
     outfile.Put(pvar, cell_perm)
     outfile.PerformPuts()
     outfile.EndStep()
+    outfile.Close()
     assert adios.RemoveIO("MeshWriter")
 
 
@@ -432,4 +430,5 @@ def write_function(
     outfile.Put(xdofmap_var, local_dofmap_offsets)
     outfile.PerformPuts()
     outfile.EndStep()
+    outfile.Close()
     assert adios.RemoveIO("FunctionWriter")
