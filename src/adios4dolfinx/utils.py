@@ -110,7 +110,7 @@ def compute_dofmap_pos(
     return local_cell, dof_pos
 
 
-@numba.jit
+@numba.njit(cache=True)
 def find_first(b: int, a: npt.NDArray[np.int32]):
     """
     Given a numpy array `a` return the first entry equal to `b`
