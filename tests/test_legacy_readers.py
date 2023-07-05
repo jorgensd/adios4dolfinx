@@ -5,12 +5,16 @@
 # SPDX-License-Identifier:    MIT
 
 
-from adios4dolfinx import read_mesh_from_legacy_h5, read_function_from_legacy_h5
-from mpi4py import MPI
-import dolfinx
 import pathlib
-import ufl
+
+import dolfinx
 import numpy as np
+import ufl
+from dolfinx.fem.petsc import LinearProblem
+from mpi4py import MPI
+
+from adios4dolfinx import (read_function_from_legacy_h5,
+                           read_mesh_from_legacy_h5)
 
 
 def test_legacy_mesh():
@@ -47,7 +51,7 @@ def test_legacy_function():
     L = ufl.inner(f, v) * ufl.dx
 
     uh = dolfinx.fem.Function(V)
-    problem = dolfinx.fem.petsc.LinearProblem(
+    problem = LinearProblem(
         a, L, [], uh, petsc_options={"ksp_type": "preonly", "pc_type": "lu"}
     )
     problem.solve()
