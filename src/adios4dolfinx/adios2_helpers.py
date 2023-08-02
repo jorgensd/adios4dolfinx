@@ -150,6 +150,7 @@ def read_dofmap(
     in_offsets -= in_offsets[0]
 
     infile.EndStep()
+    infile.Close()
     adios.RemoveIO(io_name)
     # Return local dofmap
     return dolfinx.graph.create_adjacencylist(in_dofmap, in_offsets.astype(np.int32))
@@ -191,5 +192,6 @@ def read_array(
     vals = np.empty(arr_range[1] - arr_range[0], dtype=np.dtype(arr.Type().strip("_t")))
     infile.Get(arr, vals, adios2.Mode.Sync)
     infile.EndStep()
+    infile.Close()
     adios.RemoveIO("ArrayReader")
     return vals, arr_range[0]

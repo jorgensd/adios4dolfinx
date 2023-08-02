@@ -101,6 +101,7 @@ def read_dofmap_legacy(
         global_dofs[i] = in_dofmap[read_pos]
         del input_cell_pos, read_pos
     infile.EndStep()
+    infile.Close()
     adios.RemoveIO("DofmapReader")
     return global_dofs
 
@@ -259,7 +260,7 @@ def read_mesh_from_legacy_h5(
         (local_range[1] - local_range[0], shape[1]), dtype=np.float64
     )
     infile.Get(geometry, mesh_geometry, adios2.Mode.Sync)
-
+    infile.Close()
     assert adios.RemoveIO("Mesh reader")
 
     # Create DOLFINx mesh
@@ -324,7 +325,7 @@ def read_mesh_from_legacy_checkpoint(
         (local_range[1] - local_range[0], shape[1]), dtype=np.float64
     )
     infile.Get(geometry, mesh_geometry, adios2.Mode.Sync)
-
+    infile.Close()
     assert adios.RemoveIO("Mesh reader")
 
     # Create DOLFINx mesh
@@ -344,7 +345,7 @@ def read_mesh_from_legacy_checkpoint(
 
 
 def read_function_from_legacy_h5(
-    comm: MPI.Intracomm, filename: pathlib.Path, u: dolfinx.fem.Function
+    comm: MPI.Intracomm, filename: pathlib.Path, u: dolfinx.fem.Function, group: str = "mesh"
 ):
     V = u.function_space
     mesh = u.function_space.mesh
@@ -380,8 +381,8 @@ def read_function_from_legacy_h5(
         input_cells,
         dof_pos,
         num_cells_global,
-        "/mesh/cell_dofs",
-        "/mesh/x_cell_dofs",
+        f"/{group}/cell_dofs",
+        f"/{group}/x_cell_dofs",
         "HDF5",
     )
 
@@ -393,7 +394,7 @@ def read_function_from_legacy_h5(
     # NOTE: USE NBX in C++
 
     # Read input data
-    local_array, starting_pos = read_array(filename, "/mesh/vector_0", "HDF5", comm)
+    local_array, starting_pos = read_array(filename, f"/{group}/vector_0", "HDF5", comm)
 
     unique_dof_owners = np.unique(dof_owner)
     mesh_to_dof_comm = mesh.comm.Create_dist_graph(
