@@ -101,6 +101,7 @@ def read_dofmap_legacy(
         global_dofs[i] = in_dofmap[read_pos]
         del input_cell_pos, read_pos
     infile.EndStep()
+    infile.Close()
     adios.RemoveIO("DofmapReader")
     return global_dofs
 
@@ -259,7 +260,7 @@ def read_mesh_from_legacy_h5(
         (local_range[1] - local_range[0], shape[1]), dtype=np.float64
     )
     infile.Get(geometry, mesh_geometry, adios2.Mode.Sync)
-
+    infile.Close()
     assert adios.RemoveIO("Mesh reader")
 
     # Create DOLFINx mesh
@@ -324,7 +325,7 @@ def read_mesh_from_legacy_checkpoint(
         (local_range[1] - local_range[0], shape[1]), dtype=np.float64
     )
     infile.Get(geometry, mesh_geometry, adios2.Mode.Sync)
-
+    infile.Close()
     assert adios.RemoveIO("Mesh reader")
 
     # Create DOLFINx mesh
@@ -367,7 +368,7 @@ def read_function_from_legacy_h5(
         [mesh.comm.rank], [len(unique_owners)], unique_owners, reorder=False
     )
     source, dest, _ = _tmp_comm.Get_dist_neighbors()
-
+    
     # ----------------------Step 2--------------------------------
     # Get global dofmap indices from input process
     num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
@@ -384,14 +385,14 @@ def read_function_from_legacy_h5(
         f"/{group}/x_cell_dofs",
         "HDF5",
     )
-
+    
     # ----------------------Step 3---------------------------------
     # Compute owner of global dof on distributed mesh
     num_dof_global = V.dofmap.index_map_bs * V.dofmap.index_map.size_global
     dof_owner = index_owner(mesh.comm, dofmap_indices, num_dof_global)
     # Create MPI neigh comm to owner.
     # NOTE: USE NBX in C++
-
+    
     # Read input data
     local_array, starting_pos = read_array(filename, f"/{group}/vector_0", "HDF5", comm)
 
@@ -410,3 +411,4 @@ def read_function_from_legacy_h5(
     # Populate local part of array and scatter forward
     u.x.array[: len(local_values)] = local_values
     u.x.scatter_forward()
+    
