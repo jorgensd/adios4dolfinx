@@ -57,5 +57,16 @@ def test_legacy_function():
     problem.solve()
 
     u_in = dolfinx.fem.Function(V)
-    read_function_from_legacy_h5(mesh.comm, path, u_in)
+    read_function_from_legacy_h5(mesh.comm, path, u_in, group="v")
     assert np.allclose(uh.x.array, u_in.x.array)
+
+
+    W = dolfinx.fem.VectorFunctionSpace(mesh, ("DG", 2))
+    wh = dolfinx.fem.Function(W)
+    wh.interpolate(lambda x: (x[0], 0*x[1], 0*x[2]))
+    w_in = dolfinx.fem.Function(W)
+
+    read_function_from_legacy_h5(mesh.comm, path, w_in, group="w")
+
+    assert np.allclose(wh.x.array, w_in.x.array)
+    
