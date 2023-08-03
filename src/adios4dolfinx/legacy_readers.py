@@ -34,6 +34,7 @@ def read_dofmap_legacy(
     engine: str,
     cells: npt.NDArray[np.int64],
     dof_pos: npt.NDArray[np.int32],
+    bs: int
 ) -> npt.NDArray[np.int64]:
     """
     Read dofmap with given communicator, split in continuous chunks based on number of
@@ -93,13 +94,25 @@ def read_dofmap_legacy(
 
     in_dofmap = in_dofmap.astype(np.int64)
 
+    # Map xxxyyyzzz to xyzxyz
+    mapped_dofmap = np.empty_like(in_dofmap)
+    for i in range(len(in_offsets)-1):
+        pos_begin, pos_end = in_offsets[i]-in_offsets[0], in_offsets[i+1]-in_offsets[0]
+        dofs_i = in_dofmap[pos_begin:pos_end]
+        assert (pos_end - pos_begin) % bs == 0
+        num_dofs_local = int((pos_end-pos_begin)//bs)
+        for k in range(bs):
+            for j in range(num_dofs_local):
+                mapped_dofmap[int(pos_begin + j*bs+k)] = dofs_i[int(num_dofs_local*k+j)]
+
     # Extract dofmap data
     global_dofs = np.zeros_like(cells, dtype=np.int64)
     for i, (cell, pos) in enumerate(zip(cells, dof_pos.astype(np.int64))):
         input_cell_pos = cell - local_cell_range[0]
         read_pos = np.int32(in_offsets[input_cell_pos] + pos - in_offsets[0])
-        global_dofs[i] = in_dofmap[read_pos]
+        global_dofs[i] = mapped_dofmap[read_pos]
         del input_cell_pos, read_pos
+
     infile.EndStep()
     infile.Close()
     adios.RemoveIO("DofmapReader")
@@ -118,6 +131,7 @@ def send_cells_and_receive_dofmap_index(
     dofmap_path: str,
     xdofmap_path: str,
     engine: str,
+    bs: int
 ) -> npt.NDArray[np.int64]:
     """
     Given a set of positions in input dofmap, give the global input index of this dofmap entry
@@ -187,6 +201,7 @@ def send_cells_and_receive_dofmap_index(
         engine,
         inc_cells,
         inc_pos,
+        bs
     )
     # Send input dofs back to owning process
     data_to_mesh_comm = comm.Create_dist_graph_adjacent(
@@ -371,6 +386,7 @@ def read_function_from_legacy_h5(
 
     # ----------------------Step 2--------------------------------
     # Get global dofmap indices from input process
+    bs = V.dofmap.bs
     num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
     dofmap_indices = send_cells_and_receive_dofmap_index(
         filename,
@@ -384,6 +400,7 @@ def read_function_from_legacy_h5(
         f"/{group}/cell_dofs",
         f"/{group}/x_cell_dofs",
         "HDF5",
+        bs
     )
 
     # ----------------------Step 3---------------------------------

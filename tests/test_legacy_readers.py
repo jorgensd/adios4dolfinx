@@ -62,7 +62,7 @@ def test_legacy_function():
 
     W = dolfinx.fem.VectorFunctionSpace(mesh, ("DG", 2))
     wh = dolfinx.fem.Function(W)
-    wh.interpolate(lambda x: (x[0], 0*x[1], 0*x[2]))
+    wh.interpolate(lambda x: (x[0], 3*x[2], 7*x[1]))
     w_in = dolfinx.fem.Function(W)
 
     read_function_from_legacy_h5(mesh.comm, path, w_in, group="w")

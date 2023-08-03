@@ -32,7 +32,7 @@ def create_reference_data(
     x = dolfin.SpatialCoordinate(mesh)
     f = ufl.conditional(ufl.gt(x[0], 0.5), x[1], 2 * x[0])
     v = dolfin.project(f, V)
-    w = dolfin.interpolate(dolfin.Expression(("1", "0", "0"), degree=1), W)
+    w = dolfin.interpolate(dolfin.Expression(("x[0]", "3*x[2]", "7*x[1]"), degree=1), W)
 
     with dolfin.HDF5File(mesh.mpi_comm(), str(h5_file), "w") as hdf:
         hdf.write(mesh, mesh_name)
