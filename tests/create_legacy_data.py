@@ -33,14 +33,12 @@ def create_reference_data(
     f = ufl.conditional(ufl.gt(x[0], 0.5), x[1], 2 * x[0])
     v = dolfin.project(f, V)
     w = dolfin.interpolate(dolfin.Expression(("1", "0", "0"), degree=1), W)
-    
-        
+
     with dolfin.HDF5File(mesh.mpi_comm(), str(h5_file), "w") as hdf:
         hdf.write(mesh, mesh_name)
         hdf.write(v, function_name)
         hdf.write(w, function_name_vec)
 
-    
     with dolfin.XDMFFile(mesh.mpi_comm(), str(xdmf_file)) as xdmf:
         xdmf.write(mesh)
         xdmf.write_checkpoint(
