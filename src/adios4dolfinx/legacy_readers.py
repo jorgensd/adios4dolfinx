@@ -322,26 +322,6 @@ def read_mesh_from_legacy_h5(
         MPI.COMM_WORLD, mesh_topology, mesh_geometry, domain
     )
 
-# Function for reading global cells. Might be needed later
-#
-# def read_global_cells(filename: pathlib.Path, group: str):
-
-#     adios = adios2.ADIOS(MPI.COMM_WORLD)
-#     io = adios.DeclareIO("Cells reader")
-#     io.SetEngine("HDF5")
-
-#     # Open ADIOS2 Reader
-#     infile = io.Open(str(filename), adios2.Mode.Read)
-#     cells = io.InquireVariable(f"/{group}/cells")
-#     num_cells_global = cells.Shape()[0]
-#     cells.SetSelection([[0], [num_cells_global]])
-
-#     global_cells = np.empty(num_cells_global, dtype=cells.Type().strip("_t"))
-#     infile.Get(cells, global_cells, adios2.Mode.Sync)
-#     infile.Close()
-#     assert adios.RemoveIO("Cells reader")
-#     return global_cells.astype(np.int64)
-
 
 def read_function_from_legacy_h5(
     comm: MPI.Intracomm,
