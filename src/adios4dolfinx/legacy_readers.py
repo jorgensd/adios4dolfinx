@@ -73,7 +73,6 @@ def read_dofmap_legacy(
     d_offsets = io.InquireVariable(dofmap_offsets)
     shape = d_offsets.Shape()
 
-
     # As the offsets are one longer than the number of cells, we need to read in with an overlap
     if len(shape) == 1:
         d_offsets.SetSelection(
@@ -98,14 +97,13 @@ def read_dofmap_legacy(
     if dofmap not in io.AvailableVariables().keys():
         raise KeyError(f"Dof offsets not found at {dofmap}")
     cell_dofs = io.InquireVariable(dofmap)
-    
+
     if len(shape) == 1:
         cell_dofs.SetSelection([[in_offsets[0]], [in_offsets[-1] - in_offsets[0]]])
         in_dofmap = np.empty(
             in_offsets[-1] - in_offsets[0], dtype=cell_dofs.Type().strip("_t")
         )
     else:
-        
         cell_dofs.SetSelection([[in_offsets[0], 0], [in_offsets[-1] - in_offsets[0], shape[1]]])
         in_dofmap = np.empty(
             (in_offsets[-1] - in_offsets[0], shape[1]), dtype=cell_dofs.Type().strip("_t")
@@ -250,7 +248,7 @@ def read_mesh_geometry(io: adios2.ADIOS, infile: adios2.Engine, group: str):
             break
     else:
         raise KeyError(f"Mesh coordintes not found at '{group}/coordinates'")
-    
+
     geometry = io.InquireVariable(geometry_key)
     shape = geometry.Shape()
     local_range = compute_local_range(MPI.COMM_WORLD, shape[0])
@@ -279,7 +277,7 @@ def read_mesh_from_legacy_h5(
     # Create ADIOS2 reader
     adios = adios2.ADIOS(comm)
     io = adios.DeclareIO("Mesh reader")
-  
+
     io.SetEngine("HDF5")
 
     # Open ADIOS2 Reader
@@ -300,7 +298,7 @@ def read_mesh_from_legacy_h5(
     infile.Get(topology, mesh_topology, adios2.Mode.Sync)
 
     # Get mesh cell type
-    if f"{group}/topology/celltype" in io.AvailableAttributes().keys():    
+    if f"{group}/topology/celltype" in io.AvailableAttributes().keys():
         celltype = io.InquireAttribute(f"{group}/topology/celltype")
         cell_type = celltype.DataString()[0]
 
@@ -309,9 +307,7 @@ def read_mesh_from_legacy_h5(
 
     infile.Close()
     assert adios.RemoveIO("Mesh reader")
-    
 
-   
     # Create DOLFINx mesh
     element = basix.ufl.element(
         basix.ElementFamily.P,
@@ -329,7 +325,7 @@ def read_mesh_from_legacy_h5(
 # Function for reading global cells. Might be needed later
 #
 # def read_global_cells(filename: pathlib.Path, group: str):
-    
+
 #     adios = adios2.ADIOS(MPI.COMM_WORLD)
 #     io = adios.DeclareIO("Cells reader")
 #     io.SetEngine("HDF5")
@@ -348,7 +344,11 @@ def read_mesh_from_legacy_h5(
 
 
 def read_function_from_legacy_h5(
-    comm: MPI.Intracomm, filename: pathlib.Path, u: dolfinx.fem.Function, group: str = "mesh", checkpoint: Optional[int] = None,
+    comm: MPI.Intracomm,
+    filename: pathlib.Path,
+    u: dolfinx.fem.Function,
+    group: str = "mesh",
+    checkpoint: Optional[int] = None,
 ):
     V = u.function_space
     mesh = u.function_space.mesh
@@ -360,7 +360,6 @@ def read_function_from_legacy_h5(
     # Compute index of input cells, and position in input dofmap
     local_cells, dof_pos = compute_dofmap_pos(u.function_space)
     input_cells = mesh.topology.original_cell_index[local_cells]
-
 
     # Compute mesh->input communicator
     # 1.1 Compute mesh->input communicator
