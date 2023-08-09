@@ -31,7 +31,6 @@ __all__ = [
     "write_mesh",
     "read_function_from_legacy_h5",
     "read_mesh_from_legacy_h5",
-    "read_function_from_legacy_h5",
     "write_function",
     "read_function",
     "snapshot_checkpoint",
