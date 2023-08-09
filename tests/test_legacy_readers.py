@@ -89,3 +89,35 @@ def test_legacy_function():
     read_function_from_legacy_h5(mesh.comm, path, w_in, group="w")
 
     assert np.allclose(wh.x.array, w_in.x.array)
+
+
+def test_read_legacy_function_from_checkpoint():
+    comm = MPI.COMM_WORLD
+    path = (pathlib.Path("legacy") / "mesh_checkpoint.h5").absolute()
+    mesh = read_mesh_from_legacy_h5(comm, path, "/Mesh/mesh")
+    V = dolfinx.fem.FunctionSpace(mesh, ("DG", 2))
+    u = ufl.TrialFunction(V)
+    v = ufl.TestFunction(V)
+    a = ufl.inner(u, v) * ufl.dx
+    x = ufl.SpatialCoordinate(mesh)
+    f = ufl.conditional(ufl.gt(x[0], 0.5), x[1], 2 * x[0])
+    L = ufl.inner(f, v) * ufl.dx
+
+    uh = dolfinx.fem.Function(V)
+    problem = LinearProblem(
+        a, L, [], uh, petsc_options={"ksp_type": "preonly", "pc_type": "lu"}
+    )
+    problem.solve()
+
+    u_in = dolfinx.fem.Function(V)
+    read_function_from_legacy_h5(mesh.comm, path, u_in, group="v",  checkpoint=0)
+    assert np.allclose(uh.x.array, u_in.x.array)
+
+    W = dolfinx.fem.VectorFunctionSpace(mesh, ("DG", 2))
+    wh = dolfinx.fem.Function(W)
+    wh.interpolate(lambda x: (x[0], 3*x[2], 7*x[1]))
+    w_in = dolfinx.fem.Function(W)
+
+    read_function_from_legacy_h5(mesh.comm, path, w_in, group="w", checkpoint=0)
+
+    assert np.allclose(wh.x.array, w_in.x.array)
