@@ -187,7 +187,6 @@ def read_array(
     arr_shape = arr.Shape()
     assert len(arr_shape) >= 1  # TODO: Should we always pick the first element?
     arr_range = compute_local_range(comm, arr_shape[0])
-    assert arr_range[0] == arr_range[0]  # FIXME: Should this be arr_shape?
 
     if len(arr_shape) == 1:
         arr.SetSelection([[arr_range[0]], [arr_range[1] - arr_range[0]]])
