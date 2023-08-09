@@ -110,7 +110,7 @@ def test_read_legacy_function_from_checkpoint():
     problem.solve()
 
     u_in = dolfinx.fem.Function(V)
-    read_function_from_legacy_h5(mesh.comm, path, u_in, group="v",  checkpoint=0)
+    read_function_from_legacy_h5(mesh.comm, path, u_in, group="v",  step=0)
     assert np.allclose(uh.x.array, u_in.x.array)
 
     W = dolfinx.fem.VectorFunctionSpace(mesh, ("DG", 2))
@@ -118,6 +118,6 @@ def test_read_legacy_function_from_checkpoint():
     wh.interpolate(lambda x: (x[0], 3*x[2], 7*x[1]))
     w_in = dolfinx.fem.Function(W)
 
-    read_function_from_legacy_h5(mesh.comm, path, w_in, group="w", checkpoint=0)
+    read_function_from_legacy_h5(mesh.comm, path, w_in, group="w", step=0)
 
     assert np.allclose(wh.x.array, w_in.x.array)
