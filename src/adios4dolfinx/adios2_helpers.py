@@ -185,11 +185,16 @@ def read_array(
 
     arr = io.InquireVariable(array_name)
     arr_shape = arr.Shape()
-    assert len(arr_shape) == 1
+    assert len(arr_shape) >= 1  # TODO: Should we always pick the first element?
     arr_range = compute_local_range(comm, arr_shape[0])
-    assert arr_range[0] == arr_range[0]
-    arr.SetSelection([[arr_range[0]], [arr_range[1] - arr_range[0]]])
-    vals = np.empty(arr_range[1] - arr_range[0], dtype=np.dtype(arr.Type().strip("_t")))
+
+    if len(arr_shape) == 1:
+        arr.SetSelection([[arr_range[0]], [arr_range[1] - arr_range[0]]])
+        vals = np.empty(arr_range[1] - arr_range[0], dtype=np.dtype(arr.Type().strip("_t")))
+    else:
+        arr.SetSelection([[arr_range[0], 0], [arr_range[1] - arr_range[0], arr_shape[1]]])
+        vals = np.empty((arr_range[1] - arr_range[0], arr_shape[1]), dtype=np.dtype(arr.Type().strip("_t")))
+
     infile.Get(arr, vals, adios2.Mode.Sync)
     infile.EndStep()
     infile.Close()
