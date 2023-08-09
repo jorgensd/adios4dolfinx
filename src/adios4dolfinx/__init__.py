@@ -16,7 +16,6 @@ from .checkpointing import (
 )
 from .legacy_readers import (
     read_function_from_legacy_h5,
-    read_mesh_from_legacy_checkpoint,
     read_mesh_from_legacy_h5,
 )
 
@@ -31,7 +30,6 @@ __all__ = [
     "read_mesh",
     "write_mesh",
     "read_function_from_legacy_h5",
-    "read_mesh_from_legacy_checkpoint",
     "read_mesh_from_legacy_h5",
     "read_function_from_legacy_h5",
     "write_function",

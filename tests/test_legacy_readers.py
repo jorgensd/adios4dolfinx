@@ -14,14 +14,13 @@ from dolfinx.fem.petsc import LinearProblem
 from mpi4py import MPI
 
 from adios4dolfinx import (read_function_from_legacy_h5,
-                           read_mesh_from_legacy_h5, 
-                           read_mesh_from_legacy_checkpoint)
+                           read_mesh_from_legacy_h5)
 
 
 def test_legacy_mesh():
     comm = MPI.COMM_WORLD
     path = (pathlib.Path("legacy") / "mesh.h5").absolute()
-    mesh = read_mesh_from_legacy_h5(comm, path, "/mesh")
+    mesh = read_mesh_from_legacy_h5(comm=comm, filename=path, group="/mesh")
     assert mesh.topology.dim == 3
     volume = mesh.comm.allreduce(
         dolfinx.fem.assemble_scalar(dolfinx.fem.form(1 * ufl.dx(domain=mesh))),
@@ -42,7 +41,7 @@ def test_legacy_mesh():
 def test_read_legacy_mesh_from_checkpoint():
     comm = MPI.COMM_WORLD
     filename = (pathlib.Path("legacy") / "mesh_checkpoint.h5").absolute()
-    mesh = read_mesh_from_legacy_checkpoint(filename, path="/Mesh/mesh")
+    mesh = read_mesh_from_legacy_h5(comm=comm, filename=filename, group="/Mesh/mesh")
     assert mesh.topology.dim == 3
     volume = mesh.comm.allreduce(
         dolfinx.fem.assemble_scalar(dolfinx.fem.form(1 * ufl.dx(domain=mesh))),
