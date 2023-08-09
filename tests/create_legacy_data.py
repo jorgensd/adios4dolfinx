@@ -30,27 +30,37 @@ def create_reference_data(
     V = dolfin.FunctionSpace(mesh, family, degree)
     W = dolfin.VectorFunctionSpace(mesh, family, degree)
     x = dolfin.SpatialCoordinate(mesh)
-    f = ufl.conditional(ufl.gt(x[0], 0.5), x[1], 2 * x[0])
-    v = dolfin.project(f, V)
-    w = dolfin.interpolate(dolfin.Expression(("x[0]", "3*x[2]", "7*x[1]"), degree=1), W)
+
+    f0 = ufl.conditional(ufl.gt(x[0], 0.5), x[1], 2 * x[0])
+    v0 = dolfin.project(f0, V)
+    w0 = dolfin.interpolate(dolfin.Expression(("x[0]", "3*x[2]", "7*x[1]"), degree=1), W)
+
+    v1 = dolfin.interpolate(dolfin.Expression("x[0]", degree=1), V)
+    w1 = dolfin.interpolate(dolfin.Expression(("x[0]", "0", "x[1]"), degree=1), W)
 
     with dolfin.HDF5File(mesh.mpi_comm(), str(h5_file), "w") as hdf:
         hdf.write(mesh, mesh_name)
-        hdf.write(v, function_name)
-        hdf.write(w, function_name_vec)
+        hdf.write(v0, function_name)
+        hdf.write(w0, function_name_vec)
 
     with dolfin.XDMFFile(mesh.mpi_comm(), str(xdmf_file)) as xdmf:
         xdmf.write(mesh)
         xdmf.write_checkpoint(
-            v, function_name, 0, dolfin.XDMFFile.Encoding.HDF5, append=True
+            v0, function_name, 0, dolfin.XDMFFile.Encoding.HDF5, append=True
         )
         xdmf.write_checkpoint(
-            w, function_name_vec, 0, dolfin.XDMFFile.Encoding.HDF5, append=True
+            w0, function_name_vec, 0, dolfin.XDMFFile.Encoding.HDF5, append=True
+        )
+        xdmf.write_checkpoint(
+            v1, function_name, 1, dolfin.XDMFFile.Encoding.HDF5, append=True
+        )
+        xdmf.write_checkpoint(
+            w1, function_name_vec, 1, dolfin.XDMFFile.Encoding.HDF5, append=True
         )
 
     with dolfin.XDMFFile(mesh.mpi_comm(), "test.xdmf") as xdmf:
         xdmf.write(mesh)
-    return v, w
+    return v0, w0, v1, w1
 
 
 def verify_hdf5(
@@ -79,8 +89,10 @@ def verify_hdf5(
 
 
 def verify_xdmf(
-    v_ref: dolfin.Function,
-    w_ref: dolfin.Function,
+    v0_ref: dolfin.Function,
+    w0_ref: dolfin.Function,
+    v1_ref: dolfin.Function,
+    w1_ref: dolfin.Function,
     xdmf_file: pathlib.Path,
     function_name: str,
     family: str,
@@ -91,15 +103,22 @@ def verify_xdmf(
     with dolfin.XDMFFile(mesh.mpi_comm(), str(xdmf_file)) as xdmf:
         xdmf.read(mesh)
         V = dolfin.FunctionSpace(mesh, family, degree)
-        v = dolfin.Function(V)
-        xdmf.read_checkpoint(v, function_name, 0)
+        v0 = dolfin.Function(V)
+        xdmf.read_checkpoint(v0, function_name, 0)
+        v1 = dolfin.Function(V)
+        xdmf.read_checkpoint(v1, function_name, 1)
 
         W = dolfin.VectorFunctionSpace(mesh, family, degree)
-        w = dolfin.Function(W)
-        xdmf.read_checkpoint(w, function_name_vec, 0)
+        w0 = dolfin.Function(W)
+        xdmf.read_checkpoint(w0, function_name_vec, 0)
+        w1 = dolfin.Function(W)
+        xdmf.read_checkpoint(w1, function_name_vec, 1)
 
-    assert np.allclose(v.vector().get_local(), v_ref.vector().get_local())
-    assert np.allclose(w.vector().get_local(), w_ref.vector().get_local())
+    assert np.allclose(v0.vector().get_local(), v0_ref.vector().get_local())
+    assert np.allclose(w0.vector().get_local(), w0_ref.vector().get_local())
+
+    assert np.allclose(v1.vector().get_local(), v1_ref.vector().get_local())
+    assert np.allclose(w1.vector().get_local(), w1_ref.vector().get_local())
 
 
 if __name__ == "__main__":
@@ -120,7 +139,7 @@ if __name__ == "__main__":
     h5_filename = path / f"{inputs.name}.h5"
     xdmf_filename = path / f"{inputs.name}_checkpoint.xdmf"
 
-    v_ref, w_ref = create_reference_data(
+    v0_ref, w0_ref, v1_ref, w1_ref = create_reference_data(
         h5_filename,
         xdmf_filename,
         inputs.name,
@@ -132,9 +151,9 @@ if __name__ == "__main__":
     )
 
     verify_hdf5(
-        v_ref, w_ref, h5_filename, inputs.name, inputs.f_name, inputs.family, inputs.degree, inputs.f_name_vec,
+        v0_ref, w0_ref, h5_filename, inputs.name, inputs.f_name, inputs.family, inputs.degree, inputs.f_name_vec,
     )
 
     verify_xdmf(
-        v_ref, w_ref, xdmf_filename, inputs.f_name, inputs.family, inputs.degree, inputs.f_name_vec,
+        v0_ref, w0_ref, v1_ref, w1_ref, xdmf_filename, inputs.f_name, inputs.family, inputs.degree, inputs.f_name_vec,
     )

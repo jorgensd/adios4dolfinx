@@ -95,6 +95,7 @@ def test_read_legacy_function_from_checkpoint():
     comm = MPI.COMM_WORLD
     path = (pathlib.Path("legacy") / "mesh_checkpoint.h5").absolute()
     mesh = read_mesh_from_legacy_h5(comm, path, "/Mesh/mesh")
+
     V = dolfinx.fem.FunctionSpace(mesh, ("DG", 2))
     u = ufl.TrialFunction(V)
     v = ufl.TestFunction(V)
@@ -113,11 +114,19 @@ def test_read_legacy_function_from_checkpoint():
     read_function_from_legacy_h5(mesh.comm, path, u_in, group="v",  step=0)
     assert np.allclose(uh.x.array, u_in.x.array)
 
+    # Check second step
+    uh.interpolate(lambda x: x[0])
+    read_function_from_legacy_h5(mesh.comm, path, u_in, group="v",  step=1)
+    assert np.allclose(uh.x.array, u_in.x.array)
+
     W = dolfinx.fem.VectorFunctionSpace(mesh, ("DG", 2))
     wh = dolfinx.fem.Function(W)
     wh.interpolate(lambda x: (x[0], 3*x[2], 7*x[1]))
     w_in = dolfinx.fem.Function(W)
 
     read_function_from_legacy_h5(mesh.comm, path, w_in, group="w", step=0)
+    assert np.allclose(wh.x.array, w_in.x.array)
 
+    wh.interpolate(lambda x: np.vstack((x[0], 0*x[0], x[1])))
+    read_function_from_legacy_h5(mesh.comm, path, w_in, group="w", step=1)
     assert np.allclose(wh.x.array, w_in.x.array)
