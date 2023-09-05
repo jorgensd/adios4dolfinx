@@ -33,7 +33,7 @@ jobs:
       PYTHONPATH: /usr/local/lib/python3/dist-packages:/usr/local/lib:/usr/local/dolfinx-real/lib/python3.10/dist-packages
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Update pip
         run: python3 -m pip install --upgrade pip setuptools
