@@ -58,7 +58,7 @@ def index_owner(
 
 
 def compute_dofmap_pos(
-    V: dolfinx.fem.FunctionSpace,
+    V: dolfinx.fem.FunctionSpaceBase,
 ) -> Tuple[npt.NDArray[np.int32], npt.NDArray[np.int32]]:
     """
     Compute a map from each owned dof in the dofmap to a single cell owned by the
