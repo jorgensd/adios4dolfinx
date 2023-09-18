@@ -15,9 +15,10 @@ import numpy.typing as npt
 import ufl
 from mpi4py import MPI
 
-from .adios2_helpers import read_array
+from .adios2_helpers import adios_to_numpy_dtype, read_array
 from .comm_helpers import send_dofs_and_recv_values
-from .utils import compute_dofmap_pos, compute_local_range, find_first, index_owner
+from .utils import (compute_dofmap_pos, compute_local_range, find_first,
+                    index_owner)
 
 __all__ = [
     "read_mesh_from_legacy_h5",
@@ -256,8 +257,8 @@ def read_mesh_geometry(io: adios2.ADIOS, infile: adios2.Engine, group: str):
         [[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]]
     )
     mesh_geometry = np.empty(
-        (local_range[1] - local_range[0], shape[1]), dtype=np.float64
-    )
+        (local_range[1] - local_range[0], shape[1]), dtype=np.dtype(adios_to_numpy_dtype))
+
     infile.Get(geometry, mesh_geometry, adios2.Mode.Sync)
     return mesh_geometry
 

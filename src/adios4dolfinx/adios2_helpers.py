@@ -1,18 +1,23 @@
-from mpi4py import MPI
 import pathlib
+from typing import Tuple
+
+import adios2
+import dolfinx.cpp.graph
+import dolfinx.graph
 import numpy as np
 import numpy.typing as npt
-import adios2
-from .utils import compute_local_range
-from typing import Tuple
-import dolfinx.graph
-import dolfinx.cpp.graph
+from mpi4py import MPI
+
+from .utils import compute_local_range, valid_function_types
 
 """
 Helpers reading/writing data with ADIOS2
 """
 
-__all__ = ["read_array", "read_dofmap", "read_cell_perms"]
+__all__ = ["read_array", "read_dofmap", "read_cell_perms", "adios_to_numpy_dtype"]
+
+adios_to_numpy_dtype = {"float": np.float32, "double": np.float64, 
+                        "float complex": np.complex64, "double complex": np.complex128}
 
 
 def read_cell_perms(
@@ -158,7 +163,7 @@ def read_dofmap(
 
 def read_array(
     filename: pathlib.Path, array_name: str, engine: str, comm: MPI.Intracomm
-) -> Tuple[npt.NDArray[np.float64], int]:
+) -> Tuple[npt.NDArray[valid_function_types], int]:
     """
     Read an array from file, return the global starting position of the local array
 
@@ -190,10 +195,10 @@ def read_array(
 
     if len(arr_shape) == 1:
         arr.SetSelection([[arr_range[0]], [arr_range[1] - arr_range[0]]])
-        vals = np.empty(arr_range[1] - arr_range[0], dtype=np.dtype(arr.Type().strip("_t")))
+        vals = np.empty(arr_range[1] - arr_range[0], dtype=adios_to_numpy_dtype[arr.Type()])
     else:
         arr.SetSelection([[arr_range[0], 0], [arr_range[1] - arr_range[0], arr_shape[1]]])
-        vals = np.empty((arr_range[1] - arr_range[0], arr_shape[1]), dtype=np.dtype(arr.Type().strip("_t")))
+        vals = np.empty((arr_range[1] - arr_range[0], arr_shape[1]), dtype=adios_to_numpy_dtype[arr.Type()])
 
     infile.Get(arr, vals, adios2.Mode.Sync)
     infile.EndStep()

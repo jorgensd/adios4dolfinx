@@ -9,9 +9,9 @@ from mpi4py import MPI
 import adios4dolfinx
 
 
-def write_function(mesh, el, f) -> str:
+def write_function(mesh, el, f, dtype) -> str:
     V = dolfinx.fem.FunctionSpace(mesh, el)
-    u = dolfinx.fem.Function(V)
+    u = dolfinx.fem.Function(V, dtype=dtype)
     u.interpolate(f)
     el_hash = (
         V.element.signature()
@@ -20,7 +20,7 @@ def write_function(mesh, el, f) -> str:
         .replace("(", "")
         .replace(")", "")
     )
-    filename = pathlib.Path(f"output/mesh{el_hash}.bp")
+    filename = pathlib.Path(f"output/mesh{el_hash}_{dtype}.bp")
     if mesh.comm.size != 1:
         adios4dolfinx.write_mesh(mesh, filename)
         adios4dolfinx.write_function(u, filename)
@@ -29,23 +29,25 @@ def write_function(mesh, el, f) -> str:
         if MPI.COMM_WORLD.rank == 0:
             adios4dolfinx.write_mesh(mesh, filename)
             adios4dolfinx.write_function(u, filename)
-    return el_hash
+    return f"{el_hash}_{dtype}"
 
 
-def read_function(comm, el, f, hash):
+def read_function(comm, el, f, hash, dtype):
     filename = f"output/mesh{hash}.bp"
     engine = "BP4"
     mesh = adios4dolfinx.read_mesh(
         comm, filename, engine, dolfinx.mesh.GhostMode.shared_facet
     )
     V = dolfinx.fem.FunctionSpace(mesh, el)
-    v = dolfinx.fem.Function(V)
+    v = dolfinx.fem.Function(V, dtype=dtype)
     adios4dolfinx.read_function(v, filename, engine)
-    v_ex = dolfinx.fem.Function(V)
+    v_ex = dolfinx.fem.Function(V, dtype=dtype)
     v_ex.interpolate(f)
     assert np.allclose(v.x.array, v_ex.x.array)
 
 
+@pytest.mark.parametrize("dtypes", [(np.float32, np.float32), (np.float64, np.float64), (np.float32, np.complex64),
+                                    (np.float64, np.complex128)])
 @pytest.mark.parametrize(
     "cell_type", [dolfinx.mesh.CellType.triangle, dolfinx.mesh.CellType.quadrilateral]
 )
@@ -53,16 +55,17 @@ def read_function(comm, el, f, hash):
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
 @pytest.mark.parametrize("write_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_read_write_P_2D(read_comm, write_comm, family, degree, cell_type):
-    mesh = dolfinx.mesh.create_unit_square(write_comm, 5, 5, cell_type=cell_type)
+def test_read_write_P_2D(read_comm, write_comm, family, degree, cell_type, dtypes):
+    mesh = dolfinx.mesh.create_unit_square(write_comm, 5, 5, cell_type=cell_type, dtype=dtypes[0])
+
     el = ufl.VectorElement(family, mesh.ufl_cell(), degree)
 
     def f(x):
-        return (np.full(x.shape[1], np.pi) + x[0], x[1])
+        return np.full(x.shape[1], np.pi) + x[0], x[1].astype(dtypes[1])
 
-    hash = write_function(mesh, el, f)
+    hash = write_function(mesh, el, f, dtypes[1])
     MPI.COMM_WORLD.Barrier()
-    read_function(read_comm, el, f, hash)
+    read_function(read_comm, el, f, hash, dtypes[1])
 
 
 @pytest.mark.parametrize(
@@ -80,6 +83,7 @@ def test_read_write_P_3D(read_comm, write_comm, family, degree, cell_type):
         return (np.full(x.shape[1], np.pi) + x[0], x[1] + 2 * x[0], np.cos(x[2]))
 
     hash = write_function(mesh, el, f)
+
     MPI.COMM_WORLD.Barrier()
     read_function(read_comm, el, f, hash)
 

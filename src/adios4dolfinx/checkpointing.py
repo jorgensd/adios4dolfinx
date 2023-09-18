@@ -5,6 +5,7 @@
 # SPDX-License-Identifier:    MIT
 
 from pathlib import Path
+
 import adios2
 import basix
 import dolfinx
@@ -12,13 +13,12 @@ import numpy as np
 import ufl
 from mpi4py import MPI
 
-from .comm_helpers import (
-    send_and_recv_cell_perm,
-    send_dofs_and_recv_values,
-    send_dofmap_and_recv_values,
-)
-from .utils import compute_local_range, index_owner, compute_dofmap_pos
-from .adios2_helpers import read_array, read_cell_perms, read_dofmap
+from .adios2_helpers import (adios_to_numpy_dtype, read_array, read_cell_perms,
+                             read_dofmap)
+from .comm_helpers import (send_and_recv_cell_perm,
+                           send_dofmap_and_recv_values,
+                           send_dofs_and_recv_values)
+from .utils import compute_dofmap_pos, compute_local_range, index_owner
 
 __all__ = [
     "read_mesh",
@@ -303,10 +303,9 @@ def read_mesh(
         [[geometry_range[0], 0], [geometry_range[1] - geometry_range[0], x_shape[1]]]
     )
     mesh_geometry = np.empty(
-        (geometry_range[1] - geometry_range[0], x_shape[1]), dtype=np.float64
+        (geometry_range[1] - geometry_range[0], x_shape[1]), dtype=adios_to_numpy_dtype[geometry.Type()]
     )
     infile.Get(geometry, mesh_geometry, adios2.Mode.Deferred)
-
     # Get mesh topology (distributed)
     if "Topology" not in io.AvailableVariables().keys():
         raise KeyError("Mesh topology not found at Topology'")
@@ -372,7 +371,7 @@ def write_function(
     outfile.BeginStep()
     val_var = io.DefineVariable(
         "Values",
-        np.zeros(num_dofs_local, dtype=np.float64),
+        np.zeros(num_dofs_local, dtype=u.dtype),
         shape=[num_dofs_global],
         start=[local_start],
         count=[num_dofs_local],
