@@ -16,7 +16,7 @@ Helpers reading/writing data with ADIOS2
 
 __all__ = ["read_array", "read_dofmap", "read_cell_perms", "adios_to_numpy_dtype"]
 
-adios_to_numpy_dtype = {"float": np.float32, "double": np.float64, 
+adios_to_numpy_dtype = {"float": np.float32, "double": np.float64,
                         "float complex": np.complex64, "double complex": np.complex128}
 
 
