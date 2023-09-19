@@ -17,7 +17,8 @@ Helpers reading/writing data with ADIOS2
 __all__ = ["read_array", "read_dofmap", "read_cell_perms", "adios_to_numpy_dtype"]
 
 adios_to_numpy_dtype = {"float": np.float32, "double": np.float64,
-                        "float complex": np.complex64, "double complex": np.complex128}
+                        "float complex": np.complex64, "double complex": np.complex128,
+                        "uint32_t": np.uint32}
 
 
 def read_cell_perms(
@@ -72,7 +73,7 @@ def read_cell_perms(
         [[local_cell_range[0]], [local_cell_range[1] - local_cell_range[0]]]
     )
     in_perm = np.empty(
-        local_cell_range[1] - local_cell_range[0], dtype=perm_var.Type().strip("_t")
+        local_cell_range[1] - local_cell_range[0], dtype=adios_to_numpy_dtype[perm_var.Type()]
     )
     infile.Get(perm_var, in_perm, adios2.Mode.Sync)
     infile.EndStep()
