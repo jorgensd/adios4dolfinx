@@ -257,7 +257,7 @@ def read_mesh_geometry(io: adios2.ADIOS, infile: adios2.Engine, group: str):
         [[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]]
     )
     mesh_geometry = np.empty(
-        (local_range[1] - local_range[0], shape[1]), dtype=np.dtype(adios_to_numpy_dtype))
+        (local_range[1] - local_range[0], shape[1]), dtype=adios_to_numpy_dtype[geometry.Type()])
 
     infile.Get(geometry, mesh_geometry, adios2.Mode.Sync)
     return mesh_geometry
