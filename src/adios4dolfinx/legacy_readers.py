@@ -413,7 +413,6 @@ def read_function_from_legacy_h5(
     adios = adios2.ADIOS(comm)
     local_array, starting_pos = read_array(adios, filename, f"/{group}/{vector_group}", "HDF5", comm)
 
-
     # Send global dof indices to correct input process, and receive value of given dof
     local_values = send_dofs_and_recv_values(
         dofmap_indices, dof_owner, comm, local_array, starting_pos
