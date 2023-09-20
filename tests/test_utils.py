@@ -1,8 +1,11 @@
 import pathlib
+
 import dolfinx
-import adios4dolfinx
-from mpi4py import MPI
 import numpy as np
+import numpy.typing
+from mpi4py import MPI
+
+import adios4dolfinx
 
 
 def write_function(mesh, el, f, dtype) -> str:
@@ -45,6 +48,7 @@ def read_function(comm, el, f, hash, dtype):
 
 
 def get_dtype(in_dtype: np.dtype, complex: bool):
+    dtype: numpy.typing.DTypeLike
     if in_dtype == np.float32:
         if complex:
             dtype = np.complex64
