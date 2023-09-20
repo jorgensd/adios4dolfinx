@@ -410,13 +410,9 @@ def read_function_from_legacy_h5(
     # NOTE: USE NBX in C++
 
     # Read input data
-    local_array, starting_pos = read_array(filename, f"/{group}/{vector_group}", "HDF5", comm)
+    adios = adios2.ADIOS(comm)
+    local_array, starting_pos = read_array(adios, filename, f"/{group}/{vector_group}", "HDF5", comm)
 
-    unique_dof_owners = np.unique(dof_owner)
-    mesh_to_dof_comm = mesh.comm.Create_dist_graph(
-        [mesh.comm.rank], [len(unique_dof_owners)], unique_dof_owners, reorder=False
-    )
-    dof_source, dof_dest, _ = mesh_to_dof_comm.Get_dist_neighbors()
 
     # Send global dof indices to correct input process, and receive value of given dof
     local_values = send_dofs_and_recv_values(

@@ -22,6 +22,7 @@ adios_to_numpy_dtype = {"float": np.float32, "double": np.float64,
 
 
 def read_cell_perms(
+    adios: adios2.adios2.ADIOS,
     comm: MPI.Intracomm,
     filename: pathlib.Path,
     variable: str,
@@ -33,6 +34,7 @@ def read_cell_perms(
     Split in continuous chunks based on number of cells in the mesh (global).
 
     Args:
+        adios: The ADIOS instance
         comm: The MPI communicator used to read the data
         filename: Path to input file
         variable: Name of cell-permutation variable
@@ -48,7 +50,6 @@ def read_cell_perms(
 
     # Open ADIOS engine
     io_name = f"{variable=}_reader"
-    adios = adios2.ADIOS(comm)
     io = adios.DeclareIO(io_name)
     io.SetEngine(engine)
     infile = io.Open(str(filename), adios2.Mode.Read)
@@ -84,6 +85,7 @@ def read_cell_perms(
 
 
 def read_dofmap(
+    adios: adios2.adios2.ADIOS,
     comm: MPI.Intracomm,
     filename: pathlib.Path,
     dofmap: str,
@@ -96,6 +98,7 @@ def read_dofmap(
     split in continuous chunks based on number of cells in the mesh (global).
 
     Args:
+        adios: The ADIOS instance
         comm: The MPI communicator used to read the data
         filename: Path to input file
         dofmap: Name of variable containing dofmap
@@ -113,7 +116,6 @@ def read_dofmap(
 
     # Open ADIOS engine
     io_name = f"{dofmap=}_reader"
-    adios = adios2.ADIOS(comm)
     io = adios.DeclareIO(io_name)
     io.SetEngine(engine)
     infile = io.Open(str(filename), adios2.Mode.Read)
@@ -163,12 +165,14 @@ def read_dofmap(
 
 
 def read_array(
-    filename: pathlib.Path, array_name: str, engine: str, comm: MPI.Intracomm
+            adios: adios2.adios2.ADIOS,
+            filename: pathlib.Path, array_name: str, engine: str, comm: MPI.Intracomm
 ) -> Tuple[npt.NDArray[valid_function_types], int]:
     """
     Read an array from file, return the global starting position of the local array
 
     Args:
+        adios: The ADIOS instance
         filename: Path to file to read array from
         array_name: Name of array in file
         engine: Name of engine to use to read file
@@ -176,7 +180,6 @@ def read_array(
     Returns:
         Local part of array and its global starting position
     """
-    adios = adios2.ADIOS(comm)
     io = adios.DeclareIO("ArrayReader")
     io.SetEngine(engine)
     infile = io.Open(str(filename), adios2.Mode.Read)
