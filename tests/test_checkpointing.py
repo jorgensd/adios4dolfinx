@@ -19,7 +19,6 @@ two_dim_combinations = itertools.product(dtypes, two_dimensional_cell_types, wri
 three_dim_combinations = itertools.product(dtypes, three_dimensional_cell_types, write_comm)
 
 
-
 @pytest.fixture(params=two_dim_combinations, scope="module")
 def mesh_2D(request):
     dtype, cell_type, write_comm = request.param
@@ -85,4 +84,3 @@ def test_read_write_P_3D(read_comm, family, degree, complex, mesh_3D):
 
     MPI.COMM_WORLD.Barrier()
     read_function(read_comm, el, f, hash, f_dtype)
-

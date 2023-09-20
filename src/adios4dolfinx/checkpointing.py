@@ -232,13 +232,13 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4"):
                 )
             else:
                 # NOTE: dolfinx.fem.FiniteElement is only templated over scalar precision, not complex types
-                # Need to use numpy views of real and complex part of array to make this work
-                parts = [recv_array[start:end].real, recv_array[start:end].imag]
+                parts = [recv_array[start:end].real.copy(), recv_array[start:end].imag.copy()]
                 for part in parts:
                     element.apply_transpose_dof_transformation(
-                        part[start:end], input_perms[l_cell], bs)
+                        part, input_perms[l_cell], bs)
                     element.apply_inverse_transpose_dof_transformation(
-                        part[start:end], inc_perms[i], bs)
+                        part, inc_perms[i], bs)
+                recv_array[start:end] = parts[0] + 1j*parts[1]
 
     # ------------------Step 6----------------------------------------
     # For each dof owned by a process, find the local position in the dofmap.
