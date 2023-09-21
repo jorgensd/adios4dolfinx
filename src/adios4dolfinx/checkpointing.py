@@ -210,7 +210,6 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4"):
     # Then apply current permutation to the local data
     element = u.function_space.element
     if element.needs_dof_transformations:
-        is_real = np.isrealobj(recv_array)
         bs = u.function_space.dofmap.bs
 
         # Read input cell permutations on dofmap process
@@ -223,22 +222,12 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4"):
         # First invert input data to reference element then transform to current mesh
         for i, l_cell in enumerate(input_local_cell_index):
             start, end = input_dofmap.offsets[l_cell], input_dofmap.offsets[l_cell + 1]
-            if is_real:
-                element.apply_transpose_dof_transformation(
-                    recv_array[start:end], input_perms[l_cell], bs
-                )
-                element.apply_inverse_transpose_dof_transformation(
-                    recv_array[start:end], inc_perms[i], bs
-                )
-            else:
-                # NOTE: dolfinx.fem.FiniteElement is only templated over scalar precision, not complex types
-                parts = [recv_array[start:end].real.copy(), recv_array[start:end].imag.copy()]
-                for part in parts:
-                    element.apply_transpose_dof_transformation(
-                        part, input_perms[l_cell], bs)
-                    element.apply_inverse_transpose_dof_transformation(
-                        part, inc_perms[i], bs)
-                recv_array[start:end] = parts[0] + 1j*parts[1]
+            element.apply_transpose_dof_transformation(
+                recv_array[start:end], input_perms[l_cell], bs
+            )
+            element.apply_inverse_transpose_dof_transformation(
+                recv_array[start:end], inc_perms[i], bs
+            )
 
     # ------------------Step 6----------------------------------------
     # For each dof owned by a process, find the local position in the dofmap.
