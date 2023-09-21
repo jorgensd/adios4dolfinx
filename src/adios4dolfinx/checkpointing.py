@@ -5,6 +5,7 @@
 # SPDX-License-Identifier:    MIT
 
 from pathlib import Path
+
 import adios2
 import basix
 import dolfinx
@@ -12,13 +13,12 @@ import numpy as np
 import ufl
 from mpi4py import MPI
 
-from .comm_helpers import (
-    send_and_recv_cell_perm,
-    send_dofs_and_recv_values,
-    send_dofmap_and_recv_values,
-)
-from .utils import compute_local_range, index_owner, compute_dofmap_pos
-from .adios2_helpers import read_array, read_cell_perms, read_dofmap
+from .adios2_helpers import (adios_to_numpy_dtype, read_array, read_cell_perms,
+                             read_dofmap)
+from .comm_helpers import (send_and_recv_cell_perm,
+                           send_dofmap_and_recv_values,
+                           send_dofs_and_recv_values)
+from .utils import compute_dofmap_pos, compute_local_range, index_owner
 
 __all__ = [
     "read_mesh",
@@ -164,7 +164,7 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4"):
     """
     mesh = u.function_space.mesh
     comm = mesh.comm
-
+    adios = adios2.ADIOS(comm)
     # ----------------------Step 1---------------------------------
     # Compute index of input cells and get cell permutation
     num_owned_cells = mesh.topology.index_map(mesh.topology.dim).size_local
@@ -188,7 +188,7 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4"):
     dofmap_path = "Dofmap"
     xdofmap_path = "XDofmap"
     input_dofmap = read_dofmap(
-        comm, filename, dofmap_path, xdofmap_path, num_cells_global, engine
+        adios, comm, filename, dofmap_path, xdofmap_path, num_cells_global, engine
     )
     # Compute owner of dofs in dofmap
     num_dofs_global = (
@@ -200,7 +200,7 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4"):
     # --------------------Step 4-----------------------------------
     # Read array from file and communicate them to input dofmap process
     array_path = "Values"
-    input_array, starting_pos = read_array(filename, array_path, engine, comm)
+    input_array, starting_pos = read_array(adios, filename, array_path, engine, comm)
     recv_array = send_dofs_and_recv_values(
         input_dofmap.array, dof_owner, comm, input_array, starting_pos
     )
@@ -210,24 +210,35 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4"):
     # Then apply current permutation to the local data
     element = u.function_space.element
     if element.needs_dof_transformations:
+        is_real = np.isrealobj(recv_array)
         bs = u.function_space.dofmap.bs
 
         # Read input cell permutations on dofmap process
         local_input_range = compute_local_range(comm, num_cells_global)
         input_local_cell_index = inc_cells - local_input_range[0]
         input_perms = read_cell_perms(
-            comm, filename, "CellPermutations", num_cells_global, engine
+            adios, comm, filename, "CellPermutations", num_cells_global, engine
         )
 
         # First invert input data to reference element then transform to current mesh
         for i, l_cell in enumerate(input_local_cell_index):
             start, end = input_dofmap.offsets[l_cell], input_dofmap.offsets[l_cell + 1]
-            element.apply_transpose_dof_transformation(
-                recv_array[start:end], input_perms[l_cell], bs
-            )
-            element.apply_inverse_transpose_dof_transformation(
-                recv_array[start:end], inc_perms[i], bs
-            )
+            if is_real:
+                element.apply_transpose_dof_transformation(
+                    recv_array[start:end], input_perms[l_cell], bs
+                )
+                element.apply_inverse_transpose_dof_transformation(
+                    recv_array[start:end], inc_perms[i], bs
+                )
+            else:
+                # NOTE: dolfinx.fem.FiniteElement is only templated over scalar precision, not complex types
+                parts = [recv_array[start:end].real.copy(), recv_array[start:end].imag.copy()]
+                for part in parts:
+                    element.apply_transpose_dof_transformation(
+                        part, input_perms[l_cell], bs)
+                    element.apply_inverse_transpose_dof_transformation(
+                        part, inc_perms[i], bs)
+                recv_array[start:end] = parts[0] + 1j*parts[1]
 
     # ------------------Step 6----------------------------------------
     # For each dof owned by a process, find the local position in the dofmap.
@@ -303,10 +314,9 @@ def read_mesh(
         [[geometry_range[0], 0], [geometry_range[1] - geometry_range[0], x_shape[1]]]
     )
     mesh_geometry = np.empty(
-        (geometry_range[1] - geometry_range[0], x_shape[1]), dtype=np.float64
+        (geometry_range[1] - geometry_range[0], x_shape[1]), dtype=adios_to_numpy_dtype[geometry.Type()]
     )
     infile.Get(geometry, mesh_geometry, adios2.Mode.Deferred)
-
     # Get mesh topology (distributed)
     if "Topology" not in io.AvailableVariables().keys():
         raise KeyError("Mesh topology not found at Topology'")
@@ -372,7 +382,7 @@ def write_function(
     outfile.BeginStep()
     val_var = io.DefineVariable(
         "Values",
-        np.zeros(num_dofs_local, dtype=np.float64),
+        np.zeros(num_dofs_local, dtype=u.dtype),
         shape=[num_dofs_global],
         start=[local_start],
         count=[num_dofs_local],

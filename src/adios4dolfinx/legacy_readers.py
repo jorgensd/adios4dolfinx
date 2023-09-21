@@ -15,9 +15,10 @@ import numpy.typing as npt
 import ufl
 from mpi4py import MPI
 
-from .adios2_helpers import read_array
+from .adios2_helpers import adios_to_numpy_dtype, read_array
 from .comm_helpers import send_dofs_and_recv_values
-from .utils import compute_dofmap_pos, compute_local_range, find_first, index_owner
+from .utils import (compute_dofmap_pos, compute_local_range, find_first,
+                    index_owner)
 
 __all__ = [
     "read_mesh_from_legacy_h5",
@@ -256,8 +257,8 @@ def read_mesh_geometry(io: adios2.ADIOS, infile: adios2.Engine, group: str):
         [[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]]
     )
     mesh_geometry = np.empty(
-        (local_range[1] - local_range[0], shape[1]), dtype=np.float64
-    )
+        (local_range[1] - local_range[0], shape[1]), dtype=adios_to_numpy_dtype[geometry.Type()])
+
     infile.Get(geometry, mesh_geometry, adios2.Mode.Sync)
     return mesh_geometry
 
@@ -409,13 +410,8 @@ def read_function_from_legacy_h5(
     # NOTE: USE NBX in C++
 
     # Read input data
-    local_array, starting_pos = read_array(filename, f"/{group}/{vector_group}", "HDF5", comm)
-
-    unique_dof_owners = np.unique(dof_owner)
-    mesh_to_dof_comm = mesh.comm.Create_dist_graph(
-        [mesh.comm.rank], [len(unique_dof_owners)], unique_dof_owners, reorder=False
-    )
-    dof_source, dof_dest, _ = mesh_to_dof_comm.Get_dist_neighbors()
+    adios = adios2.ADIOS(comm)
+    local_array, starting_pos = read_array(adios, filename, f"/{group}/{vector_group}", "HDF5", comm)
 
     # Send global dof indices to correct input process, and receive value of given dof
     local_values = send_dofs_and_recv_values(

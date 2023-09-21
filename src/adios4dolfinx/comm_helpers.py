@@ -4,7 +4,8 @@ import numpy as np
 import numpy.typing as npt
 from mpi4py import MPI
 
-from .utils import compute_local_range, find_first
+from .utils import compute_local_range, find_first, valid_function_types
+
 
 __all__ = [
     "send_dofmap_and_recv_values",
@@ -15,6 +16,9 @@ __all__ = [
 Helpers for sending and receiving values for checkpointing
 """
 
+numpy_to_mpi = {np.float64: MPI.DOUBLE, np.float32: MPI.FLOAT,
+                np.complex64: MPI.COMPLEX, np.complex128: MPI.DOUBLE_COMPLEX}
+
 
 def send_dofmap_and_recv_values(
     comm: MPI.Intracomm,
@@ -24,9 +28,9 @@ def send_dofmap_and_recv_values(
     input_cells: npt.NDArray[np.int64],
     dofmap_pos: npt.NDArray[np.int32],
     num_cells_global: np.int64,
-    values: npt.NDArray[np.float64],
+    values: npt.NDArray[valid_function_types],
     dofmap_offsets: npt.NDArray[np.int32],
-) -> npt.NDArray[np.float64]:
+) -> npt.NDArray[valid_function_types]:
     """
     Given a set of positions in input dofmap, give the global input index of this dofmap entry
     in input file.
@@ -102,7 +106,7 @@ def send_dofmap_and_recv_values(
     mesh_to_data_comm.Neighbor_alltoallv(s_msg, r_msg)
 
     local_input_range = compute_local_range(comm, num_cells_global)
-    values_to_distribute = np.zeros_like(inc_pos, dtype=np.float64)
+    values_to_distribute = np.zeros_like(inc_pos, dtype=values.dtype)
     for i, (cell, pos) in enumerate(zip(inc_cells, inc_pos)):
         l_cell = cell - local_input_range[0]
         values_to_distribute[i] = values[dofmap_offsets[l_cell] + pos]
@@ -112,13 +116,13 @@ def send_dofmap_and_recv_values(
         dest_ranks.tolist(), source_ranks.tolist(), reorder=False
     )
 
-    incoming_global_dofs = np.zeros(sum(out_size), dtype=np.float64)
-    s_msg = [values_to_distribute, recv_size, MPI.DOUBLE]
-    r_msg = [incoming_global_dofs, out_size, MPI.DOUBLE]
+    incoming_global_dofs = np.zeros(sum(out_size), dtype=values.dtype)
+    s_msg = [values_to_distribute, recv_size, numpy_to_mpi[values.dtype.type]]
+    r_msg = [incoming_global_dofs, out_size, numpy_to_mpi[values.dtype.type]]
     data_to_mesh_comm.Neighbor_alltoallv(s_msg, r_msg)
 
     # Sort incoming global dofs as they were inputted
-    sorted_global_dofs = np.zeros_like(incoming_global_dofs, dtype=np.float64)
+    sorted_global_dofs = np.zeros_like(incoming_global_dofs, dtype=values.dtype)
     assert len(incoming_global_dofs) == len(input_cells)
     for i in range(len(dest_ranks)):
         for j in range(out_size[i]):
@@ -203,7 +207,7 @@ def send_dofs_and_recv_values(
     input_dofmap: npt.NDArray[np.int64],
     dofmap_owners: npt.NDArray[np.int32],
     comm: MPI.Intracomm,
-    input_array: npt.NDArray[np.float64],
+    input_array: npt.NDArray[valid_function_types],
     array_start: int,
 ):
     """
@@ -255,18 +259,18 @@ def send_dofs_and_recv_values(
     dofmap_to_values.Neighbor_alltoallv(s_msg, r_msg)
 
     # Send back appropriate input values
-    sending_values = np.zeros(len(inc_dofs), dtype=np.float64)
+    sending_values = np.zeros(len(inc_dofs), dtype=input_array.dtype)
     for i, dof in enumerate(inc_dofs):
         sending_values[i] = input_array[dof - array_start]
 
     values_to_dofmap = comm.Create_dist_graph_adjacent(dest, source, reorder=False)
-    inc_values = np.zeros_like(out_dofs, dtype=np.float64)
-    s_msg_rev = [sending_values, recv_size, MPI.DOUBLE]
-    r_msg_rev = [inc_values, out_size, MPI.DOUBLE]
+    inc_values = np.zeros_like(out_dofs, dtype=input_array.dtype)
+    s_msg_rev = [sending_values, recv_size, numpy_to_mpi[input_array.dtype.type]]
+    r_msg_rev = [inc_values, out_size, numpy_to_mpi[input_array.dtype.type]]
     values_to_dofmap.Neighbor_alltoallv(s_msg_rev, r_msg_rev)
 
     # Sort inputs according to local dof number (input process)
-    values = np.empty_like(inc_values, dtype=np.float64)
+    values = np.empty_like(inc_values, dtype=input_array.dtype)
 
     for i in range(len(dest_ranks)):
         for j in range(out_size[i]):
