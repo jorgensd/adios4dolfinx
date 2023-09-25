@@ -209,7 +209,7 @@ def send_cells_and_receive_dofmap_index(
     s_msg = [out_pos, out_size, MPI.INT32_T]
     r_msg = [inc_pos, recv_size, MPI.INT32_T]
     mesh_to_data_comm.Neighbor_alltoallv(s_msg, r_msg)
-
+    mesh_to_data_comm.Free()
     # Read dofmap from file
     input_dofs = read_dofmap_legacy(
         comm,
@@ -239,6 +239,7 @@ def send_cells_and_receive_dofmap_index(
         for j in range(out_size[i]):
             input_pos = offsets[i] + j
             sorted_global_dofs[proc_to_dof[input_pos]] = incoming_global_dofs[input_pos]
+    data_to_mesh_comm.Free()
     return sorted_global_dofs
 
 
@@ -374,7 +375,7 @@ def read_function_from_legacy_h5(
         [mesh.comm.rank], [len(unique_owners)], unique_owners, reorder=False
     )
     source, dest, _ = _tmp_comm.Get_dist_neighbors()
-
+    _tmp_comm.Free()
     # Strip out any /
     group = group.strip("/")
     if step is not None:
