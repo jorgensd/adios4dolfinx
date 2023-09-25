@@ -47,15 +47,13 @@ jobs:
       - name: Install package
         run: python3 -m pip install .[test]
 
-      - name: Run tests (in two steps to avoid too many mpi communicator duplications)
+      - name: Run tests
         run: |
-          coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/ --ignore ./tests/test_checkpointing_vector.py
-          coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/test_checkpointing_vector.py
+          coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/ 
 
-      - name: Run tests in parallel (in two steps to avoid too many mpi comm duplications)
+      - name: Run tests in parallel
         run: |
-          mpirun -n 2 coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/  --ignore ./tests/test_checkpointing_vector.py
-          mpirun -n 2 coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/test_checkpointing_vector.py
+          mpirun -n 2 coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
        
       - name: Combine coverage reports
         run: |
