@@ -259,7 +259,8 @@ def send_dofs_and_recv_values(
     s_msg = [out_dofs, out_size, MPI.INT64_T]
     r_msg = [inc_dofs, recv_size, MPI.INT64_T]
     dofmap_to_values.Neighbor_alltoallv(s_msg, r_msg)
-
+    dofmap_to_values.Free()
+   
     # Send back appropriate input values
     sending_values = np.zeros(len(inc_dofs), dtype=input_array.dtype)
     for i, dof in enumerate(inc_dofs):
@@ -271,9 +272,10 @@ def send_dofs_and_recv_values(
     r_msg_rev = [inc_values, out_size, numpy_to_mpi[input_array.dtype.type]]
     values_to_dofmap.Neighbor_alltoallv(s_msg_rev, r_msg_rev)
     values_to_dofmap.Free()
+
     # Sort inputs according to local dof number (input process)
     values = np.empty_like(inc_values, dtype=input_array.dtype)
-
+    
     for i in range(len(dest_ranks)):
         for j in range(out_size[i]):
             in_pos = dofs_offsets[i] + j
