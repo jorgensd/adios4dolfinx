@@ -3,50 +3,26 @@ requires = ["setuptools>=61.0.0", "wheel"]
 
 [project]
 name = "adios4dolfinx"
-version = "0.4.0"
+version = "0.7.0"
 description = "Wrappers for reading/writing DOLFINx meshes/functions with ADIOS2"
-authors = [{name = "Jørgen S. Dokken", email = "dokken@simula.no"}]
-license = {file = "LICENSE"}
+authors = [{ name = "Jørgen S. Dokken", email = "dokken@simula.no" }]
+license = { file = "LICENSE" }
 readme = "README.md"
 
 
 [project.optional-dependencies]
-test = [
-    "pytest",
-    "coverage"
-]
-dev = [
-    "pdbpp",
-    "ipython",
-    "mypy",
-    "flake8",
-]
-docs = [
-    "jupyter-book"
-]
-all = [
-   "adios4dolfinx[test]",
-   "adios4dolfinx[dev]",
-   "adios4dolfinx[docs]"
-]
+test = ["pytest", "coverage"]
+dev = ["pdbpp", "ipython", "mypy", "flake8"]
+docs = ["jupyter-book"]
+all = ["adios4dolfinx[test]", "adios4dolfinx[dev]", "adios4dolfinx[docs]"]
 
 [tool.pytest.ini_options]
-addopts = [
-   "--import-mode=importlib",
-]
-testpaths = [
-    "tests"
-]
+addopts = ["--import-mode=importlib"]
+testpaths = ["tests"]
 
 [tool.mypy]
 ignore_missing_imports = true
 # Folders to exclude
-exclude = [
-    "docs/",
-    "build/"
-]
+exclude = ["docs/", "build/"]
 # Folder to check with mypy
-files = [
-    "src",
-    "tests"
-]
+files = ["src", "tests"]
