@@ -202,6 +202,7 @@ def send_and_recv_cell_perm(
     s_msg = [out_perm, out_size, MPI.UINT32_T]
     r_msg = [inc_perm, recv_size, MPI.UINT32_T]
     mesh_to_data.Neighbor_alltoallv(s_msg, r_msg)
+    mesh_to_data.Free()
     return inc_cells, inc_perm
 
 
