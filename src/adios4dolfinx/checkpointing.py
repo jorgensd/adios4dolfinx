@@ -253,6 +253,7 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4"):
         [V.mesh.comm.rank], [len(unique_owners)], unique_owners, reorder=False
     )
     source, dest, _ = sub_comm.Get_dist_neighbors()
+    sub_comm.Free()
 
     owned_values = send_dofmap_and_recv_values(
         comm,
@@ -265,7 +266,6 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4"):
         recv_array,
         input_dofmap.offsets,
     )
-
     u.x.array[: len(owned_values)] = owned_values
     u.x.scatter_forward()
 
