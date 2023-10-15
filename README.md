@@ -7,19 +7,17 @@ This is an experimental library for checkpoint with [DOLFINx](https://github.com
 
 ## Docker
 ADIOS2 is installed in the official DOLFINx containers.
-To get access to the Python interface of ADIOS2 (inside dolfinx docker images), you might have to extend your Python-path:
 ```bash
 docker run -ti -v $(pwd):/root/shared -w /root/shared --name=dolfinx-checkpoint ghcr.io/fenics/dolfinx/dolfinx:nightly
-export PYTHONPATH=/usr/local/lib/python3/dist-packages:$PYTHONPATH
 ```
 
 ## Conda
-To use with conda (DOLFINx release v0.6.1 works with v0.1.0 of ADIOS4DOLFINx)
+To use with conda (DOLFINx release v0.7.0 works with v0.7.1 of ADIOS4DOLFINx)
 ```bash
 conda create -n dolfinx-checkpoint python=3.10
 conda activate dolfinx-checkpoint
 conda install -c conda-forge fenics-dolfinx pip adios2 numba
-python3 -m pip install git+https://github.com/jorgensd/adios4dolfinx@v0.1.0
+python3 -m pip install git+https://github.com/jorgensd/adios4dolfinx@v0.7.1
 ```
 
 # Long term plan
