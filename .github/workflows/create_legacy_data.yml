@@ -10,7 +10,7 @@ env:
 jobs:
   create-data:
     runs-on: "ubuntu-22.04"
-    container: ghcr.io/scientificcomputing/fenics:test_2023.1.0
+    container: ghcr.io/scientificcomputing/fenics-gmsh:jupterlab-2023-08-31
     steps:
       - uses: actions/checkout@v4
 

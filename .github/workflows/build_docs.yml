@@ -23,7 +23,7 @@ jobs:
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
 
     runs-on: ubuntu-22.04
-    container: dolfinx/dolfinx:nightly
+    container: dolfinx/dolfinx:v0.7.0-post0
     steps:
       # This action sets the current path to the root of your github repo
       - uses: actions/checkout@v4
