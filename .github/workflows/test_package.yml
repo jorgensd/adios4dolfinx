@@ -27,7 +27,7 @@ jobs:
   test-code:
     runs-on: "ubuntu-22.04"
     needs: [create-datasets, check-formatting]
-    container: ghcr.io/fenics/dolfinx/dolfinx:v0.7.0-post0
+    container: ghcr.io/fenics/dolfinx/dolfinx:v0.7.0
     env: 
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
       PYTHONPATH: /usr/local/lib/python3/dist-packages:/usr/local/lib:/usr/local/dolfinx-real/lib/python3.10/dist-packages
