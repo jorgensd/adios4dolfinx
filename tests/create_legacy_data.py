@@ -14,7 +14,7 @@ import numpy as np
 import os
 import pathlib
 import argparse
-import ufl
+import ufl_legacy as ufl
 
 
 def create_reference_data(
