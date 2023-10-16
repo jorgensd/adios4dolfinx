@@ -328,7 +328,7 @@ def read_mesh(
         basix.ElementFamily.P,
         cell_type,
         degree,
-        basix.LagrangeVariant(lvar),
+        basix.LagrangeVariant(int(lvar)),
         shape=(mesh_geometry.shape[1],),
         gdim=mesh_geometry.shape[1],
     )
