@@ -9,7 +9,7 @@ import adios4dolfinx
 
 
 def write_function(mesh, el, f, dtype) -> str:
-    V = dolfinx.fem.FunctionSpace(mesh, el)
+    V = dolfinx.fem.functionspace(mesh, el)
     uh = dolfinx.fem.Function(V, dtype=dtype)
     uh.interpolate(f)
     el_hash = (

@@ -63,7 +63,7 @@ def test_legacy_function():
     comm = MPI.COMM_WORLD
     path = (pathlib.Path("legacy") / "mesh.h5").absolute()
     mesh = read_mesh_from_legacy_h5(comm, path, "/mesh")
-    V = dolfinx.fem.FunctionSpace(mesh, ("DG", 2))
+    V = dolfinx.fem.functionspace(mesh, ("DG", 2))
     u = ufl.TrialFunction(V)
     v = ufl.TestFunction(V)
     a = ufl.inner(u, v) * ufl.dx
@@ -96,7 +96,7 @@ def test_read_legacy_function_from_checkpoint():
     path = (pathlib.Path("legacy") / "mesh_checkpoint.h5").absolute()
     mesh = read_mesh_from_legacy_h5(comm, path, "/Mesh/mesh")
 
-    V = dolfinx.fem.FunctionSpace(mesh, ("DG", 2))
+    V = dolfinx.fem.functionspace(mesh, ("DG", 2))
     u = ufl.TrialFunction(V)
     v = ufl.TestFunction(V)
     a = ufl.inner(u, v) * ufl.dx
