@@ -26,7 +26,7 @@ def test_read_write_2D(family, degree, cell_type):
     def f(x):
         return (np.full(x.shape[1], np.pi) + x[0], x[1])
 
-    V = dolfinx.fem.FunctionSpace(mesh, el)
+    V = dolfinx.fem.functionspace(mesh, el)
     u = dolfinx.fem.Function(V)
     u.interpolate(f)
 
@@ -49,7 +49,7 @@ def test_read_write_3D(family, degree, cell_type):
     def f(x):
         return (np.full(x.shape[1], np.pi) + x[0], x[1], x[1] * x[2])
 
-    V = dolfinx.fem.FunctionSpace(mesh, el)
+    V = dolfinx.fem.functionspace(mesh, el)
     u = dolfinx.fem.Function(V)
     u.interpolate(f)
 
@@ -75,7 +75,7 @@ def test_read_write_P_2D(family, degree, cell_type):
     def f(x):
         return (np.full(x.shape[1], np.pi) + x[0], x[1])
 
-    V = dolfinx.fem.FunctionSpace(mesh, el)
+    V = dolfinx.fem.functionspace(mesh, el)
     u = dolfinx.fem.Function(V)
     u.interpolate(f)
 
@@ -101,7 +101,7 @@ def test_read_write_P_3D(family, degree, cell_type):
     def f(x):
         return (np.full(x.shape[1], np.pi) + x[0], x[1] + 2 * x[0], np.cos(x[2]))
 
-    V = dolfinx.fem.FunctionSpace(mesh, el)
+    V = dolfinx.fem.functionspace(mesh, el)
     u = dolfinx.fem.Function(V)
     u.interpolate(f)
 
