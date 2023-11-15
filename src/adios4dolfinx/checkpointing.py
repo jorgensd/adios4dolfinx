@@ -222,11 +222,13 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4"):
         # First invert input data to reference element then transform to current mesh
         for i, l_cell in enumerate(input_local_cell_index):
             start, end = input_dofmap.offsets[l_cell], input_dofmap.offsets[l_cell + 1]
+            # FIXME: Tempoary cast uint32 to integer as transformations doesn't support uint32 with the switch
+            # to nanobind
             element.apply_transpose_dof_transformation(
-                recv_array[start:end], input_perms[l_cell], bs
+                recv_array[start:end], int(input_perms[l_cell]), bs
             )
             element.apply_inverse_transpose_dof_transformation(
-                recv_array[start:end], inc_perms[i], bs
+                recv_array[start:end], int(inc_perms[i]), bs
             )
     # ------------------Step 6----------------------------------------
     # For each dof owned by a process, find the local position in the dofmap.
