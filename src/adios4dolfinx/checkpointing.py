@@ -123,9 +123,9 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
 
     dofs_out = np.zeros((num_cells_local, num_dofs_per_cell), dtype=np.int64)
     assert g_dmap.shape[1] == num_dofs_per_cell
-    dofs_out[:, :] = g_imap.local_to_global(
+    dofs_out[:, :] = np.asarray(g_imap.local_to_global(
         g_dmap[:num_cells_local, :].reshape(-1)
-    ).reshape(dofs_out.shape)
+    )).reshape(dofs_out.shape)
 
     dvar = io.DefineVariable(
         "Topology",
