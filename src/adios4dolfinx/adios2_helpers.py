@@ -165,8 +165,8 @@ def read_dofmap(
 
 
 def read_array(
-            adios: adios2.adios2.ADIOS,
-            filename: pathlib.Path, array_name: str, engine: str, comm: MPI.Intracomm
+    adios: adios2.adios2.ADIOS,
+    filename: pathlib.Path, array_name: str, engine: str, comm: MPI.Intracomm
 ) -> Tuple[npt.NDArray[valid_function_types], int]:
     """
     Read an array from file, return the global starting position of the local array
@@ -203,9 +203,10 @@ def read_array(
     else:
         arr.SetSelection([[arr_range[0], 0], [arr_range[1] - arr_range[0], arr_shape[1]]])
         vals = np.empty((arr_range[1] - arr_range[0], arr_shape[1]), dtype=adios_to_numpy_dtype[arr.Type()])
+        assert arr_shape[1] == 1
 
     infile.Get(arr, vals, adios2.Mode.Sync)
     infile.EndStep()
     infile.Close()
     adios.RemoveIO("ArrayReader")
-    return vals, arr_range[0]
+    return vals.reshape(-1), arr_range[0]
