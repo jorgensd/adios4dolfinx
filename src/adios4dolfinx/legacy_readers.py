@@ -109,9 +109,11 @@ def read_dofmap_legacy(
         in_dofmap = np.empty(
             (in_offsets[-1] - in_offsets[0], shape[1]), dtype=cell_dofs.Type().strip("_t")
         )
+        assert shape[1] == 1
+
     infile.Get(cell_dofs, in_dofmap, adios2.Mode.Sync)
 
-    in_dofmap = in_dofmap.astype(np.int64)
+    in_dofmap = in_dofmap.reshape(-1).astype(np.int64)
 
     # Map xxxyyyzzz to xyzxyz
     mapped_dofmap = np.empty_like(in_dofmap)
