@@ -224,10 +224,10 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4"):
             start, end = input_dofmap.offsets[l_cell], input_dofmap.offsets[l_cell + 1]
             # FIXME: Tempoary cast uint32 to integer as transformations doesn't support uint32 with the switch
             # to nanobind
-            element.apply_transpose_dof_transformation(
+            element.pre_apply_transpose_dof_transformation(
                 recv_array[start:end], int(input_perms[l_cell]), bs
             )
-            element.apply_inverse_transpose_dof_transformation(
+            element.pre_apply_inverse_transpose_dof_transformation(
                 recv_array[start:end], int(inc_perms[i]), bs
             )
     # ------------------Step 6----------------------------------------
