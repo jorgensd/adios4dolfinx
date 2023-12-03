@@ -22,7 +22,7 @@ adios_to_numpy_dtype = {"float": np.float32, "double": np.float64,
 
 
 def read_cell_perms(
-    adios: adios2.adios2.ADIOS,
+    adios: adios2.ADIOS,
     comm: MPI.Intracomm,
     filename: pathlib.Path,
     variable: str,
@@ -85,7 +85,7 @@ def read_cell_perms(
 
 
 def read_dofmap(
-    adios: adios2.adios2.ADIOS,
+    adios: adios2.ADIOS,
     comm: MPI.Intracomm,
     filename: pathlib.Path,
     dofmap: str,
@@ -165,7 +165,7 @@ def read_dofmap(
 
 
 def read_array(
-    adios: adios2.adios2.ADIOS,
+    adios: adios2.ADIOS,
     filename: pathlib.Path, array_name: str, engine: str, comm: MPI.Intracomm
 ) -> Tuple[npt.NDArray[valid_function_types], int]:
     """
