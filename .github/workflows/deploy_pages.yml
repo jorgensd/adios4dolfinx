@@ -30,6 +30,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     runs-on: ubuntu-latest
+    if: github.repository == 'jorgensd/adios4dolfinx'
     steps:
       - name: Download docs artifact
         # docs artifact is uploaded by build-docs job
