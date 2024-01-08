@@ -8,7 +8,7 @@ description = "Wrappers for reading/writing DOLFINx meshes/functions with ADIOS2
 authors = [{ name = "Jørgen S. Dokken", email = "dokken@simula.no" }]
 license = { file = "LICENSE" }
 readme = "README.md"
-dependencies = ["fenics-dolfinx>=0.8.0", "numba"]
+dependencies = ["fenics-dolfinx>=0.8.0.dev0", "numba"]
 
 [project.optional-dependencies]
 test = ["pytest", "coverage"]
