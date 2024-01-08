@@ -46,7 +46,8 @@ def test_read_write_P_2D(read_comm, family, degree, complex, mesh_2D):
                            degree,
                            basix.LagrangeVariant.gll_warped,
                            gdim=mesh.geometry.dim,
-                           shape=(mesh.geometry.dim, ))
+                           shape=(mesh.geometry.dim, ),
+                           dtype=mesh.geometry.x.dtype)
 
     def f(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
