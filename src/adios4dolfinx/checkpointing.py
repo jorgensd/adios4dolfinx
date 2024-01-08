@@ -332,6 +332,7 @@ def read_mesh(
         basix.LagrangeVariant(int(lvar)),
         shape=(mesh_geometry.shape[1],),
         gdim=mesh_geometry.shape[1],
+        dtype=mesh_geometry.dtype
     )
     domain = ufl.Mesh(element)
     partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)
