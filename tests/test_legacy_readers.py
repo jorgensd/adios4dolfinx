@@ -63,7 +63,10 @@ def test_legacy_function():
     comm = MPI.COMM_WORLD
     path = (pathlib.Path("legacy") / "mesh.h5").absolute()
     mesh = read_mesh_from_legacy_h5(comm, path, "/mesh")
-    V = dolfinx.fem.functionspace(mesh, ("DG", 2))
+    import basix.ufl
+    el = basix.ufl.quadrature_element(mesh.topology.cell_name(), degree=2)
+
+    V = dolfinx.fem.functionspace(mesh, el)
     u = ufl.TrialFunction(V)
     v = ufl.TestFunction(V)
     a = ufl.inner(u, v) * ufl.dx
@@ -76,12 +79,12 @@ def test_legacy_function():
         a, L, [], uh, petsc_options={"ksp_type": "preonly", "pc_type": "lu"}
     )
     problem.solve()
-
     u_in = dolfinx.fem.Function(V)
     read_function_from_legacy_h5(mesh.comm, path, u_in, group="v")
     assert np.allclose(uh.x.array, u_in.x.array)
+    v_el = basix.ufl.quadrature_element(mesh.topology.cell_name(), degree=2, value_shape=(3,))
 
-    W = dolfinx.fem.functionspace(mesh, ("DG", 2, (mesh.geometry.dim, )))
+    W = dolfinx.fem.functionspace(mesh, v_el)
     wh = dolfinx.fem.Function(W)
     wh.interpolate(lambda x: (x[0], 3*x[2], 7*x[1]))
     w_in = dolfinx.fem.Function(W)

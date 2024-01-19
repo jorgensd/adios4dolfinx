@@ -27,12 +27,27 @@ def create_reference_data(
     function_name_vec: str
 ) -> dolfin.Function:
     mesh = dolfin.UnitCubeMesh(1, 1, 1)
-    V = dolfin.FunctionSpace(mesh, family, degree)
-    W = dolfin.VectorFunctionSpace(mesh, family, degree)
+    if family == "Quadrature":
+        dolfin.parameters["form_compiler"]["representation"] = "quadrature"
+        el = dolfin.FiniteElement("Quadrature", mesh.ufl_cell(), degree, quad_scheme="default")
+        V = dolfin.FunctionSpace(mesh, el)
+        v_el = dolfin.VectorElement("Quadrature", mesh.ufl_cell(), degree, quad_scheme="default")
+        W = dolfin.FunctionSpace(mesh, v_el)
+        metadata = {"quadrature_degree": degree, "quadrature_scheme": "default"}
+    else:
+        dolfin.parameters["form_compiler"]["representation"] = "uflacs"
+        V = dolfin.FunctionSpace(mesh, family, degree)
+        W = dolfin.VectorFunctionSpace(mesh, family, degree)
+        metadata = {}
+    breakpoint()
+
     x = dolfin.SpatialCoordinate(mesh)
 
     f0 = ufl.conditional(ufl.gt(x[0], 0.5), x[1], 2 * x[0])
-    v0 = dolfin.project(f0, V)
+    a = dolfin.inner(dolfin.TrialFunction(V),dolfin.TestFunction(V)) *dolfin.dx(metadata=metadata)
+    L = dolfin.inner(f0, dolfin.TestFunction(V)) * dolfin.dx(metadata=metadata)
+    v0 = dolfin.Function(V)
+    dolfin.solve(a==L, v0)
     w0 = dolfin.interpolate(dolfin.Expression(("x[0]", "3*x[2]", "7*x[1]"), degree=1), W)
 
     v1 = dolfin.interpolate(dolfin.Expression("x[0]", degree=1), V)
@@ -42,21 +57,21 @@ def create_reference_data(
         hdf.write(mesh, mesh_name)
         hdf.write(v0, function_name)
         hdf.write(w0, function_name_vec)
-
-    with dolfin.XDMFFile(mesh.mpi_comm(), str(xdmf_file)) as xdmf:
-        xdmf.write(mesh)
-        xdmf.write_checkpoint(
-            v0, function_name, 0, dolfin.XDMFFile.Encoding.HDF5, append=True
-        )
-        xdmf.write_checkpoint(
-            w0, function_name_vec, 0, dolfin.XDMFFile.Encoding.HDF5, append=True
-        )
-        xdmf.write_checkpoint(
-            v1, function_name, 1, dolfin.XDMFFile.Encoding.HDF5, append=True
-        )
-        xdmf.write_checkpoint(
-            w1, function_name_vec, 1, dolfin.XDMFFile.Encoding.HDF5, append=True
-        )
+    if family != "Quadrature":
+        with dolfin.XDMFFile(mesh.mpi_comm(), str(xdmf_file)) as xdmf:
+            xdmf.write(mesh)
+            xdmf.write_checkpoint(
+                v0, function_name, 0, dolfin.XDMFFile.Encoding.HDF5, append=True
+            )
+            xdmf.write_checkpoint(
+                w0, function_name_vec, 0, dolfin.XDMFFile.Encoding.HDF5, append=True
+            )
+            xdmf.write_checkpoint(
+                v1, function_name, 1, dolfin.XDMFFile.Encoding.HDF5, append=True
+            )
+            xdmf.write_checkpoint(
+                w1, function_name_vec, 1, dolfin.XDMFFile.Encoding.HDF5, append=True
+            )
 
     with dolfin.XDMFFile(mesh.mpi_comm(), "test.xdmf") as xdmf:
         xdmf.write(mesh)
@@ -76,11 +91,20 @@ def verify_hdf5(
     mesh = dolfin.Mesh()
     with dolfin.HDF5File(mesh.mpi_comm(), str(h5_file), "r") as hdf:
         hdf.read(mesh, mesh_name, False)
-        V = dolfin.FunctionSpace(mesh, family, degree)
+        if family == "Quadrature":
+            dolfin.parameters["form_compiler"]["representation"] = "quadrature"
+            el = dolfin.FiniteElement("Quadrature", mesh.ufl_cell(), degree, quad_scheme="default")
+            V = dolfin.FunctionSpace(mesh, el)
+            v_el = dolfin.VectorElement("Quadrature", mesh.ufl_cell(), degree, quad_scheme="default")
+            W = dolfin.FunctionSpace(mesh, v_el)
+        else:
+            dolfin.parameters["form_compiler"]["representation"] = "uflacs"
+            V = dolfin.FunctionSpace(mesh, family, degree)
+            W = dolfin.VectorFunctionSpace(mesh, family, degree)
+
         v = dolfin.Function(V)
         hdf.read(v, function_name)
 
-        W = dolfin.VectorFunctionSpace(mesh, family, degree)
         w = dolfin.Function(W)
         hdf.read(w, function_name_vec)
 
@@ -153,7 +177,7 @@ if __name__ == "__main__":
     verify_hdf5(
         v0_ref, w0_ref, h5_filename, inputs.name, inputs.f_name, inputs.family, inputs.degree, inputs.f_name_vec,
     )
-
-    verify_xdmf(
-        v0_ref, w0_ref, v1_ref, w1_ref, xdmf_filename, inputs.f_name, inputs.family, inputs.degree, inputs.f_name_vec,
-    )
+    if inputs.family != "Quadrature":
+        verify_xdmf(
+            v0_ref, w0_ref, v1_ref, w1_ref, xdmf_filename, inputs.f_name, inputs.family, inputs.degree, inputs.f_name_vec,
+        )
