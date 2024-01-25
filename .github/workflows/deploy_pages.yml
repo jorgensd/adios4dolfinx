@@ -2,7 +2,7 @@ name: Github Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, artifact2-tmp]
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
