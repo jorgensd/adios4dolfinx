@@ -28,7 +28,7 @@ jobs:
     runs-on: "ubuntu-22.04"
     needs: [create-datasets, check-formatting]
     container: ghcr.io/fenics/dolfinx/dolfinx:nightly
-    env: 
+    env:
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
       PYTHONPATH: /usr/local/lib/python3/dist-packages:/usr/local/lib:/usr/local/dolfinx-real/lib/python3.10/dist-packages
 
@@ -39,22 +39,22 @@ jobs:
         run: python3 -m pip install --upgrade pip setuptools
 
       - name: Download legacy data
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: legacy
           path: ./legacy
-  
+
       - name: Install package
         run: python3 -m pip install .[test]
 
       - name: Run tests
         run: |
-          coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/ 
+          coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
 
       - name: Run tests in parallel
         run: |
           mpirun -n 2 coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
-       
+
       - name: Combine coverage reports
         run: |
           coverage combine
@@ -62,7 +62,7 @@ jobs:
           coverage html
 
       - name: Upload coverage report as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: code-coverage-report
           path: htmlcov
