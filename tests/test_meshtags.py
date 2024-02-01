@@ -7,21 +7,21 @@ import adios2
 
 def write_meshtags(filename: str, mesh: dolfinx.mesh.Mesh, meshtags: dolfinx.mesh.MeshTags, engine: str = "BP4"):
     adios4dolfinx.write_mesh(mesh, filename, engine=engine)
-    facets = meshtags.indices
+    tag_entities = meshtags.indices
+    dim = meshtags.dim
+    num_tag_entities_local = mesh.topology.index_map(dim).size_local
+    local_tag_entities = tag_entities[tag_entities < num_tag_entities_local]
+    local_values = meshtags.values[:len(local_tag_entities)]
 
-    num_facets_local = mesh.topology.index_map(mesh.topology.dim-1).size_local
-    local_facets = boundary_facets[facets < num_facets_local]
-    local_values = meshtags.values[:len(local_facets)]
-
-    num_saved_facets = len(local_facets)
-    local_start = mesh.comm.exscan(num_saved_facets, op=MPI.SUM)
+    num_saved_tag_entities = len(local_tag_entities)
+    local_start = mesh.comm.exscan(num_saved_tag_entities, op=MPI.SUM)
     local_start = local_start if mesh.comm.rank != 0 else 0
-    global_num_facets = mesh.comm.allreduce(num_saved_facets, op=MPI.SUM)
+    global_num_tag_entities = mesh.comm.allreduce(num_saved_tag_entities, op=MPI.SUM)
     dof_layout = mesh.geometry.cmap.create_dof_layout()
-    num_dofs_per_entity = dof_layout.num_entity_closure_dofs(mesh.topology.dim-1)
+    num_dofs_per_entity = dof_layout.num_entity_closure_dofs(dim)
 
     entities_to_geometry = dolfinx.cpp.mesh.entities_to_geometry(
-        mesh._cpp_object, mesh.topology.dim-1, boundary_facets, False)
+        mesh._cpp_object, dim, tag_entities, False)
 
     indices = mesh.geometry.index_map().local_to_global(entities_to_geometry.reshape(-1))
 
@@ -33,9 +33,9 @@ def write_meshtags(filename: str, mesh: dolfinx.mesh.Mesh, meshtags: dolfinx.mes
     topology_var = io.DefineVariable(
         meshtags.name+"_topology",
         indices,
-        shape=[global_num_facets, num_dofs_per_entity],
+        shape=[global_num_tag_entities, num_dofs_per_entity],
         start=[local_start, 0],
-        count=[num_saved_facets, num_dofs_per_entity],
+        count=[num_saved_tag_entities, num_dofs_per_entity],
     )
     outfile.Put(topology_var, indices, adios2.Mode.Sync)
 
@@ -43,9 +43,9 @@ def write_meshtags(filename: str, mesh: dolfinx.mesh.Mesh, meshtags: dolfinx.mes
     values_var = io.DefineVariable(
         meshtags.name+"_values",
         local_values,
-        shape=[global_num_facets],
+        shape=[global_num_tag_entities],
         start=[local_start],
-        count=[num_saved_facets],
+        count=[num_saved_tag_entities],
     )
     outfile.Put(values_var, local_values, adios2.Mode.Sync)
 
@@ -70,7 +70,7 @@ def read_meshtags(filename: str, mesh: dolfinx.mesh.Mesh, meshtag_name: str, eng
         raise KeyError(f"{dim_attr_name} nt found")
 
     m_dim = io.InquireAttribute(dim_attr_name)
-    dim = m_dim.Data()[0]
+    dim = int(m_dim.Data()[0])
     # Get mesh tags entites
 
     topology_name = f"{meshtag_name}_topology"
@@ -109,8 +109,9 @@ def read_meshtags(filename: str, mesh: dolfinx.mesh.Mesh, meshtag_name: str, eng
     infile.PerformGets()
     infile.EndStep()
     assert adios.RemoveIO("MeshTagsReader")
+
     local_entities, local_values = dolfinx.cpp.io.distribute_entity_data(
-        mesh._cpp_object, dim, mesh_entities, tag_values)
+        mesh._cpp_object, int(dim), mesh_entities, tag_values)
     mesh.topology.create_connectivity(dim, 0)
     mesh.topology.create_connectivity(dim, mesh.topology.dim)
 
@@ -118,32 +119,34 @@ def read_meshtags(filename: str, mesh: dolfinx.mesh.Mesh, meshtag_name: str, eng
 
     local_values = np.array(local_values, dtype=np.int32)
 
-    ft = dolfinx.mesh.meshtags_from_entities(mesh, int(dim), adj, local_values)
-    ft.name = meshtag_name
+    mt = dolfinx.mesh.meshtags_from_entities(mesh, int(dim), adj, local_values)
+    mt.name = meshtag_name
 
-    return ft
-
-
-filename = "meshtags.bp"
-mesh = dolfinx.mesh.create_unit_square(MPI.COMM_WORLD, 10, 10)
+    return mt
 
 
-mesh.topology.create_connectivity(mesh.topology.dim-1, mesh.topology.dim)
-boundary_facets = dolfinx.mesh.exterior_facet_indices(mesh.topology)
-ft = dolfinx.mesh.meshtags(mesh, mesh.topology.dim-1, boundary_facets, boundary_facets)
-ft.name = "facets"
-write_meshtags(filename, mesh, ft)
+mesh = dolfinx.mesh.create_unit_cube(MPI.COMM_WORLD, 10, 10, 10)
 
+for dim in range(mesh.topology.dim+1):
 
-with dolfinx.io.XDMFFile(mesh.comm, "org_tags.xdmf", "w") as xdmf:
-    xdmf.write_mesh(mesh)
-    xdmf.write_meshtags(ft, mesh.geometry)
+    filename = f"meshtags_{dim}.bp"
 
+    mesh.topology.create_connectivity(dim, mesh.topology.dim)
+    num_entities_local = mesh.topology.index_map(dim).size_local
+    entities = np.arange(num_entities_local, dtype=np.int32)
+    ft = dolfinx.mesh.meshtags(mesh, dim, entities, entities)
+    ft.name = f"entity_{dim}"
+    write_meshtags(filename, mesh, ft)
 
-MPI.COMM_WORLD.Barrier()
-new_mesh = adios4dolfinx.read_mesh(MPI.COMM_WORLD, filename, engine="BP4",
-                                   ghost_mode=dolfinx.mesh.GhostMode.shared_facet)
-new_ft = read_meshtags(filename, new_mesh, meshtag_name=ft.name, engine="BP4")
-with dolfinx.io.XDMFFile(new_mesh.comm, "new_tags.xdmf", "w") as xdmf:
-    xdmf.write_mesh(new_mesh)
-    xdmf.write_meshtags(new_ft, new_mesh.geometry)
+    with dolfinx.io.XDMFFile(mesh.comm, f"org_tags_{dim}.xdmf", "w") as xdmf:
+        xdmf.write_mesh(mesh)
+        xdmf.write_meshtags(ft, mesh.geometry)
+
+    MPI.COMM_WORLD.Barrier()
+    if MPI.COMM_WORLD.rank == 0:
+        new_mesh = adios4dolfinx.read_mesh(MPI.COMM_SELF, filename, engine="BP4",
+                                           ghost_mode=dolfinx.mesh.GhostMode.shared_facet)
+        new_ft = read_meshtags(filename, new_mesh, meshtag_name=ft.name, engine="BP4")
+        with dolfinx.io.XDMFFile(new_mesh.comm, f"new_tags{dim}.xdmf", "w") as xdmf:
+            xdmf.write_mesh(new_mesh)
+            xdmf.write_meshtags(new_ft, new_mesh.geometry)
