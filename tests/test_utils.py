@@ -22,12 +22,17 @@ def write_function(mesh, el, f, dtype) -> str:
     filename = pathlib.Path(f"output/mesh{el_hash}_{dtype}.bp")
     if mesh.comm.size != 1:
         adios4dolfinx.write_mesh(mesh, filename)
-        adios4dolfinx.write_function(uh, filename)
+        adios4dolfinx.write_function(uh, filename, t=0.0)
+        uh.x.array[:] = 1
+        adios4dolfinx.write_function(uh, filename, t=3.0)
 
     else:
         if MPI.COMM_WORLD.rank == 0:
             adios4dolfinx.write_mesh(mesh, filename)
-            adios4dolfinx.write_function(uh, filename)
+            adios4dolfinx.write_function(uh, filename, t=0.0)
+            uh.x.array[:] = 1
+            adios4dolfinx.write_function(uh, filename, t=4.0)
+
     return f"{el_hash}_{dtype}"
 
 
@@ -44,7 +49,7 @@ def read_function(comm, el, f, hash, dtype):
     v_ex.interpolate(f)
 
     res = np.finfo(dtype).resolution
-    assert np.allclose(v.x.array, v_ex.x.array, atol=10*res, rtol=10*res)
+    assert np.allclose(v.x.array, v_ex.x.array, atol=10 * res, rtol=10 * res)
 
 
 def get_dtype(in_dtype: np.dtype, complex: bool):

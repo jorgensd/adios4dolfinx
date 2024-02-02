@@ -146,7 +146,7 @@ def read_dofmap(
     # Assuming dofmap is saved in stame step
     # Get the relevant part of the dofmap
     if dofmap not in io.AvailableVariables().keys():
-        raise KeyError(f"Dof offsets not found at {dofmap}")
+        raise KeyError(f"Dof offsets not found at {dofmap} in {filename}")
     cell_dofs = io.InquireVariable(dofmap)
     cell_dofs.SetSelection([[in_offsets[0]], [in_offsets[-1] - in_offsets[0]]])
     in_dofmap = np.empty(
