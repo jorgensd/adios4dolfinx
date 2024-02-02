@@ -4,14 +4,12 @@ import dolfinx
 import numpy as np
 
 
-
-
 mesh = dolfinx.mesh.create_unit_cube(MPI.COMM_WORLD, 10, 10, 10)
 
 for dim in range(mesh.topology.dim+1):
 
     filename = f"meshtags_{dim}.bp"
-    adios4dolfinx.write_mesh(mesh,filename, engine="BP4")
+    adios4dolfinx.write_mesh(mesh, filename, engine="BP4")
 
     mesh.topology.create_connectivity(dim, mesh.topology.dim)
     num_entities_local = mesh.topology.index_map(dim).size_local

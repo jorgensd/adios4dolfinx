@@ -154,16 +154,17 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
     assert adios.RemoveIO("MeshWriter")
 
 
-def write_meshtags(filename: Path|str, mesh: dolfinx.mesh.Mesh, meshtags: dolfinx.mesh.MeshTags,
+def write_meshtags(filename: Path | str, mesh: dolfinx.mesh.Mesh, meshtags: dolfinx.mesh.MeshTags,
                    engine: str = "BP4"):
     """
     Write meshtags associated with input mesh to file.
 
     .. note::
-        For this checkpoint to work, the mesh must be written to file using :func:`write_mesh` before calling this function.
+        For this checkpoint to work, the mesh must be written to file using :func:`write_mesh`
+        before calling this function.
 
     Args:
-        filename: Path to save meshtags (with file-extension)    
+        filename: Path to save meshtags (with file-extension)
         mesh: The mesh associated with the meshtags
         meshtags: The meshtags to write to file
         engine: Adios2 Engine
@@ -222,7 +223,7 @@ def read_meshtags(filename: str, mesh: dolfinx.mesh.Mesh, meshtag_name: str,
                   engine: str = "BP4") -> dolfinx.mesh.MeshTags:
     """
     Read meshtags from file and return a :class:`dolfinx.mesh.MeshTags` object.
-    
+
     Args:
         filename: Path to meshtags file (with file-extension)
         mesh: The mesh associated with the meshtags
