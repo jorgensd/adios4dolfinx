@@ -36,7 +36,6 @@ two_dim_combinations = itertools.product(dtypes, two_dimensional_cell_types, wri
 three_dim_combinations = itertools.product(
     dtypes, three_dimensional_cell_types, write_comm
 )
-breakpoint()
 
 
 @pytest.fixture(params=one_dim_combinations, scope="module")
