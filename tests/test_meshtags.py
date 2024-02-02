@@ -1,41 +1,48 @@
 import itertools
 from collections import ChainMap
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple, Union
 
 from mpi4py import MPI
 
 import dolfinx
 import numpy as np
-import pytest
+import numpy.typing as npt
 
+import pytest
 import adios4dolfinx
 
 root = 0
-dtypes = [np.float64, np.float32]  # Mesh geometry dtypes
-write_comm = [MPI.COMM_SELF, MPI.COMM_WORLD]  # Communicators for creating mesh
-read_modes = [dolfinx.mesh.GhostMode.none, dolfinx.mesh.GhostMode.shared_facet]
+dtypes: List["str"] = ["float64", "float32"]  # Mesh geometry dtypes
+write_comm: List[MPI.Intracomm] = [
+    MPI.COMM_SELF,
+    MPI.COMM_WORLD,
+]  # Communicators for creating mesh
+read_modes: List[dolfinx.mesh.GhostMode] = [
+    dolfinx.mesh.GhostMode.none,
+    dolfinx.mesh.GhostMode.shared_facet,
+]
 # Cell types of different dimensions
-one_dim_combinations = [dolfinx.mesh.CellType.interval]
-two_dimensional_cell_types = [
+two_dimensional_cell_types: List[dolfinx.mesh.CellType] = [
     dolfinx.mesh.CellType.triangle,
     dolfinx.mesh.CellType.quadrilateral,
 ]
-three_dimensional_cell_types = [
+three_dimensional_cell_types: List[dolfinx.mesh.CellType] = [
     dolfinx.mesh.CellType.tetrahedron,
     dolfinx.mesh.CellType.hexahedron,
 ]
 
-one_dim_combinations = itertools.product(dtypes, one_dim_combinations, write_comm)
+one_dim_combinations = itertools.product(dtypes, write_comm)
 two_dim_combinations = itertools.product(dtypes, two_dimensional_cell_types, write_comm)
 three_dim_combinations = itertools.product(
     dtypes, three_dimensional_cell_types, write_comm
 )
+breakpoint()
 
 
 @pytest.fixture(params=one_dim_combinations, scope="module")
 def mesh_1D(request):
-    dtype, _, write_comm = request.param
-    mesh = dolfinx.mesh.create_unit_interval(write_comm, 8, dtype=dtype)
+    dtype, write_comm = request.param
+    mesh = dolfinx.mesh.create_unit_interval(write_comm, 8, dtype=np.dtype(dtype))
     return mesh
 
 
@@ -43,7 +50,7 @@ def mesh_1D(request):
 def mesh_2D(request):
     dtype, cell_type, write_comm = request.param
     mesh = dolfinx.mesh.create_unit_square(
-        write_comm, 10, 7, cell_type=cell_type, dtype=dtype
+        write_comm, 10, 7, cell_type=cell_type, dtype=np.dtype(dtype)
     )
     return mesh
 
@@ -52,7 +59,7 @@ def mesh_2D(request):
 def mesh_3D(request):
     dtype, cell_type, write_comm = request.param
     mesh = dolfinx.mesh.create_unit_cube(
-        write_comm, 5, 7, 3, cell_type=cell_type, dtype=dtype
+        write_comm, 5, 7, 3, cell_type=cell_type, dtype=np.dtype(dtype)
     )
     return mesh
 
@@ -62,15 +69,19 @@ def generate_reference_map(
     meshtag: dolfinx.mesh.MeshTags,
     comm: MPI.Intracomm,
     root: int,
-) -> Dict[str, Tuple[int, np.ndarray]]:
+) -> Union[None, Dict[str, Tuple[int, npt.NDArray]]]:
     midpoints = dolfinx.mesh.compute_midpoints(mesh, meshtag.dim, meshtag.indices)
     e_map = mesh.topology.index_map(meshtag.dim)
     value_to_midpoint = {}
     for index, value in zip(meshtag.indices, meshtag.values):
-        value_to_midpoint[value] = (e_map.local_range[0] + index, midpoints[index])
+        value_to_midpoint[value] = (
+            int(e_map.local_range[0] + index),
+            midpoints[index],
+        )
     global_map = comm.gather(value_to_midpoint, root=root)
     if comm.rank == root:
-        return dict(ChainMap(*global_map))
+        return dict(ChainMap(*global_map))  # type: ignore
+    return None
 
 
 @pytest.mark.parametrize("read_mode", read_modes)
