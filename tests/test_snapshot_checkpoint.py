@@ -1,11 +1,12 @@
 from pathlib import Path
 
+from mpi4py import MPI
+
 import adios2
+import basix.ufl
 import dolfinx
 import numpy as np
 import pytest
-import basix.ufl
-from mpi4py import MPI
 
 from adios4dolfinx import snapshot_checkpoint
 

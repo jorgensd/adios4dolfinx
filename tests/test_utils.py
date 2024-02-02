@@ -1,9 +1,10 @@
 import pathlib
 
+from mpi4py import MPI
+
 import dolfinx
 import numpy as np
 import numpy.typing
-from mpi4py import MPI
 
 import adios4dolfinx
 

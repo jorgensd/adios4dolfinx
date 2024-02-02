@@ -1,11 +1,14 @@
-from adios4dolfinx import write_mesh, read_mesh
-import dolfinx
-from mpi4py import MPI
 import pathlib
 import time
+
+from mpi4py import MPI
+
+import dolfinx
+import numpy as np
 import pytest
 import ufl
-import numpy as np
+
+from adios4dolfinx import read_mesh, write_mesh
 
 
 @pytest.mark.parametrize("encoder, suffix", [("BP4", ".bp"), ("HDF5", ".h5")])
