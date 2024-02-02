@@ -5,13 +5,15 @@
 # SPDX-License-Identifier:    MIT
 
 from pathlib import Path
+from typing import Optional, Union
+
+from mpi4py import MPI
 
 import adios2
 import basix
 import dolfinx
 import numpy as np
 import ufl
-from mpi4py import MPI
 
 from .adios2_helpers import (adios_to_numpy_dtype, read_array, read_cell_perms,
                              read_dofmap)
@@ -154,8 +156,8 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
     assert adios.RemoveIO("MeshWriter")
 
 
-def write_meshtags(filename: Path | str, mesh: dolfinx.mesh.Mesh, meshtags: dolfinx.mesh.MeshTags,
-                   engine: str = "BP4"):
+def write_meshtags(filename: Union[Path, str], mesh: dolfinx.mesh.Mesh, meshtags: dolfinx.mesh.MeshTags,
+                   engine: Optional[str] = "BP4"):
     """
     Write meshtags associated with input mesh to file.
 
@@ -239,22 +241,29 @@ def read_meshtags(filename: str, mesh: dolfinx.mesh.Mesh, meshtag_name: str,
 
     # Get mesh cell type
     dim_attr_name = f"{meshtag_name}_dim"
-
+    step = 0
+    for i in range(infile.Steps()):
+        infile.BeginStep()
+        if dim_attr_name in io.AvailableAttributes().keys():
+            step = i
+            break
+        infile.EndStep()
     if dim_attr_name not in io.AvailableAttributes().keys():
-        raise KeyError(f"{dim_attr_name} nt found")
+        raise KeyError(f"{dim_attr_name} not found in {filename}")
 
     m_dim = io.InquireAttribute(dim_attr_name)
     dim = int(m_dim.Data()[0])
-    # Get mesh tags entites
 
+    # Get mesh tags entites
     topology_name = f"{meshtag_name}_topology"
-    for i in range(infile.Steps()):
-        infile.BeginStep()
+    for i in range(step, infile.Steps()):
+        if i > step:
+            infile.BeginStep()
         if topology_name in io.AvailableVariables().keys():
             break
         infile.EndStep()
     if topology_name not in io.AvailableVariables().keys():
-        raise KeyError(f"{topology_name} not found")
+        raise KeyError(f"{topology_name} not found in {filename}")
 
     topology = io.InquireVariable(topology_name)
     top_shape = topology.Shape()
@@ -282,10 +291,12 @@ def read_meshtags(filename: str, mesh: dolfinx.mesh.Mesh, meshtag_name: str,
 
     infile.PerformGets()
     infile.EndStep()
+    infile.Close()
     assert adios.RemoveIO("MeshTagsReader")
 
+    # Memory leak due to nanobind, ref: https://github.com/FEniCS/dolfinx/issues/2997
     local_entities, local_values = dolfinx.cpp.io.distribute_entity_data(
-        mesh._cpp_object, int(dim), mesh_entities, tag_values)
+         mesh._cpp_object, int(dim), mesh_entities, tag_values)
     mesh.topology.create_connectivity(dim, 0)
     mesh.topology.create_connectivity(dim, mesh.topology.dim)
 
