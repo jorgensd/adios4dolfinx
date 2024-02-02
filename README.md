@@ -3,7 +3,7 @@
 [![MIT](https://img.shields.io/github/license/jorgensd/adios4dolfinx)](LICENSE)
 [Read Latest Documentation](https://jsdokken.com/adios4dolfinx/)
 
-This is an experimental library for checkpoint with [DOLFINx](https://github.com/FEniCS/dolfinx/) using [ADIOS2](https://adios2.readthedocs.io/en/latest/).
+This is an extension for [DOLFINx](https://github.com/FEniCS/dolfinx/) to checkpoint meshes, meshtags and functions using [ADIOS2](https://adios2.readthedocs.io/en/latest/).
 
 ## Docker
 ADIOS2 is installed in the official DOLFINx containers.
@@ -25,6 +25,12 @@ The long term plan is to get this library merged into DOLFINx (rewritten in C++ 
 _________________
 
 # Functionality 
+
+## Implementation details
+The code uses the adios2 Python-wrappers to write DOLFINx objects to file, supporting N-to-M (*recoverable*) and N-to-N (*snapshot*) checkpointing.
+See: [Checkpointing in DOLFINx - FEniCS 23](https://jsdokken.com/checkpointing-presentation/#/) for more information.
+
+For scalability, the code uses [MPI Neighbourhood collectives](https://www.mpi-forum.org/docs/mpi-3.1/mpi31-report/node200.htm) for communication across processes.
 
 ## DOLFINx
 - Reading and writing meshes, using `adios4dolfinx.read/write_mesh`
