@@ -28,6 +28,7 @@ _________________
 
 ## DOLFINx
 - Reading and writing meshes, using `adios4dolfinx.read/write_mesh`
+- Reading and writing meshtags associated to meshes `adios4dolfinx.read/write_meshtags`
 - Reading checkpoints for any element (serial and parallel, one checkpoint per file). Use `adios4dolfinx.read/write_function`.
 
 
