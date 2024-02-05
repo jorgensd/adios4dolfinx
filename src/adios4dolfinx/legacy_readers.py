@@ -7,13 +7,14 @@
 import pathlib
 from typing import Optional
 
+from mpi4py import MPI
+
 import adios2
 import basix
 import dolfinx
 import numpy as np
 import numpy.typing as npt
 import ufl
-from mpi4py import MPI
 
 from .adios2_helpers import adios_to_numpy_dtype, read_array
 from .comm_helpers import send_dofs_and_recv_values

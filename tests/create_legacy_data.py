@@ -9,11 +9,12 @@
 Functions to create checkpoints with Legacy dolfin
 """
 
-import dolfin
-import numpy as np
+import argparse
 import os
 import pathlib
-import argparse
+
+import dolfin
+import numpy as np
 import ufl_legacy as ufl
 
 
