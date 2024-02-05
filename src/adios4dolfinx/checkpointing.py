@@ -298,7 +298,7 @@ def read_meshtags(filename: str, mesh: dolfinx.mesh.Mesh, meshtag_name: str,
 
     # Memory leak due to nanobind, ref: https://github.com/FEniCS/dolfinx/issues/2997
     local_entities, local_values = dolfinx.cpp.io.distribute_entity_data(
-         mesh._cpp_object, int(dim), mesh_entities, tag_values)
+        mesh._cpp_object, int(dim), mesh_entities, tag_values)
     mesh.topology.create_connectivity(dim, 0)
     mesh.topology.create_connectivity(dim, mesh.topology.dim)
 
@@ -312,7 +312,8 @@ def read_meshtags(filename: str, mesh: dolfinx.mesh.Mesh, meshtag_name: str,
     return mt
 
 
-def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4", time: float = 0.):
+def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4", time: float = 0.,
+                  legacy: bool = False):
     """
     Read checkpoint from file and fill it into `u`.
 
@@ -320,6 +321,7 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4", 
         u: Function to fill
         filename: Path to checkpoint
         engine: ADIOS engine type used for reading
+        legacy: If checkpoint is from prior to time-dependent writing set to True
     """
     mesh = u.function_space.mesh
     comm = mesh.comm
@@ -345,8 +347,12 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4", 
 
     # -------------------Step 3-----------------------------------
     # Read dofmap from file and compute dof owners
-    dofmap_path = f"{name}_dofmap"
-    xdofmap_path = f"{name}_XDofmap"
+    if legacy:
+        dofmap_path = f"Dofmap"
+        xdofmap_path = f"XDofmap"
+    else:
+        dofmap_path = f"{name}_dofmap"
+        xdofmap_path = f"{name}_XDofmap"
     input_dofmap = read_dofmap(
         adios, comm, filename, dofmap_path, xdofmap_path, num_cells_global, engine
     )
@@ -359,7 +365,10 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4", 
 
     # --------------------Step 4-----------------------------------
     # Read array from file and communicate them to input dofmap process
-    array_path = f"{name}_values"
+    if legacy:
+        array_path = "Values"
+    else:
+        array_path = f"{name}_values"
     time_name = f"{name}_time"
     input_array, starting_pos = read_array(adios, filename, array_path, engine, comm, time, time_name)
     recv_array = send_dofs_and_recv_values(
