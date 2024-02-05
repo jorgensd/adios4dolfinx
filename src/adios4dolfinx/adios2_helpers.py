@@ -169,7 +169,7 @@ def read_array(
         adios: adios2.ADIOS,
         filename: pathlib.Path, array_name: str, engine: str, comm: MPI.Intracomm,
         time: float = 0., time_name: str = "",
-        legacy: bool=False) -> Tuple[npt.NDArray[valid_function_types], int]:
+        legacy: bool = False) -> Tuple[npt.NDArray[valid_function_types], int]:
     """
     Read an array from file, return the global starting position of the local array
 

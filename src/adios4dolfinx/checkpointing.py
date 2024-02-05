@@ -348,8 +348,8 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4", 
     # -------------------Step 3-----------------------------------
     # Read dofmap from file and compute dof owners
     if legacy:
-        dofmap_path = f"Dofmap"
-        xdofmap_path = f"XDofmap"
+        dofmap_path = "Dofmap"
+        xdofmap_path = "XDofmap"
     else:
         dofmap_path = f"{name}_dofmap"
         xdofmap_path = f"{name}_XDofmap"
