@@ -158,7 +158,6 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
     assert adios.RemoveIO("MeshWriter")
 
 
-
 def write_meshtags(filename: Union[Path, str], mesh: dolfinx.mesh.Mesh, meshtags: dolfinx.mesh.MeshTags,
                    engine: Optional[str] = "BP4"):
     """
