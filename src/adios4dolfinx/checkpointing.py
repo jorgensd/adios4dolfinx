@@ -154,7 +154,7 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
     assert adios.RemoveIO("MeshWriter")
 
 
-def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4"):
+def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4", time: float = 0.):
     """
     Read checkpoint from file and fill it into `u`.
 
@@ -202,7 +202,8 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4"):
     # --------------------Step 4-----------------------------------
     # Read array from file and communicate them to input dofmap process
     array_path = f"{name}_values"
-    input_array, starting_pos = read_array(adios, filename, array_path, engine, comm)
+    time_name = f"{name}_time"
+    input_array, starting_pos = read_array(adios, filename, array_path, engine, comm, time, time_name)
     recv_array = send_dofs_and_recv_values(
         input_dofmap.array, dof_owner, comm, input_array, starting_pos
     )
@@ -284,21 +285,21 @@ def read_mesh(
 
     # Get mesh cell type
     if "CellType" not in io.AvailableAttributes().keys():
-        raise KeyError("Mesh cell type not found at CellType")
+        raise KeyError(f"Mesh cell type not found at CellType in {file}")
     celltype = io.InquireAttribute("CellType")
     cell_type = celltype.DataString()[0]
 
     # Get basix info
     if "LagrangeVariant" not in io.AvailableAttributes().keys():
-        raise KeyError("Mesh LagrangeVariant not found")
+        raise KeyError(f"Mesh LagrangeVariant not found in {file}")
     lvar = io.InquireAttribute("LagrangeVariant").Data()[0]
     if "Degree" not in io.AvailableAttributes().keys():
-        raise KeyError("Mesh degree not found")
+        raise KeyError(f"Mesh degree not found in {file}")
     degree = io.InquireAttribute("Degree").Data()[0]
 
     # Get mesh geometry
     if "Points" not in io.AvailableVariables().keys():
-        raise KeyError("Mesh coordinates not found at Points")
+        raise KeyError(f"Mesh coordinates not found at Points in {file}")
     geometry = io.InquireVariable("Points")
     x_shape = geometry.Shape()
     geometry_range = compute_local_range(comm, x_shape[0])
@@ -312,7 +313,7 @@ def read_mesh(
     infile.Get(geometry, mesh_geometry, adios2.Mode.Deferred)
     # Get mesh topology (distributed)
     if "Topology" not in io.AvailableVariables().keys():
-        raise KeyError("Mesh topology not found at Topology'")
+        raise KeyError("Mesh topology not found at Topology in {file}")
     topology = io.InquireVariable("Topology")
     shape = topology.Shape()
     local_range = compute_local_range(comm, shape[0])
@@ -350,7 +351,7 @@ def write_function(
     filename: Path,
     engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Append,
-    t:float=0.0
+    time: float = 0.0
 ):
     """
     Write function checkpoint to file.
@@ -358,8 +359,9 @@ def write_function(
     Args:
         u: Function to write to file
         filename: Path to write to
-        egine: ADIOS2 engine
+        engine: ADIOS2 engine
         mode: Write or append.
+        time: Time-stamp for simulation
     """
     dofmap = u.function_space.dofmap
     values = u.x.array
@@ -378,27 +380,25 @@ def write_function(
         read_file = io.Open(str(filename), adios2.Mode.Read)
         io.SetEngine(engine)
         first_write = True
-        for step in range(read_file.Steps()):
+        for _ in range(read_file.Steps()):
             read_file.BeginStep()
             if name in io.AvailableAttributes():
                 first_write = False
                 break
             read_file.EndStep()
         read_file.Close()
-
-    
     outfile = io.Open(str(filename), mode)
     io.DefineAttribute(name, name)
     outfile.BeginStep()
 
     # Add time step to file
-    t_arr = np.array([t], dtype=np.float64)
+    t_arr = np.array([time], dtype=np.float64)
     time_var = io.DefineVariable(
-        "time",
+        f"{name}_time",
         t_arr,
         shape=[1],
         start=[0],
-        count=[1 if mesh.comm.rank==0 else 0],
+        count=[1 if mesh.comm.rank == 0 else 0],
     )
     outfile.Put(time_var, t_arr)
 
@@ -414,7 +414,7 @@ def write_function(
         count=[num_dofs_local],
     )
     outfile.Put(val_var, values[:num_dofs_local])
-    
+
     if not first_write:
         outfile.PerformPuts()
         outfile.EndStep()
