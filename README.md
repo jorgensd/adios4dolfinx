@@ -46,6 +46,8 @@ For scalability, the code uses [MPI Neighbourhood collectives](https://www.mpi-f
 > [!IMPORTANT]  
 > Only one mesh per file is allowed
 
+> [!WARNING]
+> If you are using checkpoints written with `adios4dolfinx` prior to time-dependent/multi-function support, please use the `legacy=True` flag for reading in the checkpoint
 
 
 ## Legacy DOLFIN
