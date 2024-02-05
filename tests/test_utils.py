@@ -90,16 +90,16 @@ def write_function_time_dep(mesh, el, f0, f1, t0, t1, dtype) -> str:
     filename = pathlib.Path(f"output/mesh_{file_hash}.bp")
     if mesh.comm.size != 1:
         adios4dolfinx.write_mesh(mesh, filename)
-        adios4dolfinx.write_function(uh, filename, t=t0)
+        adios4dolfinx.write_function(uh, filename, time=t0)
         uh.interpolate(f1)
-        adios4dolfinx.write_function(uh, filename, t=t1)
+        adios4dolfinx.write_function(uh, filename, time=t1)
 
     else:
         if MPI.COMM_WORLD.rank == 0:
             adios4dolfinx.write_mesh(mesh, filename)
-            adios4dolfinx.write_function(uh, filename, t=t0)
+            adios4dolfinx.write_function(uh, filename, time=t0)
             uh.interpolate(f1)
-            adios4dolfinx.write_function(uh, filename, t=t1)
+            adios4dolfinx.write_function(uh, filename, time=t1)
 
     return file_hash
 
