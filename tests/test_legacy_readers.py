@@ -7,11 +7,12 @@
 
 import pathlib
 
+from mpi4py import MPI
+
 import dolfinx
 import numpy as np
 import ufl
 from dolfinx.fem.petsc import LinearProblem
-from mpi4py import MPI
 
 from adios4dolfinx import (read_function_from_legacy_h5,
                            read_mesh_from_legacy_h5)

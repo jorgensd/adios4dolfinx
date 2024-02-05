@@ -1,14 +1,14 @@
 import itertools
 
+from mpi4py import MPI
+
 import basix
 import basix.ufl
 import dolfinx
 import numpy as np
 import pytest
-from mpi4py import MPI
 
-from .test_utils import read_function, write_function, get_dtype
-
+from .test_utils import get_dtype, read_function, write_function
 
 dtypes = [np.float64, np.float32]  # Mesh geometry dtypes
 write_comm = [MPI.COMM_SELF, MPI.COMM_WORLD]  # Communicators for creating mesh

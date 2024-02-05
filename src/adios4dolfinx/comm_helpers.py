@@ -1,11 +1,11 @@
 from typing import Tuple
 
-import numpy as np
-import numpy.typing as npt
 from mpi4py import MPI
 
-from .utils import compute_local_range, find_first, valid_function_types
+import numpy as np
+import numpy.typing as npt
 
+from .utils import compute_local_range, find_first, valid_function_types
 
 __all__ = [
     "send_dofmap_and_recv_values",

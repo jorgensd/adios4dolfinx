@@ -26,3 +26,27 @@ ignore_missing_imports = true
 exclude = ["docs/", "build/"]
 # Folder to check with mypy
 files = ["src", "tests"]
+
+
+[tool.isort]
+src_paths = ["src", "tests"]
+known_first_party = "adios4dolfinx"
+known_third_party = [
+    "basix",
+    "dolfinx",
+    "ffcx",
+    "ufl",
+    "gmsh",
+    "numba",
+    "numpy",
+    "pytest",
+]
+known_mpi = ["mpi4py", "petsc4py"]
+sections = [
+    "FUTURE",
+    "STDLIB",
+    "MPI",
+    "THIRDPARTY",
+    "FIRSTPARTY",
+    "LOCALFOLDER",
+]

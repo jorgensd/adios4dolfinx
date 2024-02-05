@@ -7,17 +7,11 @@
 """Top-level package for ADIOS2Wrappers."""
 from importlib.metadata import metadata
 
-from .checkpointing import (
-    read_function,
-    read_mesh,
-    write_function,
-    write_mesh,
-    snapshot_checkpoint,
-)
-from .legacy_readers import (
-    read_function_from_legacy_h5,
-    read_mesh_from_legacy_h5,
-)
+from .checkpointing import (read_function, read_mesh, read_meshtags,
+                            snapshot_checkpoint, write_function, write_mesh,
+                            write_meshtags)
+from .legacy_readers import (read_function_from_legacy_h5,
+                             read_mesh_from_legacy_h5)
 
 meta = metadata("adios4dolfinx")
 __version__ = meta["Version"]
@@ -27,6 +21,8 @@ __email__ = meta["Author-email"]
 __program_name__ = meta["Name"]
 
 __all__ = [
+    "write_meshtags",
+    "read_meshtags",
     "read_mesh",
     "write_mesh",
     "read_function_from_legacy_h5",

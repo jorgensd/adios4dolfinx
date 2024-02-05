@@ -5,13 +5,15 @@
 # SPDX-License-Identifier:    MIT
 
 from pathlib import Path
+from typing import Optional, Union
+
+from mpi4py import MPI
 
 import adios2
 import basix
 import dolfinx
 import numpy as np
 import ufl
-from mpi4py import MPI
 
 from .adios2_helpers import (
     adios_to_numpy_dtype,
@@ -32,6 +34,8 @@ __all__ = [
     "read_function",
     "write_mesh",
     "snapshot_checkpoint",
+    "read_meshtags",
+    "write_meshtags"
 ]
 
 
@@ -152,6 +156,161 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
     outfile.EndStep()
     outfile.Close()
     assert adios.RemoveIO("MeshWriter")
+
+
+
+def write_meshtags(filename: Union[Path, str], mesh: dolfinx.mesh.Mesh, meshtags: dolfinx.mesh.MeshTags,
+                   engine: Optional[str] = "BP4"):
+    """
+    Write meshtags associated with input mesh to file.
+
+    .. note::
+        For this checkpoint to work, the mesh must be written to file using :func:`write_mesh`
+        before calling this function.
+
+    Args:
+        filename: Path to save meshtags (with file-extension)
+        mesh: The mesh associated with the meshtags
+        meshtags: The meshtags to write to file
+        engine: Adios2 Engine
+    """
+    tag_entities = meshtags.indices
+    dim = meshtags.dim
+    num_tag_entities_local = mesh.topology.index_map(dim).size_local
+    local_tag_entities = tag_entities[tag_entities < num_tag_entities_local]
+    local_values = meshtags.values[:len(local_tag_entities)]
+
+    num_saved_tag_entities = len(local_tag_entities)
+    local_start = mesh.comm.exscan(num_saved_tag_entities, op=MPI.SUM)
+    local_start = local_start if mesh.comm.rank != 0 else 0
+    global_num_tag_entities = mesh.comm.allreduce(num_saved_tag_entities, op=MPI.SUM)
+    dof_layout = mesh.geometry.cmap.create_dof_layout()
+    num_dofs_per_entity = dof_layout.num_entity_closure_dofs(dim)
+
+    entities_to_geometry = dolfinx.cpp.mesh.entities_to_geometry(
+        mesh._cpp_object, dim, tag_entities, False)
+
+    indices = mesh.geometry.index_map().local_to_global(entities_to_geometry.reshape(-1))
+
+    adios = adios2.ADIOS(mesh.comm)
+    io = adios.DeclareIO("MeshTagWriter")
+    io.SetEngine(engine)
+    outfile = io.Open(str(filename), adios2.Mode.Append)
+    # Write meshtag topology
+    topology_var = io.DefineVariable(
+        meshtags.name+"_topology",
+        indices,
+        shape=[global_num_tag_entities, num_dofs_per_entity],
+        start=[local_start, 0],
+        count=[num_saved_tag_entities, num_dofs_per_entity],
+    )
+    outfile.Put(topology_var, indices, adios2.Mode.Sync)
+
+    # Write meshtag topology
+    values_var = io.DefineVariable(
+        meshtags.name+"_values",
+        local_values,
+        shape=[global_num_tag_entities],
+        start=[local_start],
+        count=[num_saved_tag_entities],
+    )
+    outfile.Put(values_var, local_values, adios2.Mode.Sync)
+
+    # Write meshtag dim
+    io.DefineAttribute(meshtags.name + "_dim", np.array([meshtags.dim], dtype=np.uint8))
+
+    outfile.PerformPuts()
+    outfile.EndStep()
+    outfile.Close()
+
+
+def read_meshtags(filename: str, mesh: dolfinx.mesh.Mesh, meshtag_name: str,
+                  engine: str = "BP4") -> dolfinx.mesh.MeshTags:
+    """
+    Read meshtags from file and return a :class:`dolfinx.mesh.MeshTags` object.
+
+    Args:
+        filename: Path to meshtags file (with file-extension)
+        mesh: The mesh associated with the meshtags
+        meshtag_name: The name of the meshtag to read
+        engine: Adios2 Engine
+    Returns:
+        The meshtags
+    """
+    adios = adios2.ADIOS(mesh.comm)
+    io = adios.DeclareIO("MeshTagsReader")
+    io.SetEngine(engine)
+    infile = io.Open(str(filename), adios2.Mode.Read)
+
+    # Get mesh cell type
+    dim_attr_name = f"{meshtag_name}_dim"
+    step = 0
+    for i in range(infile.Steps()):
+        infile.BeginStep()
+        if dim_attr_name in io.AvailableAttributes().keys():
+            step = i
+            break
+        infile.EndStep()
+    if dim_attr_name not in io.AvailableAttributes().keys():
+        raise KeyError(f"{dim_attr_name} not found in {filename}")
+
+    m_dim = io.InquireAttribute(dim_attr_name)
+    dim = int(m_dim.Data()[0])
+
+    # Get mesh tags entites
+    topology_name = f"{meshtag_name}_topology"
+    for i in range(step, infile.Steps()):
+        if i > step:
+            infile.BeginStep()
+        if topology_name in io.AvailableVariables().keys():
+            break
+        infile.EndStep()
+    if topology_name not in io.AvailableVariables().keys():
+        raise KeyError(f"{topology_name} not found in {filename}")
+
+    topology = io.InquireVariable(topology_name)
+    top_shape = topology.Shape()
+    topology_range = compute_local_range(mesh.comm, top_shape[0])
+
+    topology.SetSelection(
+        [[topology_range[0], 0], [topology_range[1] - topology_range[0], top_shape[1]]]
+    )
+    mesh_entities = np.empty((topology_range[1] - topology_range[0], top_shape[1]), dtype=np.int64)
+    infile.Get(topology, mesh_entities, adios2.Mode.Deferred)
+
+    # Get mesh tags values
+    values_name = f"{meshtag_name}_values"
+    if values_name not in io.AvailableVariables().keys():
+        raise KeyError(f"{values_name} not found")
+
+    values = io.InquireVariable(values_name)
+    val_shape = values.Shape()
+    assert val_shape[0] == top_shape[0]
+    values.SetSelection(
+        [[topology_range[0]], [topology_range[1] - topology_range[0]]]
+    )
+    tag_values = np.empty((topology_range[1] - topology_range[0]), dtype=np.int32)
+    infile.Get(values, tag_values, adios2.Mode.Deferred)
+
+    infile.PerformGets()
+    infile.EndStep()
+    infile.Close()
+    assert adios.RemoveIO("MeshTagsReader")
+
+    # Memory leak due to nanobind, ref: https://github.com/FEniCS/dolfinx/issues/2997
+    local_entities, local_values = dolfinx.cpp.io.distribute_entity_data(
+         mesh._cpp_object, int(dim), mesh_entities, tag_values)
+    mesh.topology.create_connectivity(dim, 0)
+    mesh.topology.create_connectivity(dim, mesh.topology.dim)
+
+    adj = dolfinx.cpp.graph.AdjacencyList_int32(local_entities)
+
+    local_values = np.array(local_values, dtype=np.int32)
+
+    mt = dolfinx.mesh.meshtags_from_entities(mesh, int(dim), adj, local_values)
+    mt.name = meshtag_name
+
+    return mt
 
 
 def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4", time: float = 0.):
