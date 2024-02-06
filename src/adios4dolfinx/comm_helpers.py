@@ -81,7 +81,6 @@ def send_dofmap_and_recv_values(
         # Compute map from global out position to relative position in proc
         proc_to_dof[offsets[proc_pos] + count[proc_pos]] = i
         count[proc_pos] += 1
-        del proc_pos
     del count
 
     # Prepare data-structures for receiving
@@ -123,16 +122,10 @@ def send_dofmap_and_recv_values(
     sorted_global_dofs = np.zeros_like(incoming_global_dofs, dtype=values.dtype)
     assert len(incoming_global_dofs) == len(input_cells)
 
-    def sort_global(sort_global_dofs, num_data_out, insert_pos, incoming_global_dofs, proc_to_dof):
-        """
-        Sort incoming global dofs by their original position in the unput
-        """
-        for i in range(num_data_out):
-            input_pos = insert_pos + i
-            sort_global_dofs[proc_to_dof[input_pos]] = incoming_global_dofs[input_pos]
-
     for i in range(len(dest_ranks)):
-        sort_global(sorted_global_dofs, out_size[i], offsets[i], incoming_global_dofs, proc_to_dof)
+        out_pos = offsets[i] + np.arange(out_size[i], dtype=np.int32)
+        sorted_global_dofs[proc_to_dof[out_pos]] = incoming_global_dofs[out_pos]
+
     data_to_mesh_comm.Free()
     return sorted_global_dofs
 
