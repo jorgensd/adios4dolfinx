@@ -72,6 +72,7 @@ def send_dofmap_and_recv_values(
     proc_to_dof = np.zeros_like(input_cells, dtype=np.int32)
 
     # Fill outgoing data
+    # FIXME: Remove this in the same way in other places with cumsum
     proc_row, proc_col = np.nonzero(process_pos_indicator)
     for i, proc_pos, cell, dof_pos in zip(proc_row, proc_col, input_cells, dofmap_pos):
         # Fill outgoing data
@@ -168,16 +169,15 @@ def send_and_recv_cell_perm(
     assert offsets[-1] == len(cells)
     out_cells = np.zeros_like(cells, dtype=np.int64)
     out_perm = np.zeros_like(perms, dtype=np.uint32)
-    count = np.zeros_like(out_size, dtype=np.int32)
 
     proc_row, proc_col = np.nonzero(process_pos_indicator)
-    for i, proc_pos in zip(proc_row, proc_col):
-        # Fill output data
-        out_cells[offsets[proc_pos] + count[proc_pos]] = cells[i]
-        out_perm[offsets[proc_pos] + count[proc_pos]] = perms[i]
-        count[proc_pos] += 1
-        del proc_pos
-    del count
+    assert np.allclose(proc_row, np.arange(len(process_pos_indicator), dtype=np.int32))
+    cum_pos = np.cumsum(process_pos_indicator, axis=0)
+    insert_position = np.asarray([ip[pos]-1 for ip, pos in zip(cum_pos, proc_col)], dtype=np.int32)
+    insertion_array = offsets[proc_col] + insert_position
+    out_cells[insertion_array] = cells
+    out_perm[insertion_array] = perms
+    del cum_pos, insert_position, insertion_array
 
     # Prepare data-structures for receiving
     total_incoming = sum(recv_size)
@@ -237,10 +237,7 @@ def send_dofs_and_recv_values(
     dofs_offsets = np.zeros(len(out_size) + 1, dtype=np.intc)
     dofs_offsets[1:] = np.cumsum(out_size)
     out_dofs = np.zeros(dofs_offsets[-1], dtype=np.int64)
-    dof_count = np.zeros_like(out_size, dtype=np.int32)
-    proc_to_local = np.zeros_like(
-        input_dofmap, dtype=np.int32
-    )
+    proc_to_local = np.zeros_like(input_dofmap, dtype=np.int32)
 
     # Map output to local dof
     proc_row, proc_col = np.nonzero(process_pos_indicator)
