@@ -71,15 +71,16 @@ def send_dofmap_and_recv_values(
     count = np.zeros_like(out_size, dtype=np.int32)
     proc_to_dof = np.zeros_like(input_cells, dtype=np.int32)
 
-    # Compute relative position of owner in MPI communicator
+    # Fill outgoing data
     proc_row, proc_col = np.nonzero(process_pos_indicator)
-    for i, proc_pos in zip(proc_row, proc_col):
-        # Fill output data
-        out_cells[offsets[proc_pos] + count[proc_pos]] = input_cells[i]
-        out_pos[offsets[proc_pos] + count[proc_pos]] = dofmap_pos[i]
+    for i, proc_pos, cell, dof_pos in zip(proc_row, proc_col, input_cells, dofmap_pos):
+        # Fill outgoing data
+        insert_pos = offsets[proc_pos] + count[proc_pos]
+        out_cells[insert_pos] = cell
+        out_pos[insert_pos] = dof_pos
 
         # Compute map from global out position to relative position in proc
-        proc_to_dof[offsets[proc_pos] + count[proc_pos]] = i
+        proc_to_dof[insert_pos] = i
         count[proc_pos] += 1
     del count
 
@@ -104,9 +105,10 @@ def send_dofmap_and_recv_values(
 
     local_input_range = compute_local_range(comm, num_cells_global)
     values_to_distribute = np.zeros_like(inc_pos, dtype=values.dtype)
-    for i, (cell, pos) in enumerate(zip(inc_cells, inc_pos)):
-        l_cell = cell - local_input_range[0]
-        values_to_distribute[i] = values[dofmap_offsets[l_cell] + pos]
+
+    # Map values based on input cells and dofmap
+    local_cells = inc_cells - local_input_range[0]
+    values_to_distribute = values[dofmap_offsets[local_cells]+inc_pos]
 
     # Send input dofs back to owning process
     data_to_mesh_comm = comm.Create_dist_graph_adjacent(
@@ -119,9 +121,8 @@ def send_dofmap_and_recv_values(
     data_to_mesh_comm.Neighbor_alltoallv(s_msg, r_msg)
 
     # Sort incoming global dofs as they were inputted
-    sorted_global_dofs = np.zeros_like(incoming_global_dofs, dtype=values.dtype)
     assert len(incoming_global_dofs) == len(input_cells)
-
+    sorted_global_dofs = np.zeros_like(incoming_global_dofs, dtype=values.dtype)
     for i in range(len(dest_ranks)):
         out_pos = offsets[i] + np.arange(out_size[i], dtype=np.int32)
         sorted_global_dofs[proc_to_dof[out_pos]] = incoming_global_dofs[out_pos]
@@ -239,13 +240,20 @@ def send_dofs_and_recv_values(
     dof_count = np.zeros_like(out_size, dtype=np.int32)
     proc_to_local = np.zeros_like(
         input_dofmap, dtype=np.int32
-    )  # Map output to local dof
+    )
 
+    # Map output to local dof
     proc_row, proc_col = np.nonzero(process_pos_indicator)
-    for (i, dof, proc_pos) in zip(proc_row, input_dofmap, proc_col):
-        out_dofs[dofs_offsets[proc_pos] + dof_count[proc_pos]] = dof
-        proc_to_local[dofs_offsets[proc_pos] + dof_count[proc_pos]] = i
-        dof_count[proc_pos] += 1
+    assert np.allclose(proc_row, np.arange(len(process_pos_indicator), dtype=np.int32))
+
+    cum_pos = np.cumsum(process_pos_indicator, axis=0)
+    insert_position = np.asarray([ip[pos]-1 for ip, pos in zip(cum_pos, proc_col)], dtype=np.int32)
+    out_dofs = np.zeros(dofs_offsets[-1], dtype=np.int64)
+    insertion_array = dofs_offsets[proc_col] + insert_position
+    out_dofs[insertion_array] = input_dofmap
+    proc_to_local = np.zeros_like(input_dofmap, dtype=np.int32)
+    proc_to_local[insertion_array] = np.arange(len(input_dofmap), dtype=np.int32)
+    del insertion_array, cum_pos, insert_position
 
     # Send input dofs to processes holding input array
     inc_dofs = np.zeros(sum(recv_size), dtype=np.int64)
@@ -255,9 +263,7 @@ def send_dofs_and_recv_values(
     dofmap_to_values.Free()
 
     # Send back appropriate input values
-    sending_values = np.zeros(len(inc_dofs), dtype=input_array.dtype)
-    for i, dof in enumerate(inc_dofs):
-        sending_values[i] = input_array[dof - array_start]
+    sending_values = input_array[inc_dofs - array_start]
 
     values_to_dofmap = comm.Create_dist_graph_adjacent(dest, source, reorder=False)
     inc_values = np.zeros_like(out_dofs, dtype=input_array.dtype)
@@ -268,7 +274,5 @@ def send_dofs_and_recv_values(
 
     # Sort inputs according to local dof number (input process)
     values = np.empty_like(inc_values, dtype=input_array.dtype)
-    for i in range(len(dest_ranks)):
-        positions = np.arange(dofs_offsets[i], dofs_offsets[i+1])
-        values[proc_to_local[positions]] = inc_values[positions]
+    values[proc_to_local] = inc_values
     return values
