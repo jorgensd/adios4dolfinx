@@ -548,7 +548,7 @@ def write_function(
     # Unroll dofmap for block size
     dofmap_blocks = np.repeat(dmap, dofmap_bs).reshape(dmap.shape[0], dmap.shape[1] * dofmap_bs) * dofmap_bs
     dofmap_rems = dofmap_blocks + np.tile(np.arange(dofmap_bs), dmap.shape[1])
-    dmap_loc = (dofmap_blocks//index_map_bs).reshape(-1)
+    dmap_loc = (dofmap_blocks // index_map_bs).reshape(-1)
     dmap_rem = (dofmap_rems % index_map_bs).reshape(-1)
 
     local_dofmap_offsets = np.arange(num_cells_local + 1, dtype=np.int64)
