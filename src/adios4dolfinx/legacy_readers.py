@@ -18,7 +18,7 @@ import ufl
 
 from .adios2_helpers import adios_to_numpy_dtype, read_array
 from .comm_helpers import send_dofs_and_recv_values
-from .utils import (compute_dofmap_pos, compute_local_range, find_first,
+from .utils import (compute_dofmap_pos, compute_local_range,
                     index_owner)
 
 __all__ = [
@@ -161,11 +161,10 @@ def send_cells_and_receive_dofmap_index(
     """
 
     # Compute amount of data to send to each process
-    out_size = np.zeros(len(dest_ranks), dtype=np.int32)
-    for owner in output_owners:
-        proc_pos = find_first(owner, dest_ranks)
-        out_size[proc_pos] += 1
-        del proc_pos
+    owners_transposed = output_owners.reshape(-1, 1)
+    process_pos_indicator = (owners_transposed == np.asarray(dest_ranks))
+    out_size = np.count_nonzero(process_pos_indicator, axis=0)
+
     recv_size = np.zeros(len(source_ranks), dtype=np.int32)
     mesh_to_data_comm = comm.Create_dist_graph_adjacent(
         source_ranks.tolist(), dest_ranks.tolist(), reorder=False
@@ -180,10 +179,8 @@ def send_cells_and_receive_dofmap_index(
     out_pos = np.zeros(offsets[-1], dtype=np.int32)
     count = np.zeros_like(out_size, dtype=np.int32)
     proc_to_dof = np.zeros_like(input_cells, dtype=np.int32)
-    for i, owner in enumerate(output_owners):
-        # Find relative position of owner in MPI communicator
-        # Could be cached from previous run
-        proc_pos = find_first(owner, dest_ranks)
+    proc_row, proc_col = np.nonzero(process_pos_indicator)
+    for i, proc_pos in zip(proc_row, proc_col):
 
         # Fill output data
         out_cells[offsets[proc_pos] + count[proc_pos]] = input_cells[i]

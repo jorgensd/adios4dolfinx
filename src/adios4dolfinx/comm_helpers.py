@@ -5,7 +5,7 @@ from mpi4py import MPI
 import numpy as np
 import numpy.typing as npt
 
-from .utils import compute_local_range, find_first, valid_function_types
+from .utils import compute_local_range, valid_function_types
 
 __all__ = [
     "send_dofmap_and_recv_values",
@@ -51,13 +51,11 @@ def send_dofmap_and_recv_values(
     Returns:
         Values corresponding to the dofs owned by this process.
     """
-
     # Compute amount of data to send to each process
-    out_size = np.zeros(len(dest_ranks), dtype=np.int32)
-    for owner in output_owners:
-        proc_pos = find_first(owner, dest_ranks)
-        out_size[proc_pos] += 1
-        del proc_pos
+    owners_transposed = output_owners.reshape(-1, 1)
+    process_pos_indicator = (owners_transposed == dest_ranks)
+    out_size = np.count_nonzero(process_pos_indicator, axis=0)
+
     recv_size = np.zeros(len(source_ranks), dtype=np.int32)
     mesh_to_data_comm = comm.Create_dist_graph_adjacent(
         source_ranks.tolist(), dest_ranks.tolist(), reorder=False
@@ -72,11 +70,10 @@ def send_dofmap_and_recv_values(
     out_pos = np.zeros(offsets[-1], dtype=np.int32)
     count = np.zeros_like(out_size, dtype=np.int32)
     proc_to_dof = np.zeros_like(input_cells, dtype=np.int32)
-    for i, owner in enumerate(output_owners):
-        # Find relative position of owner in MPI communicator
-        # Could be cached from previous run
-        proc_pos = find_first(owner, dest_ranks)
 
+    # Compute relative position of owner in MPI communicator
+    proc_row, proc_col = np.nonzero(process_pos_indicator)
+    for i, proc_pos in zip(proc_row, proc_col):
         # Fill output data
         out_cells[offsets[proc_pos] + count[proc_pos]] = input_cells[i]
         out_pos[offsets[proc_pos] + count[proc_pos]] = dofmap_pos[i]
@@ -125,10 +122,17 @@ def send_dofmap_and_recv_values(
     # Sort incoming global dofs as they were inputted
     sorted_global_dofs = np.zeros_like(incoming_global_dofs, dtype=values.dtype)
     assert len(incoming_global_dofs) == len(input_cells)
+
+    def sort_global(sort_global_dofs, num_data_out, insert_pos, incoming_global_dofs, proc_to_dof):
+        """
+        Sort incoming global dofs by their original position in the unput
+        """
+        for i in range(num_data_out):
+            input_pos = insert_pos + i
+            sort_global_dofs[proc_to_dof[input_pos]] = incoming_global_dofs[input_pos]
+
     for i in range(len(dest_ranks)):
-        for j in range(out_size[i]):
-            input_pos = offsets[i] + j
-            sorted_global_dofs[proc_to_dof[input_pos]] = incoming_global_dofs[input_pos]
+        sort_global(sorted_global_dofs, out_size[i], offsets[i], incoming_global_dofs, proc_to_dof)
     data_to_mesh_comm.Free()
     return sorted_global_dofs
 
@@ -156,11 +160,9 @@ def send_and_recv_cell_perm(
     source, dest, _ = mesh_to_data.Get_dist_neighbors()
 
     # Compute amount of data to send to each process
-    out_size = np.zeros_like(dest, dtype=np.int32)
-    for owner in cell_owners:
-        proc_pos = find_first(owner, np.asarray(dest, dtype=np.int32))
-        out_size[proc_pos] += 1
-        del proc_pos
+    owners_transposed = cell_owners.reshape(-1, 1)
+    process_pos_indicator = (owners_transposed == np.asarray(dest))
+    out_size = np.count_nonzero(process_pos_indicator, axis=0)
 
     # Send sizes to create data structures for receiving from NeighAlltoAllv
     recv_size = np.zeros_like(source, dtype=np.int32)
@@ -173,11 +175,9 @@ def send_and_recv_cell_perm(
     out_cells = np.zeros_like(cells, dtype=np.int64)
     out_perm = np.zeros_like(perms, dtype=np.uint32)
     count = np.zeros_like(out_size, dtype=np.int32)
-    for i in range(len(cells)):
-        # Find relative position of owner in MPI communicator
-        # Could be cached from previous run
-        proc_pos = find_first(cell_owners[i], np.asarray(dest_ranks, dtype=np.int32))
 
+    proc_row, proc_col = np.nonzero(process_pos_indicator)
+    for i, proc_pos in zip(proc_row, proc_col):
         # Fill output data
         out_cells[offsets[proc_pos] + count[proc_pos]] = cells[i]
         out_perm[offsets[proc_pos] + count[proc_pos]] = perms[i]
@@ -231,11 +231,9 @@ def send_dofs_and_recv_values(
     source, dest, _ = dofmap_to_values.Get_dist_neighbors()
 
     # Compute amount of data to send to each process
-    out_size = np.zeros_like(dest, dtype=np.int32)
-    for owner in dofmap_owners:
-        proc_pos = find_first(owner, dest_ranks)
-        out_size[proc_pos] += 1
-        del proc_pos
+    owners_transposed = dofmap_owners.reshape(-1, 1)
+    process_pos_indicator = (owners_transposed == dest_ranks)
+    out_size = np.count_nonzero(process_pos_indicator, axis=0)
 
     # Send sizes to create data structures for receiving from NeighAlltoAllv
     recv_size = np.zeros_like(source, dtype=np.int32)
@@ -249,8 +247,9 @@ def send_dofs_and_recv_values(
     proc_to_local = np.zeros_like(
         input_dofmap, dtype=np.int32
     )  # Map output to local dof
-    for i, (dof, owner) in enumerate(zip(input_dofmap, dofmap_owners)):
-        proc_pos = find_first(owner, dest_ranks)
+
+    proc_row, proc_col = np.nonzero(process_pos_indicator)
+    for (i, dof, proc_pos) in zip(proc_row, input_dofmap, proc_col):
         out_dofs[dofs_offsets[proc_pos] + dof_count[proc_pos]] = dof
         proc_to_local[dofs_offsets[proc_pos] + dof_count[proc_pos]] = i
         dof_count[proc_pos] += 1

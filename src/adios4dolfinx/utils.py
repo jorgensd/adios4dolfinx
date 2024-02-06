@@ -4,7 +4,7 @@
 #
 # SPDX-License-Identifier:    MIT
 
-__all__ = ["compute_local_range", "index_owner", "compute_dofmap_pos", "find_first"]
+__all__ = ["compute_local_range", "index_owner", "compute_dofmap_pos"]
 from typing import Tuple, Union
 
 from mpi4py import MPI
@@ -112,13 +112,3 @@ def compute_dofmap_pos(
         local_cell, dof_pos, dofs, dofmap_bs, num_owned_dofs, num_owned_cells
     )
     return local_cell, dof_pos
-
-
-@numba.njit(cache=True)
-def find_first(b: int, a: npt.NDArray[np.int32]):
-    """
-    Given a numpy array `a` return the first entry equal to `b`
-    """
-    for i, ai in enumerate(a):
-        if ai == b:
-            return i
