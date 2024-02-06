@@ -275,9 +275,7 @@ def send_dofs_and_recv_values(
 
     # Sort inputs according to local dof number (input process)
     values = np.empty_like(inc_values, dtype=input_array.dtype)
-
     for i in range(len(dest_ranks)):
-        for j in range(out_size[i]):
-            in_pos = dofs_offsets[i] + j
-            values[proc_to_local[in_pos]] = inc_values[in_pos]
+        positions = np.arange(dofs_offsets[i], dofs_offsets[i+1])
+        values[proc_to_local[positions]] = inc_values[positions]
     return values
