@@ -296,7 +296,7 @@ def read_meshtags(filename: str, mesh: dolfinx.mesh.Mesh, meshtag_name: str,
 
     # Memory leak due to nanobind, ref: https://github.com/FEniCS/dolfinx/issues/2997
     local_entities, local_values = dolfinx.cpp.io.distribute_entity_data(
-         mesh._cpp_object, int(dim), mesh_entities, tag_values)
+        mesh._cpp_object, int(dim), mesh_entities, tag_values)
     mesh.topology.create_connectivity(dim, 0)
     mesh.topology.create_connectivity(dim, mesh.topology.dim)
 
@@ -537,32 +537,26 @@ def write_function(
     )
     outfile.Put(val_var, values[:num_dofs_local])
 
-    # Convert local dofmap into global_dofmap
+    # Create global, unrolled dofmap
     dmap = dofmap.list
     num_dofs_per_cell = dmap.shape[1]
     dofmap_bs = dofmap.bs
     num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
     num_dofs_local_dmap = num_cells_local * num_dofs_per_cell * dofmap_bs
-    dmap_loc = np.empty(num_dofs_local_dmap, dtype=np.int32)
-    dmap_rem = np.empty(num_dofs_local_dmap, dtype=np.int32)
     index_map_bs = dofmap.index_map_bs
-    # Unroll local dofmap and convert into index map index
-    for c in range(num_cells_local):
-        for i, dof in enumerate(dmap[c]):
-            for b in range(dofmap_bs):
-                dmap_loc[(num_dofs_per_cell * c + i) * dofmap_bs + b] = (
-                    dof * dofmap_bs + b
-                ) // index_map_bs
-                dmap_rem[(num_dofs_per_cell * c + i) * dofmap_bs + b] = (
-                    dof * dofmap_bs + b
-                ) % index_map_bs
+
+    # Unroll dofmap for block size
+    dofmap_blocks = np.repeat(dmap, dofmap_bs).reshape(dmap.shape[0], dmap.shape[1] * dofmap_bs) * dofmap_bs
+    dofmap_rems = dofmap_blocks + np.tile(np.arange(dofmap_bs), dmap.shape[1])
+    dmap_loc = (dofmap_blocks//index_map_bs).reshape(-1)
+    dmap_rem = (dofmap_rems % index_map_bs).reshape(-1)
+
     local_dofmap_offsets = np.arange(num_cells_local + 1, dtype=np.int64)
     local_dofmap_offsets[:] *= num_dofs_per_cell * dofmap_bs
+
     # Convert imap index to global index
     imap_global = dofmap.index_map.local_to_global(dmap_loc)
-    dofmap_global = np.empty_like(dmap_loc, dtype=np.int64)
-    for i in range(num_dofs_local_dmap):
-        dofmap_global[i] = imap_global[i] * index_map_bs + dmap_rem[i]
+    dofmap_global = imap_global * index_map_bs + dmap_rem
 
     # Get offsets of dofmap
     dofmap_imap = dolfinx.common.IndexMap(mesh.comm, num_dofs_local_dmap)
