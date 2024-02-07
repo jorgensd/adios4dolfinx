@@ -37,6 +37,18 @@ For scalability, the code uses [MPI Neighbourhood collectives](https://www.mpi-f
 - Reading and writing meshtags associated to meshes `adios4dolfinx.read/write_meshtags`
 - Reading checkpoints for any element (serial and parallel, one checkpoint per file). Use `adios4dolfinx.read/write_function`.
 
+> [!IMPORTANT]  
+> For a checkpoint to be valid, you first have to store the mesh with `write_mesh`, then use `write_function` to append to the checkpoint file.
+
+> [!IMPORTANT]  
+> A checkpoint file supports multiple functions and multiple time steps, as long as the functions are associated with the same mesh
+
+> [!IMPORTANT]  
+> Only one mesh per file is allowed
+
+> [!WARNING]
+> If you are using checkpoints written with `adios4dolfinx` prior to time-dependent/multi-function support, please use the `legacy=True` flag for reading in the checkpoint
+
 
 ## Legacy DOLFIN
 Only checkpoints for `Lagrange` or `DG` functions are supported from legacy DOLFIN

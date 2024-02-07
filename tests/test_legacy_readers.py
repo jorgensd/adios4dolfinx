@@ -11,16 +11,19 @@ from mpi4py import MPI
 
 import dolfinx
 import numpy as np
+import pytest
 import ufl
 from dolfinx.fem.petsc import LinearProblem
 
-from adios4dolfinx import (read_function_from_legacy_h5,
-                           read_mesh_from_legacy_h5)
+from adios4dolfinx import (read_function, read_function_from_legacy_h5,
+                           read_mesh, read_mesh_from_legacy_h5)
 
 
 def test_legacy_mesh():
     comm = MPI.COMM_WORLD
     path = (pathlib.Path("legacy") / "mesh.h5").absolute()
+    if not path.exists():
+        pytest.skip(f"{path} does not exist")
     mesh = read_mesh_from_legacy_h5(comm=comm, filename=path, group="/mesh")
     assert mesh.topology.dim == 3
     volume = mesh.comm.allreduce(
@@ -42,6 +45,8 @@ def test_legacy_mesh():
 def test_read_legacy_mesh_from_checkpoint():
     comm = MPI.COMM_WORLD
     filename = (pathlib.Path("legacy") / "mesh_checkpoint.h5").absolute()
+    if not filename.exists():
+        pytest.skip(f"{filename} does not exist")
     mesh = read_mesh_from_legacy_h5(comm=comm, filename=filename, group="/Mesh/mesh")
     assert mesh.topology.dim == 3
     volume = mesh.comm.allreduce(
@@ -63,6 +68,8 @@ def test_read_legacy_mesh_from_checkpoint():
 def test_legacy_function():
     comm = MPI.COMM_WORLD
     path = (pathlib.Path("legacy") / "mesh.h5").absolute()
+    if not path.exists():
+        pytest.skip(f"{path} does not exist")
     mesh = read_mesh_from_legacy_h5(comm, path, "/mesh")
     V = dolfinx.fem.functionspace(mesh, ("DG", 2))
     u = ufl.TrialFunction(V)
@@ -80,7 +87,7 @@ def test_legacy_function():
 
     u_in = dolfinx.fem.Function(V)
     read_function_from_legacy_h5(mesh.comm, path, u_in, group="v")
-    assert np.allclose(uh.x.array, u_in.x.array)
+    np.testing.assert_allclose(uh.x.array, u_in.x.array, atol=1e-14)
 
     W = dolfinx.fem.functionspace(mesh, ("DG", 2, (mesh.geometry.dim, )))
     wh = dolfinx.fem.Function(W)
@@ -89,12 +96,14 @@ def test_legacy_function():
 
     read_function_from_legacy_h5(mesh.comm, path, w_in, group="w")
 
-    assert np.allclose(wh.x.array, w_in.x.array)
+    np.testing.assert_allclose(wh.x.array, w_in.x.array, atol=1e-14)
 
 
 def test_read_legacy_function_from_checkpoint():
     comm = MPI.COMM_WORLD
     path = (pathlib.Path("legacy") / "mesh_checkpoint.h5").absolute()
+    if not path.exists():
+        pytest.skip(f"{path} does not exist")
     mesh = read_mesh_from_legacy_h5(comm, path, "/Mesh/mesh")
 
     V = dolfinx.fem.functionspace(mesh, ("DG", 2))
@@ -126,8 +135,33 @@ def test_read_legacy_function_from_checkpoint():
     w_in = dolfinx.fem.Function(W)
 
     read_function_from_legacy_h5(mesh.comm, path, w_in, group="w", step=0)
-    assert np.allclose(wh.x.array, w_in.x.array)
+    np.testing.assert_allclose(wh.x.array, w_in.x.array, atol=1e-14)
 
     wh.interpolate(lambda x: np.vstack((x[0], 0*x[0], x[1])))
     read_function_from_legacy_h5(mesh.comm, path, w_in, group="w", step=1)
-    assert np.allclose(wh.x.array, w_in.x.array)
+    np.testing.assert_allclose(wh.x.array, w_in.x.array, atol=1e-14)
+
+
+def test_adios4dolfinx_legacy():
+    comm = MPI.COMM_WORLD
+    path = (pathlib.Path("legacy_checkpoint") / "adios4dolfinx_checkpoint.bp").absolute()
+    if not path.exists():
+        pytest.skip(f"{path} does not exist")
+
+    el = ("N1curl", 3)
+    mesh = read_mesh(comm, path, "BP4", dolfinx.mesh.GhostMode.shared_facet)
+
+    def f(x):
+        values = np.zeros((2, x.shape[1]), dtype=np.float64)
+        values[0] = x[0]
+        values[1] = -x[1]
+        return values
+
+    V = dolfinx.fem.functionspace(mesh, el)
+    u = dolfinx.fem.Function(V)
+    read_function(u, path, engine="BP4", legacy=True)
+
+    u_ex = dolfinx.fem.Function(V)
+    u_ex.interpolate(f)
+
+    np.testing.assert_allclose(u.x.array, u_ex.x.array, atol=1e-14)

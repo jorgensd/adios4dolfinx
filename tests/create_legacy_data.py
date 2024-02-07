@@ -10,7 +10,6 @@ Functions to create checkpoints with Legacy dolfin
 """
 
 import argparse
-import os
 import pathlib
 
 import dolfin
@@ -135,8 +134,7 @@ if __name__ == "__main__":
 
     inputs = parser.parse_args()
     path = pathlib.Path(inputs.dir)
-    if not os.path.exists(path):
-        os.mkdir(path)
+    path.mkdir(exist_ok=True, parents=True)
     h5_filename = path / f"{inputs.name}.h5"
     xdmf_filename = path / f"{inputs.name}_checkpoint.xdmf"
 

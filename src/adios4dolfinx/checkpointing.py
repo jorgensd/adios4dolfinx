@@ -108,12 +108,8 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
 
     # Write basix properties
     cmap = mesh.geometry.cmap
-    io.DefineAttribute(
-        "Degree", np.array([cmap.degree], dtype=np.int32)
-    )
-    io.DefineAttribute(
-        "LagrangeVariant", np.array([cmap.variant], dtype=np.int32)
-    )
+    io.DefineAttribute("Degree", np.array([cmap.degree], dtype=np.int32))
+    io.DefineAttribute("LagrangeVariant", np.array([cmap.variant], dtype=np.int32))
 
     # Write topology
     g_imap = mesh.geometry.index_map()
@@ -126,9 +122,9 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
 
     dofs_out = np.zeros((num_cells_local, num_dofs_per_cell), dtype=np.int64)
     assert g_dmap.shape[1] == num_dofs_per_cell
-    dofs_out[:, :] = np.asarray(g_imap.local_to_global(
-        g_dmap[:num_cells_local, :].reshape(-1)
-    )).reshape(dofs_out.shape)
+    dofs_out[:, :] = np.asarray(
+        g_imap.local_to_global(g_dmap[:num_cells_local, :].reshape(-1))
+    ).reshape(dofs_out.shape)
 
     dvar = io.DefineVariable(
         "Topology",
@@ -309,7 +305,8 @@ def read_meshtags(filename: str, mesh: dolfinx.mesh.Mesh, meshtag_name: str,
     return mt
 
 
-def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4"):
+def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4", time: float = 0.,
+                  legacy: bool = False):
     """
     Read checkpoint from file and fill it into `u`.
 
@@ -317,10 +314,12 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4"):
         u: Function to fill
         filename: Path to checkpoint
         engine: ADIOS engine type used for reading
+        legacy: If checkpoint is from prior to time-dependent writing set to True
     """
     mesh = u.function_space.mesh
     comm = mesh.comm
     adios = adios2.ADIOS(comm)
+    name = u.name
     # ----------------------Step 1---------------------------------
     # Compute index of input cells and get cell permutation
     num_owned_cells = mesh.topology.index_map(mesh.topology.dim).size_local
@@ -341,8 +340,12 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4"):
 
     # -------------------Step 3-----------------------------------
     # Read dofmap from file and compute dof owners
-    dofmap_path = "Dofmap"
-    xdofmap_path = "XDofmap"
+    if legacy:
+        dofmap_path = "Dofmap"
+        xdofmap_path = "XDofmap"
+    else:
+        dofmap_path = f"{name}_dofmap"
+        xdofmap_path = f"{name}_XDofmap"
     input_dofmap = read_dofmap(
         adios, comm, filename, dofmap_path, xdofmap_path, num_cells_global, engine
     )
@@ -355,8 +358,13 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4"):
 
     # --------------------Step 4-----------------------------------
     # Read array from file and communicate them to input dofmap process
-    array_path = "Values"
-    input_array, starting_pos = read_array(adios, filename, array_path, engine, comm)
+    if legacy:
+        array_path = "Values"
+    else:
+        array_path = f"{name}_values"
+    time_name = f"{name}_time"
+    input_array, starting_pos = read_array(adios, filename, array_path, engine, comm, time, time_name,
+                                           legacy=legacy)
     recv_array = send_dofs_and_recv_values(
         input_dofmap.array, dof_owner, comm, input_array, starting_pos
     )
@@ -438,21 +446,21 @@ def read_mesh(
 
     # Get mesh cell type
     if "CellType" not in io.AvailableAttributes().keys():
-        raise KeyError("Mesh cell type not found at CellType")
+        raise KeyError(f"Mesh cell type not found at CellType in {file}")
     celltype = io.InquireAttribute("CellType")
     cell_type = celltype.DataString()[0]
 
     # Get basix info
     if "LagrangeVariant" not in io.AvailableAttributes().keys():
-        raise KeyError("Mesh LagrangeVariant not found")
+        raise KeyError(f"Mesh LagrangeVariant not found in {file}")
     lvar = io.InquireAttribute("LagrangeVariant").Data()[0]
     if "Degree" not in io.AvailableAttributes().keys():
-        raise KeyError("Mesh degree not found")
+        raise KeyError(f"Mesh degree not found in {file}")
     degree = io.InquireAttribute("Degree").Data()[0]
 
     # Get mesh geometry
     if "Points" not in io.AvailableVariables().keys():
-        raise KeyError("Mesh coordinates not found at Points")
+        raise KeyError(f"Mesh coordinates not found at Points in {file}")
     geometry = io.InquireVariable("Points")
     x_shape = geometry.Shape()
     geometry_range = compute_local_range(comm, x_shape[0])
@@ -460,12 +468,13 @@ def read_mesh(
         [[geometry_range[0], 0], [geometry_range[1] - geometry_range[0], x_shape[1]]]
     )
     mesh_geometry = np.empty(
-        (geometry_range[1] - geometry_range[0], x_shape[1]), dtype=adios_to_numpy_dtype[geometry.Type()]
+        (geometry_range[1] - geometry_range[0], x_shape[1]),
+        dtype=adios_to_numpy_dtype[geometry.Type()],
     )
     infile.Get(geometry, mesh_geometry, adios2.Mode.Deferred)
     # Get mesh topology (distributed)
     if "Topology" not in io.AvailableVariables().keys():
-        raise KeyError("Mesh topology not found at Topology'")
+        raise KeyError("Mesh topology not found at Topology in {file}")
     topology = io.InquireVariable("Topology")
     shape = topology.Shape()
     local_range = compute_local_range(comm, shape[0])
@@ -489,7 +498,7 @@ def read_mesh(
         basix.LagrangeVariant(int(lvar)),
         shape=(mesh_geometry.shape[1],),
         gdim=mesh_geometry.shape[1],
-        dtype=mesh_geometry.dtype
+        dtype=mesh_geometry.dtype,
     )
     domain = ufl.Mesh(element)
     partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)
@@ -503,6 +512,7 @@ def write_function(
     filename: Path,
     engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Append,
+    time: float = 0.0
 ):
     """
     Write function checkpoint to file.
@@ -510,8 +520,9 @@ def write_function(
     Args:
         u: Function to write to file
         filename: Path to write to
-        egine: ADIOS2 engine
+        engine: ADIOS2 engine
         mode: Write or append.
+        time: Time-stamp for simulation
     """
     dofmap = u.function_space.dofmap
     values = u.x.array
@@ -521,14 +532,43 @@ def write_function(
     adios = adios2.ADIOS(comm)
     io = adios.DeclareIO("FunctionWriter")
     io.SetEngine(engine)
-    outfile = io.Open(str(filename), adios2.Mode.Append)
+
+    # If mode is append, check if we have written the function to file before
+    name = u.name
+
+    if mode == adios2.Mode.Append:
+        # First open the file in read-mode to check if the function has been written before
+        read_file = io.Open(str(filename), adios2.Mode.Read)
+        io.SetEngine(engine)
+        first_write = True
+        for _ in range(read_file.Steps()):
+            read_file.BeginStep()
+            if name in io.AvailableAttributes():
+                first_write = False
+                break
+            read_file.EndStep()
+        read_file.Close()
+    outfile = io.Open(str(filename), mode)
+    io.DefineAttribute(name, name)
+    outfile.BeginStep()
+
+    # Add time step to file
+    t_arr = np.array([time], dtype=np.float64)
+    time_var = io.DefineVariable(
+        f"{name}_time",
+        t_arr,
+        shape=[1],
+        start=[0],
+        count=[1 if mesh.comm.rank == 0 else 0],
+    )
+    outfile.Put(time_var, t_arr)
+
     # Write local part of vector
     num_dofs_local = dofmap.index_map.size_local * dofmap.index_map_bs
     num_dofs_global = dofmap.index_map.size_global * dofmap.index_map_bs
     local_start = dofmap.index_map.local_range[0] * dofmap.index_map_bs
-    outfile.BeginStep()
     val_var = io.DefineVariable(
-        "Values",
+        f"{name}_values",
         np.zeros(num_dofs_local, dtype=u.dtype),
         shape=[num_dofs_global],
         start=[local_start],
@@ -536,7 +576,14 @@ def write_function(
     )
     outfile.Put(val_var, values[:num_dofs_local])
 
-    # Create global, unrolled dofmap
+    if not first_write:
+        outfile.PerformPuts()
+        outfile.EndStep()
+        outfile.Close()
+        assert adios.RemoveIO("FunctionWriter")
+        return
+
+    # Convert local dofmap into global_dofmap
     dmap = dofmap.list
     num_dofs_per_cell = dmap.shape[1]
     dofmap_bs = dofmap.bs
@@ -559,7 +606,7 @@ def write_function(
     # Get offsets of dofmap
     dofmap_imap = dolfinx.common.IndexMap(mesh.comm, num_dofs_local_dmap)
     dofmap_var = io.DefineVariable(
-        "Dofmap",
+        f"{name}_dofmap",
         np.zeros(num_dofs_local_dmap, dtype=np.int64),
         shape=[dofmap_imap.size_global],
         start=[dofmap_imap.local_range[0]],
@@ -571,7 +618,7 @@ def write_function(
     cell_start = mesh.topology.index_map(mesh.topology.dim).local_range[0]
     local_dofmap_offsets += dofmap_imap.local_range[0]
     xdofmap_var = io.DefineVariable(
-        "XDofmap",
+        f"{name}_XDofmap",
         np.zeros(num_cells_local + 1, dtype=np.int64),
         shape=[num_cells_global + 1],
         start=[cell_start],

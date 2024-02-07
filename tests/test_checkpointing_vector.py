@@ -140,3 +140,36 @@ def test_read_write_hex(read_comm, family, degree, complex, non_simplex_mesh_3D)
     hash = write_function(mesh, el, f, dtype=f_dtype)
     MPI.COMM_WORLD.Barrier()
     read_function(read_comm, el, f, hash, dtype=f_dtype)
+
+
+@pytest.mark.parametrize("complex", [True, False])
+@pytest.mark.parametrize("family", ["RTCF"])
+@pytest.mark.parametrize("degree", [1, 2, 3])
+@pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
+def test_read_write_multiple(read_comm, family, degree, complex, non_simplex_mesh_2D):
+    mesh = non_simplex_mesh_2D
+    f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
+    el = basix.ufl.element(family,
+                           mesh.ufl_cell().cellname(),
+                           degree,
+                           gdim=mesh.geometry.dim)
+
+    def f(x):
+        values = np.empty((2, x.shape[1]), dtype=f_dtype)
+        values[0] = np.full(x.shape[1], np.pi) + 2j*x[2]
+        values[1] = x[1] + 2 * x[0] + 2j*np.cos(x[2])
+        return values
+
+    def g(x):
+        values = np.empty((2, x.shape[1]), dtype=f_dtype)
+        values[0] = (1+1j) * x[0]
+        values[1] = (3-3j) * x[1]
+        return values
+
+    hash_f = write_function(mesh, el, f, dtype=f_dtype, name="f", append=False)
+    hash_g = write_function(mesh, el, g, dtype=f_dtype, name="g", append=True)
+    assert hash_f == hash_g
+
+    MPI.COMM_WORLD.Barrier()
+    read_function(read_comm, el, f, hash_f, dtype=f_dtype, name="f")
+    read_function(read_comm, el, g, hash_g, dtype=f_dtype, name="g")

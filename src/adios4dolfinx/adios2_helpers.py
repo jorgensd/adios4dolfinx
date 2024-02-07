@@ -128,7 +128,7 @@ def read_dofmap(
             break
         infile.EndStep()
     if dofmap_offsets not in io.AvailableVariables().keys():
-        raise KeyError(f"Dof offsets not found at '{dofmap_offsets}'")
+        raise KeyError(f"Dof offsets not found at '{dofmap_offsets}' in {filename}")
 
     # Get global shape of dofmap-offset, and read in data with an overlap
     d_offsets = io.InquireVariable(dofmap_offsets)
@@ -147,7 +147,7 @@ def read_dofmap(
     # Assuming dofmap is saved in stame step
     # Get the relevant part of the dofmap
     if dofmap not in io.AvailableVariables().keys():
-        raise KeyError(f"Dof offsets not found at {dofmap}")
+        raise KeyError(f"Dof offsets not found at {dofmap} in {filename}")
     cell_dofs = io.InquireVariable(dofmap)
     cell_dofs.SetSelection([[in_offsets[0]], [in_offsets[-1] - in_offsets[0]]])
     in_dofmap = np.empty(
@@ -166,9 +166,10 @@ def read_dofmap(
 
 
 def read_array(
-    adios: adios2.ADIOS,
-    filename: pathlib.Path, array_name: str, engine: str, comm: MPI.Intracomm
-) -> Tuple[npt.NDArray[valid_function_types], int]:
+        adios: adios2.ADIOS,
+        filename: pathlib.Path, array_name: str, engine: str, comm: MPI.Intracomm,
+        time: float = 0., time_name: str = "",
+        legacy: bool = False) -> Tuple[npt.NDArray[valid_function_types], int]:
     """
     Read an array from file, return the global starting position of the local array
 
@@ -178,6 +179,8 @@ def read_array(
         array_name: Name of array in file
         engine: Name of engine to use to read file
         comm: MPI communicator used for reading the data
+        time_name: Name of time variable for modern checkpoints
+        legacy: If True ignore time_name and read the first available step
     Returns:
         Local part of array and its global starting position
     """
@@ -185,13 +188,36 @@ def read_array(
     io.SetEngine(engine)
     infile = io.Open(str(filename), adios2.Mode.Read)
 
-    for i in range(infile.Steps()):
-        infile.BeginStep()
-        if array_name in io.AvailableVariables().keys():
-            break
-        infile.EndStep()
-    if array_name not in io.AvailableVariables().keys():
-        raise KeyError(f"No array found at {array_name}")
+    # Get time-stamp from first available step
+    if legacy:
+        for i in range(infile.Steps()):
+            infile.BeginStep()
+            if array_name in io.AvailableVariables().keys():
+                break
+            infile.EndStep()
+        if array_name not in io.AvailableVariables().keys():
+            raise KeyError(f"No array found at {array_name}")
+    else:
+        for i in range(infile.Steps()):
+            infile.BeginStep()
+            if time_name in io.AvailableVariables().keys():
+                arr = io.InquireVariable(time_name)
+                time_shape = arr.Shape()
+                arr.SetSelection([[0], [time_shape[0]]])
+                times = np.empty(time_shape[0], dtype=adios_to_numpy_dtype[arr.Type()])
+                infile.Get(arr, times, adios2.Mode.Sync)
+                if times[0] == time:
+                    break
+            if i == infile.Steps() - 1:
+                raise KeyError(f"No data associated with {time_name}={time} found in {filename}")
+
+            infile.EndStep()
+
+        if time_name not in io.AvailableVariables().keys():
+            raise KeyError(f"No data associated with {time_name}={time} found in {filename}")
+
+        if array_name not in io.AvailableVariables().keys():
+            raise KeyError(f"No array found at {time=} for {array_name}")
 
     arr = io.InquireVariable(array_name)
     arr_shape = arr.Shape()
