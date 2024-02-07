@@ -120,7 +120,7 @@ def test_compute_dofmap_pos_RTCF(family, degree, mesh_3D):
 
 @pytest.mark.parametrize("family", ["Lagrange", "DG"])
 @pytest.mark.parametrize("degree", [1, 4])
-def test_unroll_P(family, degree, mesh_2D):
+def test_compute_dofmap_pos_P(family, degree, mesh_2D):
     el = basix.ufl.element(family,
                            mesh_2D.ufl_cell().cellname(),
                            degree,
