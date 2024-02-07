@@ -29,7 +29,8 @@ def mesh_2D(request):
 @pytest.fixture(params=three_dim_combinations, scope="module")
 def mesh_3D(request):
     dtype, cell_type, write_comm = request.param
-    mesh = dolfinx.mesh.create_unit_cube(write_comm, 5, 5, 5, cell_type=cell_type, dtype=dtype)
+    M = 5
+    mesh = dolfinx.mesh.create_unit_cube(write_comm, M, M, M, cell_type=cell_type, dtype=dtype)
     return mesh
 
 

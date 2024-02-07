@@ -15,18 +15,12 @@ import dolfinx
 import numpy as np
 import ufl
 
-from .adios2_helpers import (
-    adios_to_numpy_dtype,
-    read_array,
-    read_cell_perms,
-    read_dofmap,
-)
-from .comm_helpers import (
-    send_and_recv_cell_perm,
-    send_dofmap_and_recv_values,
-    send_dofs_and_recv_values,
-)
-from .utils import compute_dofmap_pos, compute_local_range, index_owner
+from .adios2_helpers import (adios_to_numpy_dtype, read_array, read_cell_perms,
+                             read_dofmap)
+from .comm_helpers import (send_and_recv_cell_perm,
+                           send_dofmap_and_recv_values,
+                           send_dofs_and_recv_values)
+from .utils import compute_dofmap_pos, compute_local_range, index_owner, unroll_dofmap
 
 __all__ = [
     "read_mesh",
@@ -296,7 +290,6 @@ def read_meshtags(filename: str, mesh: dolfinx.mesh.Mesh, meshtag_name: str,
     infile.Close()
     assert adios.RemoveIO("MeshTagsReader")
 
-    # Memory leak due to nanobind, ref: https://github.com/FEniCS/dolfinx/issues/2997
     local_entities, local_values = dolfinx.cpp.io.distribute_entity_data(
         mesh._cpp_object, int(dim), mesh_entities, tag_values)
     mesh.topology.create_connectivity(dim, 0)
@@ -391,14 +384,14 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4", 
 
         # First invert input data to reference element then transform to current mesh
         for i, l_cell in enumerate(input_local_cell_index):
-            start, end = input_dofmap.offsets[l_cell], input_dofmap.offsets[l_cell + 1]
+            start, end = input_dofmap.offsets[l_cell:l_cell+2]
             # FIXME: Tempoary cast uint32 to integer as transformations doesn't support uint32 with the switch
             # to nanobind
             element.pre_apply_transpose_dof_transformation(
-                recv_array[start:end], int(input_perms[l_cell]), bs
+                recv_array[int(start):int(end)], int(input_perms[l_cell]), bs
             )
             element.pre_apply_inverse_transpose_dof_transformation(
-                recv_array[start:end], int(inc_perms[i]), bs
+                recv_array[int(start):int(end)], int(inc_perms[i]), bs
             )
     # ------------------Step 6----------------------------------------
     # For each dof owned by a process, find the local position in the dofmap.
@@ -588,32 +581,26 @@ def write_function(
         outfile.Close()
         assert adios.RemoveIO("FunctionWriter")
         return
+
     # Convert local dofmap into global_dofmap
     dmap = dofmap.list
     num_dofs_per_cell = dmap.shape[1]
     dofmap_bs = dofmap.bs
     num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
     num_dofs_local_dmap = num_cells_local * num_dofs_per_cell * dofmap_bs
-    dmap_loc = np.empty(num_dofs_local_dmap, dtype=np.int32)
-    dmap_rem = np.empty(num_dofs_local_dmap, dtype=np.int32)
     index_map_bs = dofmap.index_map_bs
-    # Unroll local dofmap and convert into index map index
-    for c in range(num_cells_local):
-        for i, dof in enumerate(dmap[c]):
-            for b in range(dofmap_bs):
-                dmap_loc[(num_dofs_per_cell * c + i) * dofmap_bs + b] = (
-                    dof * dofmap_bs + b
-                ) // index_map_bs
-                dmap_rem[(num_dofs_per_cell * c + i) * dofmap_bs + b] = (
-                    dof * dofmap_bs + b
-                ) % index_map_bs
+
+    # Unroll dofmap for block size
+    unrolled_dofmap = unroll_dofmap(dofmap.list[:num_cells_local, :], dofmap_bs)
+    dmap_loc = (unrolled_dofmap // index_map_bs).reshape(-1)
+    dmap_rem = (unrolled_dofmap % index_map_bs).reshape(-1)
+
     local_dofmap_offsets = np.arange(num_cells_local + 1, dtype=np.int64)
     local_dofmap_offsets[:] *= num_dofs_per_cell * dofmap_bs
+
     # Convert imap index to global index
     imap_global = dofmap.index_map.local_to_global(dmap_loc)
-    dofmap_global = np.empty_like(dmap_loc, dtype=np.int64)
-    for i in range(num_dofs_local_dmap):
-        dofmap_global[i] = imap_global[i] * index_map_bs + dmap_rem[i]
+    dofmap_global = imap_global * index_map_bs + dmap_rem
 
     # Get offsets of dofmap
     dofmap_imap = dolfinx.common.IndexMap(mesh.comm, num_dofs_local_dmap)
