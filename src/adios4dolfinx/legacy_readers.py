@@ -129,11 +129,10 @@ def read_dofmap_legacy(
 
     # Extract dofmap data
     global_dofs = np.zeros_like(cells, dtype=np.int64)
-    for i, (cell, pos) in enumerate(zip(cells, dof_pos.astype(np.int64))):
-        input_cell_pos = cell - local_cell_range[0]
-        read_pos = np.int32(in_offsets[input_cell_pos] + pos - in_offsets[0])
-        global_dofs[i] = mapped_dofmap[read_pos]
-        del input_cell_pos, read_pos
+    input_cell_positions = cells - local_cell_range[0]
+    read_pos = in_offsets[input_cell_positions].astype(np.int32) + dof_pos - in_offsets[0]
+    global_dofs = mapped_dofmap[read_pos]
+    del input_cell_positions, read_pos
 
     infile.EndStep()
     infile.Close()

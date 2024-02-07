@@ -68,22 +68,19 @@ def send_dofmap_and_recv_values(
     offsets[1:] = np.cumsum(out_size)
     out_cells = np.zeros(offsets[-1], dtype=np.int64)
     out_pos = np.zeros(offsets[-1], dtype=np.int32)
-    count = np.zeros_like(out_size, dtype=np.int32)
     proc_to_dof = np.zeros_like(input_cells, dtype=np.int32)
 
     # Fill outgoing data
-    # FIXME: Remove this in the same way in other places with cumsum
-    proc_row, proc_col = np.nonzero(process_pos_indicator)
-    for i, proc_pos, cell, dof_pos in zip(proc_row, proc_col, input_cells, dofmap_pos):
-        # Fill outgoing data
-        insert_pos = offsets[proc_pos] + count[proc_pos]
-        out_cells[insert_pos] = cell
-        out_pos[insert_pos] = dof_pos
 
-        # Compute map from global out position to relative position in proc
-        proc_to_dof[insert_pos] = i
-        count[proc_pos] += 1
-    del count
+    proc_row, proc_col = np.nonzero(process_pos_indicator)
+    assert np.allclose(proc_row, np.arange(len(process_pos_indicator), dtype=np.int32))
+    cum_pos = np.cumsum(process_pos_indicator, axis=0)
+    insert_position = cum_pos[np.arange(len(proc_col), dtype=np.int32), proc_col] - 1
+    insertion_array = offsets[proc_col] + insert_position
+    out_cells[insertion_array] = input_cells
+    out_pos[insertion_array] = dofmap_pos
+    proc_to_dof[insertion_array] = np.arange(len(input_cells), dtype=np.int32)
+    del cum_pos, insert_position, insertion_array
 
     # Prepare data-structures for receiving
     total_incoming = sum(recv_size)
@@ -124,9 +121,7 @@ def send_dofmap_and_recv_values(
     # Sort incoming global dofs as they were inputted
     assert len(incoming_global_dofs) == len(input_cells)
     sorted_global_dofs = np.zeros_like(incoming_global_dofs, dtype=values.dtype)
-    for i in range(len(dest_ranks)):
-        out_pos = offsets[i] + np.arange(out_size[i], dtype=np.int32)
-        sorted_global_dofs[proc_to_dof[out_pos]] = incoming_global_dofs[out_pos]
+    sorted_global_dofs[proc_to_dof] = incoming_global_dofs
 
     data_to_mesh_comm.Free()
     return sorted_global_dofs
@@ -173,7 +168,8 @@ def send_and_recv_cell_perm(
     proc_row, proc_col = np.nonzero(process_pos_indicator)
     assert np.allclose(proc_row, np.arange(len(process_pos_indicator), dtype=np.int32))
     cum_pos = np.cumsum(process_pos_indicator, axis=0)
-    insert_position = np.asarray([ip[pos]-1 for ip, pos in zip(cum_pos, proc_col)], dtype=np.int32)
+    insert_position = cum_pos[np.arange(len(proc_col), dtype=np.int32), proc_col] - 1
+
     insertion_array = offsets[proc_col] + insert_position
     out_cells[insertion_array] = cells
     out_perm[insertion_array] = perms
@@ -244,7 +240,7 @@ def send_dofs_and_recv_values(
     assert np.allclose(proc_row, np.arange(len(process_pos_indicator), dtype=np.int32))
 
     cum_pos = np.cumsum(process_pos_indicator, axis=0)
-    insert_position = np.asarray([ip[pos]-1 for ip, pos in zip(cum_pos, proc_col)], dtype=np.int32)
+    insert_position = cum_pos[np.arange(len(proc_col), dtype=np.int32), proc_col] - 1
     out_dofs = np.zeros(dofs_offsets[-1], dtype=np.int64)
     insertion_array = dofs_offsets[proc_col] + insert_position
     out_dofs[insertion_array] = input_dofmap
