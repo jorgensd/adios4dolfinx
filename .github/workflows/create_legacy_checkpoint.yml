@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install legacy version of adios4dolfinx
-      - run: python3 -m pip install adios4dolfinx==${adios4dolfinx_version}
+        run: python3 -m pip install adios4dolfinx==${adios4dolfinx_version}
 
       - name: Create datasets
         run: python3 ./tests/create_legacy_checkpoint.py --output-dir=$data_dir
