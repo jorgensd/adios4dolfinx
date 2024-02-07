@@ -71,7 +71,6 @@ def send_dofmap_and_recv_values(
     proc_to_dof = np.zeros_like(input_cells, dtype=np.int32)
 
     # Fill outgoing data
-
     proc_row, proc_col = np.nonzero(process_pos_indicator)
     assert np.allclose(proc_row, np.arange(len(process_pos_indicator), dtype=np.int32))
     cum_pos = np.cumsum(process_pos_indicator, axis=0)

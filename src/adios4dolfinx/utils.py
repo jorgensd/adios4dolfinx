@@ -4,7 +4,7 @@
 #
 # SPDX-License-Identifier:    MIT
 
-__all__ = ["compute_local_range", "index_owner", "compute_dofmap_pos"]
+__all__ = ["compute_local_range", "index_owner", "compute_dofmap_pos", "unroll_dofmap"]
 from typing import Tuple, Union
 
 from mpi4py import MPI
@@ -60,6 +60,19 @@ def index_owner(
     return owner
 
 
+def unroll_dofmap(dofs: npt.NDArray[np.int32], bs: int) -> npt.NDArray[np.int32]:
+    """
+    Given a two-dimensional dofmap of size `(num_cells, num_dofs_per_cell)`
+    Expand the dofmap by its block size such that the resulting array
+    is of size `(num_cells, bs*num_dofs_per_cell)`
+    """
+    num_cells, num_dofs_per_cell = dofs.shape
+    unrolled_dofmap = np.repeat(dofs, bs).reshape(
+        num_cells, num_dofs_per_cell * bs) * bs
+    unrolled_dofmap += np.tile(np.arange(bs), num_dofs_per_cell)
+    return unrolled_dofmap
+
+
 def compute_dofmap_pos(
     V: dolfinx.fem.FunctionSpace,
 ) -> Tuple[npt.NDArray[np.int32], npt.NDArray[np.int32]]:
@@ -84,10 +97,7 @@ def compute_dofmap_pos(
         num_owned_dofs, dtype=np.int32
     )  # Position in dofmap for said dof
 
-    local_dmap = dofs[:num_owned_cells, :]
-    unrolled_dofmap_blocks = np.repeat(local_dmap, dofmap_bs).reshape(
-        local_dmap.shape[0], local_dmap.shape[1] * dofmap_bs) * dofmap_bs
-    unrolled_dofmap = unrolled_dofmap_blocks + np.tile(np.arange(dofmap_bs), local_dmap.shape[1])
+    unrolled_dofmap = unroll_dofmap(dofs[:num_owned_cells, :], dofmap_bs)
     markers = unrolled_dofmap < num_owned_dofs
     local_indices = np.broadcast_to(np.arange(markers.shape[1]), markers.shape)
     cell_indicator = np.broadcast_to(

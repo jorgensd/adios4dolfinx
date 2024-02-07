@@ -20,7 +20,7 @@ from .adios2_helpers import (adios_to_numpy_dtype, read_array, read_cell_perms,
 from .comm_helpers import (send_and_recv_cell_perm,
                            send_dofmap_and_recv_values,
                            send_dofs_and_recv_values)
-from .utils import compute_dofmap_pos, compute_local_range, index_owner
+from .utils import compute_dofmap_pos, compute_local_range, index_owner, unroll_dofmap
 
 __all__ = [
     "read_mesh",
@@ -546,10 +546,9 @@ def write_function(
     index_map_bs = dofmap.index_map_bs
 
     # Unroll dofmap for block size
-    dofmap_blocks = np.repeat(dmap, dofmap_bs).reshape(dmap.shape[0], dmap.shape[1] * dofmap_bs) * dofmap_bs
-    dofmap_rems = dofmap_blocks + np.tile(np.arange(dofmap_bs), dmap.shape[1])
-    dmap_loc = (dofmap_blocks // index_map_bs).reshape(-1)
-    dmap_rem = (dofmap_rems % index_map_bs).reshape(-1)
+    unrolled_dofmap = unroll_dofmap(dofmap.list[:num_cells_local, :], dofmap_bs)
+    dmap_loc = (unrolled_dofmap // index_map_bs).reshape(-1)
+    dmap_rem = (unrolled_dofmap % index_map_bs).reshape(-1)
 
     local_dofmap_offsets = np.arange(num_cells_local + 1, dtype=np.int64)
     local_dofmap_offsets[:] *= num_dofs_per_cell * dofmap_bs
