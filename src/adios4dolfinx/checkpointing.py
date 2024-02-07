@@ -107,7 +107,7 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
     io.DefineAttribute("CellType", mesh.topology.cell_name())
 
     # Write basix properties
-    cmap = mesh.geometry.cmap
+    cmap = mesh.geometry.cmaps[0]
     io.DefineAttribute("Degree", np.array([cmap.degree], dtype=np.int32))
     io.DefineAttribute("LagrangeVariant", np.array([cmap.variant], dtype=np.int32))
 
@@ -177,7 +177,7 @@ def write_meshtags(filename: Union[Path, str], mesh: dolfinx.mesh.Mesh, meshtags
     local_start = mesh.comm.exscan(num_saved_tag_entities, op=MPI.SUM)
     local_start = local_start if mesh.comm.rank != 0 else 0
     global_num_tag_entities = mesh.comm.allreduce(num_saved_tag_entities, op=MPI.SUM)
-    dof_layout = mesh.geometry.cmap.create_dof_layout()
+    dof_layout = mesh.geometry.cmaps[0].create_dof_layout()
     num_dofs_per_entity = dof_layout.num_entity_closure_dofs(dim)
 
     entities_to_geometry = dolfinx.cpp.mesh.entities_to_geometry(
@@ -388,10 +388,10 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4", 
             start, end = input_dofmap.offsets[l_cell:l_cell+2]
             # FIXME: Tempoary cast uint32 to integer as transformations doesn't support uint32 with the switch
             # to nanobind
-            element.pre_apply_transpose_dof_transformation(
+            element.apply_transpose_dof_transformation(
                 recv_array[int(start):int(end)], int(input_perms[l_cell]), bs
             )
-            element.pre_apply_inverse_transpose_dof_transformation(
+            element.apply_inverse_transpose_dof_transformation(
                 recv_array[int(start):int(end)], int(inc_perms[i]), bs
             )
     # ------------------Step 6----------------------------------------
@@ -498,7 +498,6 @@ def read_mesh(
         basix.LagrangeVariant(int(lvar)),
         shape=(mesh_geometry.shape[1],),
         gdim=mesh_geometry.shape[1],
-        dtype=mesh_geometry.dtype,
     )
     domain = ufl.Mesh(element)
     partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)
