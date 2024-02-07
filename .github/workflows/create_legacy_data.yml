@@ -1,4 +1,4 @@
-name: Generate legacy data
+name: Generate data from Legacy DOLFIN
 
 on:
   workflow_call:
@@ -8,7 +8,7 @@ env:
 
 
 jobs:
-  create-data:
+  create-dolfin-data:
     runs-on: "ubuntu-22.04"
     container: ghcr.io/scientificcomputing/fenics:2023-11-15
     steps:
