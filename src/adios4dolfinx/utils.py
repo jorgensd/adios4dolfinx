@@ -10,7 +10,6 @@ from typing import Tuple, Union
 from mpi4py import MPI
 
 import dolfinx
-import numba
 import numpy as np
 import numpy.typing as npt
 
@@ -77,8 +76,7 @@ def compute_dofmap_pos(
     num_owned_cells = mesh.topology.index_map(mesh.topology.dim).size_local
     dofmap_bs = V.dofmap.bs
     num_owned_dofs = V.dofmap.index_map.size_local * V.dofmap.index_map_bs
-    import time
-    start_org = time.perf_counter()
+
     local_cell = np.empty(
         num_owned_dofs, dtype=np.int32
     )  # Local cell index for each dof owned by process
@@ -86,41 +84,6 @@ def compute_dofmap_pos(
         num_owned_dofs, dtype=np.int32
     )  # Position in dofmap for said dof
 
-    @numba.njit(cache=True)
-    def compute_positions(
-        local_cell: npt.NDArray[np.int32],
-        dof_pos: npt.NDArray[np.int32],
-        dofs: npt.NDArray[np.int32],
-        dofmap_bs: int,
-        num_owned_dofs: int,
-        num_owned_cells: int,
-    ):
-        """
-        Loop through each owned cell and every dof in that cell, and for all cells owned by the process
-        attach a cell and a position in the dofmap to it
-        """
-        assert len(local_cell) == num_owned_dofs
-        assert len(dof_pos) == num_owned_dofs
-
-        for c in range(num_owned_cells):
-            for i, dof in enumerate(dofs[c]):
-                for b in range(dofmap_bs):
-                    local_dof = dof * dofmap_bs + b
-                    if local_dof < num_owned_dofs:
-                        local_cell[local_dof] = c
-                        dof_pos[local_dof] = i * dofmap_bs + b
-    compute_positions(
-        local_cell, dof_pos, dofs, dofmap_bs, num_owned_dofs, num_owned_cells
-    )
-    end_org = time.perf_counter()
-
-    start_vector = time.perf_counter()
-    local_cell_vector = np.empty(
-        num_owned_dofs, dtype=np.int32
-    )  # Local cell index for each dof owned by process
-    dof_pos_vector = np.empty(
-        num_owned_dofs, dtype=np.int32
-    )  # Position in dofmap for said dof
     local_dmap = dofs[:num_owned_cells, :]
     unrolled_dofmap_blocks = np.repeat(local_dmap, dofmap_bs).reshape(
         local_dmap.shape[0], local_dmap.shape[1] * dofmap_bs) * dofmap_bs
@@ -130,32 +93,6 @@ def compute_dofmap_pos(
     cell_indicator = np.broadcast_to(
         np.arange(num_owned_cells, dtype=np.int32).reshape(-1, 1), (num_owned_cells, markers.shape[1]))
     indicator = unrolled_dofmap[markers].reshape(-1)
-    local_cell_vector[indicator] = cell_indicator[markers].reshape(-1)
-    dof_pos_vector[indicator] = local_indices[markers].reshape(-1)
-    end_vector = time.perf_counter()
-
-    start_numba_2 = time.perf_counter()
-
-    @numba.njit(cache=True)
-    def compute_positions_2(local_cell: npt.NDArray[np.int32], dof_pos: npt.NDArray[np.int32],
-                            unrolled_dofmap: npt.NDArray[np.int32], markers: npt.NDArray[np.bool_]):
-        for c, (dofs, marker) in enumerate(zip(unrolled_dofmap, markers)):
-            pos = np.arange(len(dofs), dtype=np.int32)
-            loc = dofs[marker]
-            local_cell[loc] = c
-            dof_pos[loc] = pos[marker]
-
-    local_cell_2 = np.empty(
-        num_owned_dofs, dtype=np.int32
-    )  # Local cell index for each dof owned by process
-    dof_pos_2 = np.empty(
-        num_owned_dofs, dtype=np.int32)
-    local_dmap = dofs[:num_owned_cells, :]
-    unrolled_dofmap_blocks = np.repeat(local_dmap, dofmap_bs).reshape(
-        local_dmap.shape[0], local_dmap.shape[1] * dofmap_bs) * dofmap_bs
-    unrolled_dofmap = unrolled_dofmap_blocks + np.tile(np.arange(dofmap_bs), local_dmap.shape[1])
-    markers = unrolled_dofmap < num_owned_dofs
-    compute_positions_2(local_cell_2, dof_pos_2, unrolled_dofmap, markers)
-    end_numba_2 = time.perf_counter()
-
+    local_cell[indicator] = cell_indicator[markers].reshape(-1)
+    dof_pos[indicator] = local_indices[markers].reshape(-1)
     return local_cell, dof_pos
