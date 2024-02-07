@@ -363,7 +363,8 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4", 
     else:
         array_path = f"{name}_values"
     time_name = f"{name}_time"
-    input_array, starting_pos = read_array(adios, filename, array_path, engine, comm, time, time_name)
+    input_array, starting_pos = read_array(adios, filename, array_path, engine, comm, time, time_name,
+                                           legacy=legacy)
     recv_array = send_dofs_and_recv_values(
         input_dofmap.array, dof_owner, comm, input_array, starting_pos
     )

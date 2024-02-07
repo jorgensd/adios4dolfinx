@@ -21,6 +21,9 @@ jobs:
   create-datasets:
     uses: ./.github/workflows/create_legacy_data.yml
 
+  create-legacy-datasets:
+    uses: ./.github/workflows/create_legacy_checkpoint.yml
+  
   check-formatting:
     uses: ./.github/workflows/check_formatting.yml
 
@@ -43,7 +46,13 @@ jobs:
         with:
           name: legacy
           path: ./legacy
-
+    
+      - name: Download legacy data
+        uses: actions/download-artifact@v4
+        with:
+          name: legacy_checkpoint
+          path: ./legacy_checkpoint
+    
       - name: Install package
         run: python3 -m pip install .[test]
 
