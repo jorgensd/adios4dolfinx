@@ -294,7 +294,6 @@ def read_meshtags(filename: str, mesh: dolfinx.mesh.Mesh, meshtag_name: str,
     infile.Close()
     assert adios.RemoveIO("MeshTagsReader")
 
-    # Memory leak due to nanobind, ref: https://github.com/FEniCS/dolfinx/issues/2997
     local_entities, local_values = dolfinx.cpp.io.distribute_entity_data(
         mesh._cpp_object, int(dim), mesh_entities, tag_values)
     mesh.topology.create_connectivity(dim, 0)
