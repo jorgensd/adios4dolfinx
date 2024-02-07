@@ -134,3 +134,28 @@ def test_unroll_P(family, degree, mesh_2D):
     reference_cells, reference_pos = compute_positions(V.dofmap.list, V.dofmap.bs, num_dofs_local, num_cells_local)
     np.testing.assert_allclose(reference_cells, local_cells)
     np.testing.assert_allclose(reference_pos, local_pos)
+
+
+def test_compute_send_sizes():
+    np.random.seed(42)
+    N = 0
+    M = 10
+    num_data = 100
+
+    # Set of ranks to recieve data
+    dest_ranks = np.arange(N, M, dtype=np.int32)
+
+    # Random data owners
+    data_owners = np.random.randint(N, M, num_data).astype(np.int32)
+
+    # Compute the number of data to send to each rank with loops
+    out_size = np.zeros(len(dest_ranks), dtype=np.int32)
+    for owner in data_owners:
+        for j, rank in enumerate(dest_ranks):
+            if owner == rank:
+                out_size[j] += 1
+                break
+
+    process_pos_indicator = (data_owners.reshape(-1, 1) == dest_ranks)
+    vectorized_out_size = np.count_nonzero(process_pos_indicator, axis=0)
+    np.testing.assert_allclose(vectorized_out_size, out_size)

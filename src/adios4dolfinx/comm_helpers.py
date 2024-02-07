@@ -51,35 +51,50 @@ def send_dofmap_and_recv_values(
     Returns:
         Values corresponding to the dofs owned by this process.
     """
-    # Compute amount of data to send to each process
+
+    # This becomes a (num_dofs, num_dest_ranks) matrix where the (i,j) entry
+    # is True if dof i is owned by dest_rank_j
     owners_transposed = output_owners.reshape(-1, 1)
     process_pos_indicator = (owners_transposed == dest_ranks)
+
+    # Compute number of dofs owned by each rank
     out_size = np.count_nonzero(process_pos_indicator, axis=0)
 
+    # Compute send offset based of number of dofs owned by each rank
+    offsets = np.zeros(len(out_size) + 1, dtype=np.intc)
+    offsets[1:] = np.cumsum(out_size)
+
+    # As each dof can only be owned by one process, this returns what column
+    # the ith dof is owned by
+    proc_row, proc_col = np.nonzero(process_pos_indicator)
+    assert np.allclose(proc_row, np.arange(len(process_pos_indicator), dtype=np.int32))
+
+    # For a dof owned by process j, get its position in the list of dofs owned by this process
+    cum_pos = np.cumsum(process_pos_indicator, axis=0)
+
+    # Get the insert position (relative to process) for each dof. Subtract 0 as first occurence is equal to 1) due
+    # to the cumsum above
+    insert_position = cum_pos[proc_row, proc_col] - 1
+    # Compute aboslute insert position
+    insert_position += offsets[proc_col]
+
+    # Pack the cells and dofmap position for all dofs this process is distributing
+    out_cells = np.zeros(offsets[-1], dtype=np.int64)
+    out_cells[insert_position] = input_cells
+    out_pos = np.zeros(offsets[-1], dtype=np.int32)
+    out_pos[insert_position] = dofmap_pos
+
+    # Compute map from the data index sent to each process and the local number on the current process
+    proc_to_dof = np.zeros_like(input_cells, dtype=np.int32)
+    proc_to_dof[insert_position] = np.arange(len(input_cells), dtype=np.int32)
+    del cum_pos, insert_position
+
+    # Send sizes to create data structures for receiving from NeighAlltoAllv
     recv_size = np.zeros(len(source_ranks), dtype=np.int32)
     mesh_to_data_comm = comm.Create_dist_graph_adjacent(
         source_ranks.tolist(), dest_ranks.tolist(), reorder=False
     )
-    # Send sizes to create data structures for receiving from NeighAlltoAllv
     mesh_to_data_comm.Neighbor_alltoall(out_size, recv_size)
-
-    # Sort output for sending
-    offsets = np.zeros(len(out_size) + 1, dtype=np.intc)
-    offsets[1:] = np.cumsum(out_size)
-    out_cells = np.zeros(offsets[-1], dtype=np.int64)
-    out_pos = np.zeros(offsets[-1], dtype=np.int32)
-    proc_to_dof = np.zeros_like(input_cells, dtype=np.int32)
-
-    # Fill outgoing data
-    proc_row, proc_col = np.nonzero(process_pos_indicator)
-    assert np.allclose(proc_row, np.arange(len(process_pos_indicator), dtype=np.int32))
-    cum_pos = np.cumsum(process_pos_indicator, axis=0)
-    insert_position = cum_pos[np.arange(len(proc_col), dtype=np.int32), proc_col] - 1
-    insertion_array = offsets[proc_col] + insert_position
-    out_cells[insertion_array] = input_cells
-    out_pos[insertion_array] = dofmap_pos
-    proc_to_dof[insertion_array] = np.arange(len(input_cells), dtype=np.int32)
-    del cum_pos, insert_position, insertion_array
 
     # Prepare data-structures for receiving
     total_incoming = sum(recv_size)
@@ -148,31 +163,44 @@ def send_and_recv_cell_perm(
     )
     source, dest, _ = mesh_to_data.Get_dist_neighbors()
 
-    # Compute amount of data to send to each process
+    # This becomes a (num_cells, num_dest_ranks) matrix where the (i,j) entry
+    # is True if cell i is owned by dest[j]
     owners_transposed = cell_owners.reshape(-1, 1)
     process_pos_indicator = (owners_transposed == np.asarray(dest))
+
+    # Compute number of cells owned by each rank
     out_size = np.count_nonzero(process_pos_indicator, axis=0)
+
+    # Compute send offset based of number of cells owned by each rank
+    offsets = np.zeros(len(out_size) + 1, dtype=np.intc)
+    offsets[1:] = np.cumsum(out_size)
+    assert offsets[-1] == len(cells)
+
+    # As each cell can only be owned by one process, this returns what column
+    # the ith cell is owned by
+    proc_row, proc_col = np.nonzero(process_pos_indicator)
+    assert np.allclose(proc_row, np.arange(len(process_pos_indicator), dtype=np.int32))
+
+    # For a cell owned by process j, get its position in the list of cell owned by this process
+    cum_pos = np.cumsum(process_pos_indicator, axis=0)
+
+    # Get the insert position (relative to process) for each dof. Subtract 0 as first occurence is equal to 1) due
+    # to the cumsum above
+    insert_position = cum_pos[proc_row, proc_col] - 1
+
+    # Compute aboslute insert position
+    insert_position += offsets[proc_col]
+
+    # Pack cells and permutations for sending
+    out_cells = np.zeros_like(cells, dtype=np.int64)
+    out_perm = np.zeros_like(perms, dtype=np.uint32)
+    out_cells[insert_position] = cells
+    out_perm[insert_position] = perms
+    del cum_pos, insert_position
 
     # Send sizes to create data structures for receiving from NeighAlltoAllv
     recv_size = np.zeros_like(source, dtype=np.int32)
     mesh_to_data.Neighbor_alltoall(out_size, recv_size)
-
-    # Sort cells, perms for sending
-    offsets = np.zeros(len(out_size) + 1, dtype=np.intc)
-    offsets[1:] = np.cumsum(out_size)
-    assert offsets[-1] == len(cells)
-    out_cells = np.zeros_like(cells, dtype=np.int64)
-    out_perm = np.zeros_like(perms, dtype=np.uint32)
-
-    proc_row, proc_col = np.nonzero(process_pos_indicator)
-    assert np.allclose(proc_row, np.arange(len(process_pos_indicator), dtype=np.int32))
-    cum_pos = np.cumsum(process_pos_indicator, axis=0)
-    insert_position = cum_pos[np.arange(len(proc_col), dtype=np.int32), proc_col] - 1
-
-    insertion_array = offsets[proc_col] + insert_position
-    out_cells[insertion_array] = cells
-    out_perm[insertion_array] = perms
-    del cum_pos, insert_position, insertion_array
 
     # Prepare data-structures for receiving
     total_incoming = sum(recv_size)
@@ -220,32 +248,46 @@ def send_dofs_and_recv_values(
     source, dest, _ = dofmap_to_values.Get_dist_neighbors()
 
     # Compute amount of data to send to each process
+
+    # This becomes a (num_dofs, num_dest_ranks) matrix where the (i,j) entry
+    # is True if dof i is owned by dest_rank[j]
     owners_transposed = dofmap_owners.reshape(-1, 1)
     process_pos_indicator = (owners_transposed == dest_ranks)
+
+    # Compute number of dofs owned by each rank
     out_size = np.count_nonzero(process_pos_indicator, axis=0)
+
+    # Compute send offset based of number of dofs owned by each rank
+    dofs_offsets = np.zeros(len(out_size) + 1, dtype=np.intc)
+    dofs_offsets[1:] = np.cumsum(out_size)
+
+    # As each dof can only be owned by one process, this returns what column
+    # the ith dof is owned by
+    proc_row, proc_col = np.nonzero(process_pos_indicator)
+    assert len(proc_row) == len(proc_col)
+    assert np.allclose(proc_row, np.arange(len(process_pos_indicator), dtype=np.int32))
+
+    # For a dof owned by process j, get its position in the list of dofs owned by this process
+    cum_pos = np.cumsum(process_pos_indicator, axis=0)
+
+    # Get the insert position (relative to process) for each dof. Subtract 0 as first occurence is equal to 1) due
+    # to the cumsum above
+    insert_position = cum_pos[proc_row, proc_col] - 1
+    # Compute aboslute insert position
+    insert_position += dofs_offsets[proc_col]
+
+    # Pack dofs for sending
+    out_dofs = np.zeros(dofs_offsets[-1], dtype=np.int64)
+    out_dofs[insert_position] = input_dofmap
+
+    # Compute map from the data index sent to each process and the local number on the current process
+    proc_to_local = np.zeros_like(input_dofmap, dtype=np.int32)
+    proc_to_local[insert_position] = np.arange(len(input_dofmap), dtype=np.int32)
+    del insert_position, cum_pos
 
     # Send sizes to create data structures for receiving from NeighAlltoAllv
     recv_size = np.zeros_like(source, dtype=np.int32)
     dofmap_to_values.Neighbor_alltoall(out_size, recv_size)
-
-    # Sort output for sending
-    dofs_offsets = np.zeros(len(out_size) + 1, dtype=np.intc)
-    dofs_offsets[1:] = np.cumsum(out_size)
-    out_dofs = np.zeros(dofs_offsets[-1], dtype=np.int64)
-    proc_to_local = np.zeros_like(input_dofmap, dtype=np.int32)
-
-    # Map output to local dof
-    proc_row, proc_col = np.nonzero(process_pos_indicator)
-    assert np.allclose(proc_row, np.arange(len(process_pos_indicator), dtype=np.int32))
-
-    cum_pos = np.cumsum(process_pos_indicator, axis=0)
-    insert_position = cum_pos[np.arange(len(proc_col), dtype=np.int32), proc_col] - 1
-    out_dofs = np.zeros(dofs_offsets[-1], dtype=np.int64)
-    insertion_array = dofs_offsets[proc_col] + insert_position
-    out_dofs[insertion_array] = input_dofmap
-    proc_to_local = np.zeros_like(input_dofmap, dtype=np.int32)
-    proc_to_local[insertion_array] = np.arange(len(input_dofmap), dtype=np.int32)
-    del insertion_array, cum_pos, insert_position
 
     # Send input dofs to processes holding input array
     inc_dofs = np.zeros(sum(recv_size), dtype=np.int64)
