@@ -1,0 +1,79 @@
+name: Test package with openmpi
+
+on:
+  push:
+    # The CI is executed on every push on every branch
+    branches:
+      - "**"
+  pull_request:
+    # The CI is executed on every pull request to the main branch
+    branches:
+      - main
+
+  workflow_call:
+  workflow_dispatch:
+  schedule:
+    # The CI is executed every day at 8am
+    - cron: "0 8 * * *"
+
+jobs:
+
+  create-datasets:
+    uses: ./.github/workflows/create_legacy_data.yml
+
+  create-legacy-datasets:
+    uses: ./.github/workflows/create_legacy_checkpoint.yml
+  
+  check-formatting:
+    uses: ./.github/workflows/check_formatting.yml
+
+
+  test-code:
+    runs-on: "ubuntu-22.04"
+    needs: [create-datasets, create-legacy-datasets, check-formatting]
+    container: ghcr.io/fenics/test-env:current-openmpi
+    env:
+      DEB_PYTHON_INSTALL_LAYOUT: deb_system
+    strategy:
+      matrix:
+        adios2: ["default", "v2.10.0-rc1"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update pip
+        run: python3 -m pip install --upgrade pip setuptools
+
+      - name: Install DOLFINx
+        uses: jorgensd/actions/install-dolfinx@v0.2.0
+        with:
+          adios2: ${{ matrix.adios2 }}
+
+      - name: Download legacy data
+        uses: actions/download-artifact@v4
+        with:
+          name: legacy
+          path: ./legacy
+
+      - name: Install package
+        run: python3 -m pip install .[test]
+
+      - name: Run tests
+        run: |
+          coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
+
+      - name: Run tests in parallel
+        run: |
+          mpirun -n 2 coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
+
+      - name: Combine coverage reports
+        run: |
+          coverage combine
+          coverage report -m
+          coverage html
+
+      - name: Upload coverage report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-coverage-report
+          path: htmlcov
+          if-no-files-found: error

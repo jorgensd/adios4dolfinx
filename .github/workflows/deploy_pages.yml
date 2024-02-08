@@ -22,8 +22,11 @@ jobs:
   run-coverage:
     uses: ./.github/workflows/test_package.yml
 
+  test-openmpi:
+    uses: ./.github/workflows/test_package_openmpi.yml
+
   deploy:
-    needs: [run-coverage, build-docs]
+    needs: [run-coverage, build-docs, test-openmpi]
 
     environment:
       name: github-pages
