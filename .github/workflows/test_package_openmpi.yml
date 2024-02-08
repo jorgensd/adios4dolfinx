@@ -23,14 +23,10 @@ jobs:
 
   create-legacy-datasets:
     uses: ./.github/workflows/create_legacy_checkpoint.yml
-  
-  check-formatting:
-    uses: ./.github/workflows/check_formatting.yml
-
 
   test-code:
     runs-on: "ubuntu-22.04"
-    needs: [create-datasets, create-legacy-datasets, check-formatting]
+    needs: [create-datasets, create-legacy-datasets]
     container: ghcr.io/fenics/test-env:current-openmpi
     env:
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
