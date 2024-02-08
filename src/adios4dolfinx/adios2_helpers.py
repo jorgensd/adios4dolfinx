@@ -3,7 +3,12 @@ from typing import Tuple
 
 from mpi4py import MPI
 
+import packaging.version
 import adios2
+if (packaging.version.parse(adios2.__version__)
+        >= packaging.version.Version("2.10.0")):
+    adios2 = adios2.bindings
+
 import dolfinx.cpp.graph
 import dolfinx.graph
 import numpy as np

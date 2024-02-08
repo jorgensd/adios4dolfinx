@@ -9,12 +9,12 @@ from typing import Optional, Union
 
 from mpi4py import MPI
 
-import adios2
 import basix
 import dolfinx
 import numpy as np
 import ufl
 
+from .adios2_helpers import adios2
 from .adios2_helpers import (adios_to_numpy_dtype, read_array, read_cell_perms,
                              read_dofmap)
 from .comm_helpers import (send_and_recv_cell_perm,
