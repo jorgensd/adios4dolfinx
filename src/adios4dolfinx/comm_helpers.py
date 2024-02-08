@@ -58,7 +58,7 @@ def send_dofmap_and_recv_values(
     process_pos_indicator = (owners_transposed == dest_ranks)
 
     # Compute number of dofs owned by each rank
-    out_size = np.count_nonzero(process_pos_indicator, axis=0)
+    out_size = np.count_nonzero(process_pos_indicator, axis=0).astype(np.int32)
 
     # Compute send offset based of number of dofs owned by each rank
     offsets = np.zeros(len(out_size) + 1, dtype=np.intc)
@@ -169,7 +169,7 @@ def send_and_recv_cell_perm(
     process_pos_indicator = (owners_transposed == np.asarray(dest))
 
     # Compute number of cells owned by each rank
-    out_size = np.count_nonzero(process_pos_indicator, axis=0)
+    out_size = np.count_nonzero(process_pos_indicator, axis=0).astype(np.int32)
 
     # Compute send offset based of number of cells owned by each rank
     offsets = np.zeros(len(out_size) + 1, dtype=np.intc)
@@ -255,7 +255,7 @@ def send_dofs_and_recv_values(
     process_pos_indicator = (owners_transposed == dest_ranks)
 
     # Compute number of dofs owned by each rank
-    out_size = np.count_nonzero(process_pos_indicator, axis=0)
+    out_size = np.count_nonzero(process_pos_indicator, axis=0).astype(np.int32)
 
     # Compute send offset based of number of dofs owned by each rank
     dofs_offsets = np.zeros(len(out_size) + 1, dtype=np.intc)
