@@ -10,7 +10,7 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
   workflow_call:
-   inputs:
+    inputs:
       artifact_name:
         type: string
         required: true
@@ -44,7 +44,7 @@ jobs:
 
       - name: Upload documentation as artifact (from workflow call)
         uses: actions/upload-artifact@v4
-        if: ${ { github.event_name } == 'workflow_call' 
+        if: ${{ github.event_name == 'workflow_call' }}
         with:
           name: ${{ inputs.artifact_name }}
           path: ${{ env.PUBLISH_DIR }}
@@ -53,7 +53,7 @@ jobs:
 
       - name: Upload documentation as artifact
         uses: actions/upload-artifact@v4
-        if: ${ { github.event_name } != 'workflow_call' 
+        if: ${{ github.event_name  != 'workflow_call' }}
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ env.PUBLISH_DIR }}

@@ -2,17 +2,17 @@ name: Generate adios4dolfinx legacy data
 
 on:
   workflow_call:
-   inputs:
+    inputs:
       artifact_name:
         type: string
         required: true
-
-env:
-  data_dir: "legacy_checkpoint"
-  adios4dolfinx_version: "0.7.1"
+        description: "Name of the artifact to be created"
 
 jobs:
   create-adios-data:
+    env:
+      data_dir: "legacy_checkpoint"
+      adios4dolfinx_version: "0.7.1"
     runs-on: "ubuntu-22.04"
     container: ghcr.io/fenics/dolfinx/dolfinx:v0.7.3
   
@@ -27,5 +27,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{inputs.artifact_name}_${{ env.data_dir }}
+          name: ${{ inputs.artifact_name }}
           path: ./${{ env.data_dir }}

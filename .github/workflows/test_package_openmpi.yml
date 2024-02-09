@@ -56,14 +56,14 @@ jobs:
       - name: Download legacy data
         uses: actions/download-artifact@v4
         with:
-          name: legacy
-          path: ./legacy_ompi
+          name: legacy_ompi
+          path: ./legacy
 
       - name: Download legacy data
         uses: actions/download-artifact@v4
         with:
-          name: legacy_checkpoint
-          path: ./legacy_checkpoint_ompi
+          name: legacy_checkpoint_ompi
+          path: ./legacy_checkpoint
 
       - name: Install package
         run: python3 -m pip install .[test]

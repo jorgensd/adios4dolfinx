@@ -2,26 +2,27 @@ name: Generate data from Legacy DOLFIN
 
 on:
   workflow_call:
-   inputs:
+    inputs:
       artifact_name:
         type: string
         required: true
-
-env:
-  data_dir: "legacy"
-
+        description: "Name of the artifact to be created"
 
 jobs:
+
   create-dolfin-data:
+    env:
+      data_dir: "legacy"
+  
     runs-on: "ubuntu-22.04"
     container: ghcr.io/scientificcomputing/fenics:2023-11-15
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Create datasets
-        run: python3 ./tests/create_legacy_data.py --output-dir=$data_dir
+    - name: Create datasets
+      run: python3 ./tests/create_legacy_data.py --output-dir=$data_dir
 
-  - uses: actions/upload-artifact@v4
-        with:
-          name: ${{inputs.artifact_name}_${{ env.data_dir }}
-          path: ./${{ env.data_dir }}
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact_name }}
+        path: ./${{ env.data_dir }}
