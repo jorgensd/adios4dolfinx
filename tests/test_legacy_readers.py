@@ -26,7 +26,7 @@ def test_legacy_mesh():
         pytest.skip(f"{path} does not exist")
     mesh = read_mesh_from_legacy_h5(comm=comm, filename=path, group="/mesh")
     assert mesh.topology.dim == 3
-    print(dolfinx.default_scalar_type, dolfinx.default_scalar_type, dolfinx.fem.form(1 * ufl.dx(domain=mesh)))
+    print(dolfinx.default_scalar_type, dolfinx.default_scalar_type)
     volume = mesh.comm.allreduce(
         dolfinx.fem.assemble_scalar(dolfinx.fem.form(1 * ufl.dx(domain=mesh))),
         op=MPI.SUM,
