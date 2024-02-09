@@ -16,12 +16,12 @@ import numpy.typing as npt
 import ufl
 
 from .adios2_helpers import import_adios
-adios2 = import_adios()
-
 from .adios2_helpers import adios_to_numpy_dtype, read_array
 from .comm_helpers import send_dofs_and_recv_values
 from .utils import (compute_dofmap_pos, compute_local_range,
                     index_owner)
+
+adios2 = import_adios()
 
 __all__ = [
     "read_mesh_from_legacy_h5",
