@@ -2,10 +2,11 @@ name: Generate data from Legacy DOLFIN
 
 on:
   workflow_call:
-   inputs:
+    inputs:
       artifact_name:
         type: string
         required: true
+        description: "Name of the artifact to be created"
 
 jobs:
   env:
