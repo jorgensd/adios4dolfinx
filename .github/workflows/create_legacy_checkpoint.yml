@@ -9,10 +9,10 @@ on:
         description: "Name of the artifact to be created"
 
 jobs:
-  env:
-    data_dir: "legacy_checkpoint"
-    adios4dolfinx_version: "0.7.1"
   create-adios-data:
+    env:
+      data_dir: "legacy_checkpoint"
+      adios4dolfinx_version: "0.7.1"
     runs-on: "ubuntu-22.04"
     container: ghcr.io/fenics/dolfinx/dolfinx:v0.7.3
   
