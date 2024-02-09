@@ -27,5 +27,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.artifact_name }}_${{ env.data_dir }}
+          name: ${{ inputs.artifact_name }}
           path: ./${{ env.data_dir }}
