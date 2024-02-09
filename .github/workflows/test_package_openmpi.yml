@@ -31,6 +31,9 @@ jobs:
     env:
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
       PETSC_ARCH: "linux-gnu-real64-32"
+      OMPI_ALLOW_RUN_AS_ROOT: 1
+      OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
+
     strategy:
       matrix:
         adios2: ["default", "v2.10.0-rc1"]
