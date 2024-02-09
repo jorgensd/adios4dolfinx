@@ -3,18 +3,22 @@ from typing import Tuple
 
 from mpi4py import MPI
 
-import packaging.version
-import adios2
-if (packaging.version.parse(adios2.__version__)
-        >= packaging.version.Version("2.10.0")):
-    adios2 = adios2.bindings
-
 import dolfinx.cpp.graph
 import dolfinx.graph
 import numpy as np
 import numpy.typing as npt
 
 from .utils import compute_local_range, valid_function_types
+
+
+def import_adios():
+    import adios2
+    if hasattr(adios2, "bindings"):
+        adios2 = adios2.bindings
+    return adios2
+
+
+adios2 = import_adios()
 
 """
 Helpers reading/writing data with ADIOS2
