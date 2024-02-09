@@ -164,7 +164,7 @@ def send_cells_and_receive_dofmap_index(
     # Compute amount of data to send to each process
     owners_transposed = output_owners.reshape(-1, 1)
     process_pos_indicator = (owners_transposed == np.asarray(dest_ranks))
-    out_size = np.count_nonzero(process_pos_indicator, axis=0)
+    out_size = np.count_nonzero(process_pos_indicator, axis=0).astype(np.int32)
 
     recv_size = np.zeros(len(source_ranks), dtype=np.int32)
     mesh_to_data_comm = comm.Create_dist_graph_adjacent(
