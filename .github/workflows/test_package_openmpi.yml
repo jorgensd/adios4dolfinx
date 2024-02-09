@@ -30,6 +30,7 @@ jobs:
     container: ghcr.io/fenics/test-env:current-openmpi
     env:
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
+      PETSC_ARCH: "linux-gnu-real64-32"
     strategy:
       matrix:
         adios2: ["default", "v2.10.0-rc1"]
@@ -43,7 +44,7 @@ jobs:
         uses: jorgensd/actions/install-dolfinx@v0.2.0
         with:
           adios2: ${{ matrix.adios2 }}
-          petsc_arch: "linux-gnu-real64-32"
+          petsc_arch: ${{ env.PETSC_ARCH }}
 
       - name: Download legacy data
         uses: actions/download-artifact@v4
