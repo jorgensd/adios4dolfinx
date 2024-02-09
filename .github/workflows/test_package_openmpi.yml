@@ -1,4 +1,4 @@
-name: Test package
+name: Test package with openmpi
 
 on:
   push:
@@ -21,42 +21,50 @@ jobs:
   create-datasets:
     uses: ./.github/workflows/create_legacy_data.yml
     with:
-      artifact_name: "legacy_mpich"
+      artifact_name: "legacy_ompi"
 
   create-legacy-datasets:
     uses: ./.github/workflows/create_legacy_checkpoint.yml
     with:
-      artifact_name: "legacy_checkpoint_mpich"
-  
-  check-formatting:
-    uses: ./.github/workflows/check_formatting.yml
+      artifact_name: "legacy_checkpoint_ompi"
 
   test-code:
     runs-on: "ubuntu-22.04"
-    needs: [create-datasets, create-legacy-datasets, check-formatting]
-    container: ghcr.io/fenics/dolfinx/dolfinx:nightly
+    needs: [create-datasets, create-legacy-datasets]
+    container: ghcr.io/fenics/test-env:current-openmpi
     env:
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
-      PYTHONPATH: /usr/local/lib/python3/dist-packages:/usr/local/lib:/usr/local/dolfinx-real/lib/python3.10/dist-packages
+      PETSC_ARCH: "linux-gnu-real64-32"
+      OMPI_ALLOW_RUN_AS_ROOT: 1
+      OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
 
+    strategy:
+      matrix:
+        adios2: ["default"] # , "v2.10.0-rc1"]
     steps:
       - uses: actions/checkout@v4
 
       - name: Update pip
         run: python3 -m pip install --upgrade pip setuptools
 
+      - name: Install DOLFINx
+        uses: jorgensd/actions/install-dolfinx@v0.2.0
+        with:
+          adios2: ${{ matrix.adios2 }}
+          petsc_arch: ${{ env.PETSC_ARCH }}
+
       - name: Download legacy data
         uses: actions/download-artifact@v4
         with:
-          name: legacy_mpich
+          name: legacy_ompi
           path: ./legacy
-    
+
       - name: Download legacy data
         uses: actions/download-artifact@v4
         with:
-          name: legacy_checkpoint_mpich
+          name: legacy_checkpoint_ompi
           path: ./legacy_checkpoint
-    
+
       - name: Install package
         run: python3 -m pip install .[test]
 
@@ -67,16 +75,3 @@ jobs:
       - name: Run tests in parallel
         run: |
           mpirun -n 2 coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
-
-      - name: Combine coverage reports
-        run: |
-          coverage combine
-          coverage report -m
-          coverage html
-
-      - name: Upload coverage report as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: code-coverage-report
-          path: htmlcov
-          if-no-files-found: error

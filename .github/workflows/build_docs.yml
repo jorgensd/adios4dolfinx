@@ -15,6 +15,7 @@ env:
   # Directory that will be published on github pages
   PUBLISH_DIR: ./_build/html
   DEB_PYTHON_INSTALL_LAYOUT: deb_system
+  ARTIFACT_NAME: "docs"
 
 jobs:
   build-docs:
@@ -39,8 +40,9 @@ jobs:
 
       - name: Upload documentation as artifact
         uses: actions/upload-artifact@v4
+        if: github.event_name != 'workflow_call'
         with:
-          name: documentation
+          name: ${{ env.ARTIFACT_NAME }}
           path: ${{ env.PUBLISH_DIR }}
           if-no-files-found: error
 

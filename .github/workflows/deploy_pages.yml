@@ -19,11 +19,15 @@ jobs:
   build-docs:
     uses: ./.github/workflows/build_docs.yml
 
+
   run-coverage:
     uses: ./.github/workflows/test_package.yml
 
+  test-openmpi:
+    uses: ./.github/workflows/test_package_openmpi.yml
+
   deploy:
-    needs: [run-coverage, build-docs]
+    needs: [run-coverage, build-docs, test-openmpi]
 
     environment:
       name: github-pages
@@ -35,7 +39,7 @@ jobs:
         # docs artifact is uploaded by build-docs job
         uses: actions/download-artifact@v4
         with:
-          name: documentation
+          name: docs
           path: "./public"
 
       - name: Download docs artifact
