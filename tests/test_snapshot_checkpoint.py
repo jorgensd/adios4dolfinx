@@ -7,8 +7,11 @@ import dolfinx
 import numpy as np
 import pytest
 
-from adios4dolfinx.adios2_helpers import adios2
+from adios4dolfinx.adios2_helpers import import_adios
 from adios4dolfinx import snapshot_checkpoint
+
+adios2 = import_adios()
+
 
 triangle = dolfinx.mesh.CellType.triangle
 quad = dolfinx.mesh.CellType.quadrilateral
