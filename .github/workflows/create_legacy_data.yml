@@ -7,11 +7,10 @@ on:
         type: string
         required: true
 
-env:
-  data_dir: "legacy"
-
-
 jobs:
+  env:
+    data_dir: "legacy"
+
   create-dolfin-data:
     runs-on: "ubuntu-22.04"
     container: ghcr.io/scientificcomputing/fenics:2023-11-15

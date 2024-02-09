@@ -7,11 +7,10 @@ on:
         type: string
         required: true
 
-env:
-  data_dir: "legacy_checkpoint"
-  adios4dolfinx_version: "0.7.1"
-
 jobs:
+  env:
+    data_dir: "legacy_checkpoint"
+    adios4dolfinx_version: "0.7.1"
   create-adios-data:
     runs-on: "ubuntu-22.04"
     container: ghcr.io/fenics/dolfinx/dolfinx:v0.7.3
