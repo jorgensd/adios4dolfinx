@@ -2,6 +2,10 @@ name: Generate data from Legacy DOLFIN
 
 on:
   workflow_call:
+   inputs:
+      artifact_name:
+        type: string
+        required: true
 
 env:
   data_dir: "legacy"
@@ -17,7 +21,7 @@ jobs:
       - name: Create datasets
         run: python3 ./tests/create_legacy_data.py --output-dir=$data_dir
 
-      - uses: actions/upload-artifact@v4
+  - uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.data_dir }}
+          name: ${{inputs.artifact_name}_${{ env.data_dir }}
           path: ./${{ env.data_dir }}

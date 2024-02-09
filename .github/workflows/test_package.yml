@@ -20,9 +20,13 @@ jobs:
 
   create-datasets:
     uses: ./.github/workflows/create_legacy_data.yml
+    with:
+      artifact_name: "legacy_mpich"
 
   create-legacy-datasets:
     uses: ./.github/workflows/create_legacy_checkpoint.yml
+    with:
+      artifact_name: "legacy_checkpoint_mpich"
   
   check-formatting:
     uses: ./.github/workflows/check_formatting.yml
@@ -44,13 +48,13 @@ jobs:
       - name: Download legacy data
         uses: actions/download-artifact@v4
         with:
-          name: legacy
+          name: legacy_mpich
           path: ./legacy
     
       - name: Download legacy data
         uses: actions/download-artifact@v4
         with:
-          name: legacy_checkpoint
+          name: legacy_checkpoint_mpich
           path: ./legacy_checkpoint
     
       - name: Install package

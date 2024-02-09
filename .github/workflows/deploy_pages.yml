@@ -18,6 +18,8 @@ concurrency:
 jobs:
   build-docs:
     uses: ./.github/workflows/build_docs.yml
+    with:
+      artifact_name: "documentation"
 
   run-coverage:
     uses: ./.github/workflows/test_package.yml

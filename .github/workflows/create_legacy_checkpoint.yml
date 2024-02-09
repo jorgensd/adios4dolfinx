@@ -2,6 +2,10 @@ name: Generate adios4dolfinx legacy data
 
 on:
   workflow_call:
+   inputs:
+      artifact_name:
+        type: string
+        required: true
 
 env:
   data_dir: "legacy_checkpoint"
@@ -23,5 +27,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.data_dir }}
+          name: ${{inputs.artifact_name}_${{ env.data_dir }}
           path: ./${{ env.data_dir }}
