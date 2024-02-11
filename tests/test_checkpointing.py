@@ -46,7 +46,6 @@ def test_read_write_P_2D(read_comm, family, degree, complex, mesh_2D):
                            mesh.ufl_cell().cellname(),
                            degree,
                            basix.LagrangeVariant.gll_warped,
-                           gdim=mesh.geometry.dim,
                            shape=(mesh.geometry.dim, ),
                            dtype=mesh.geometry.x.dtype)
 
@@ -72,7 +71,6 @@ def test_read_write_P_3D(read_comm, family, degree, complex, mesh_3D):
                            mesh.ufl_cell().cellname(),
                            degree,
                            basix.LagrangeVariant.gll_warped,
-                           gdim=mesh.geometry.dim,
                            shape=(mesh.geometry.dim, ))
 
     def f(x):
@@ -100,7 +98,6 @@ def test_read_write_P_2D_time(read_comm, family, degree, complex, mesh_2D):
                            mesh.ufl_cell().cellname(),
                            degree,
                            basix.LagrangeVariant.gll_warped,
-                           gdim=mesh.geometry.dim,
                            shape=(mesh.geometry.dim, ),
                            dtype=mesh.geometry.x.dtype)
 
@@ -134,7 +131,6 @@ def test_read_write_P_3D_time(read_comm, family, degree, complex, mesh_3D):
                            mesh.ufl_cell().cellname(),
                            degree,
                            basix.LagrangeVariant.gll_warped,
-                           gdim=mesh.geometry.dim,
                            shape=(mesh.geometry.dim, ))
 
     def f(x):
