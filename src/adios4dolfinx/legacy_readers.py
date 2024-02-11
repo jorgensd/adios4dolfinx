@@ -316,7 +316,6 @@ def read_mesh_from_legacy_h5(
         1,
         basix.LagrangeVariant.equispaced,
         shape=(mesh_geometry.shape[1],),
-        gdim=mesh_geometry.shape[1],
     )
     domain = ufl.Mesh(element)
     return dolfinx.mesh.create_mesh(
