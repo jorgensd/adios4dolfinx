@@ -58,8 +58,7 @@ def test_read_write_2D(read_comm, family, degree, complex, simplex_mesh_2D):
     f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
     el = basix.ufl.element(family,
                            mesh.ufl_cell().cellname(),
-                           degree,
-                           gdim=mesh.geometry.dim)
+                           degree)
 
     def f(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
@@ -81,8 +80,7 @@ def test_read_write_3D(read_comm, family, degree, complex, simplex_mesh_3D):
     f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
     el = basix.ufl.element(family,
                            mesh.ufl_cell().cellname(),
-                           degree,
-                           gdim=mesh.geometry.dim)
+                           degree)
 
     def f(x):
         values = np.empty((3, x.shape[1]), dtype=f_dtype)
@@ -104,8 +102,7 @@ def test_read_write_2D_quad(read_comm, family, degree, complex, non_simplex_mesh
     f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
     el = basix.ufl.element(family,
                            mesh.ufl_cell().cellname(),
-                           degree,
-                           gdim=mesh.geometry.dim)
+                           degree)
 
     def f(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
@@ -127,8 +124,7 @@ def test_read_write_hex(read_comm, family, degree, complex, non_simplex_mesh_3D)
     f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
     el = basix.ufl.element(family,
                            mesh.ufl_cell().cellname(),
-                           degree,
-                           gdim=mesh.geometry.dim)
+                           degree)
 
     def f(x):
         values = np.empty((3, x.shape[1]), dtype=f_dtype)
@@ -151,8 +147,7 @@ def test_read_write_multiple(read_comm, family, degree, complex, non_simplex_mes
     f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
     el = basix.ufl.element(family,
                            mesh.ufl_cell().cellname(),
-                           degree,
-                           gdim=mesh.geometry.dim)
+                           degree)
 
     def f(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)

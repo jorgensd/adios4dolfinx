@@ -499,7 +499,6 @@ def read_mesh(
         degree,
         basix.LagrangeVariant(int(lvar)),
         shape=(mesh_geometry.shape[1],),
-        gdim=mesh_geometry.shape[1],
         dtype=mesh_geometry.dtype,
     )
     domain = ufl.Mesh(element)

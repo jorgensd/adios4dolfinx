@@ -82,8 +82,7 @@ def test_unroll_P(family, degree, mesh_2D):
 def test_unroll_RTCF(family, degree, mesh_3D):
     el = basix.ufl.element(family,
                            mesh_3D.ufl_cell().cellname(),
-                           degree,
-                           gdim=mesh_3D.geometry.dim)
+                           degree)
 
     V = dolfinx.fem.functionspace(mesh_3D, el)
     dofmap = V.dofmap
@@ -105,8 +104,7 @@ def test_unroll_RTCF(family, degree, mesh_3D):
 def test_compute_dofmap_pos_RTCF(family, degree, mesh_3D):
     el = basix.ufl.element(family,
                            mesh_3D.ufl_cell().cellname(),
-                           degree,
-                           gdim=mesh_3D.geometry.dim)
+                           degree)
 
     V = dolfinx.fem.functionspace(mesh_3D, el)
     local_cells, local_pos = compute_dofmap_pos(V)
@@ -123,8 +121,7 @@ def test_compute_dofmap_pos_RTCF(family, degree, mesh_3D):
 def test_compute_dofmap_pos_P(family, degree, mesh_2D):
     el = basix.ufl.element(family,
                            mesh_2D.ufl_cell().cellname(),
-                           degree,
-                           gdim=mesh_2D.geometry.dim)
+                           degree)
 
     V = dolfinx.fem.functionspace(mesh_2D, el)
     local_cells, local_pos = compute_dofmap_pos(V)
