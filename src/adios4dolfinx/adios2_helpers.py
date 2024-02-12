@@ -10,15 +10,14 @@ import numpy.typing as npt
 
 from .utils import compute_local_range, valid_function_types
 
-
-def import_adios():
-    import adios2
-    if hasattr(adios2, "bindings"):
-        adios2 = adios2.bindings
-    return adios2
+import adios2
 
 
-adios2 = import_adios()
+def resolve_adios_scope(adios2):
+    return adios2.bindings if hasattr(adios2, "bindings") else adios2
+
+
+adios2 = resolve_adios_scope(adios2)
 
 """
 Helpers reading/writing data with ADIOS2

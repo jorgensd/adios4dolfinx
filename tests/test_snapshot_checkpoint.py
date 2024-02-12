@@ -7,10 +7,11 @@ import dolfinx
 import numpy as np
 import pytest
 
-from adios4dolfinx.adios2_helpers import import_adios
+from adios4dolfinx.adios2_helpers import resolve_adios_scope
 from adios4dolfinx import snapshot_checkpoint
 
-adios2 = import_adios()
+import adios2
+adios2 = resolve_adios_scope(adios2)
 
 
 triangle = dolfinx.mesh.CellType.triangle
