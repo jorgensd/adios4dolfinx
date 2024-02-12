@@ -2,13 +2,17 @@ from pathlib import Path
 
 from mpi4py import MPI
 
-import adios2
 import basix.ufl
 import dolfinx
 import numpy as np
 import pytest
 
+from adios4dolfinx.adios2_helpers import resolve_adios_scope
 from adios4dolfinx import snapshot_checkpoint
+
+import adios2
+adios2 = resolve_adios_scope(adios2)
+
 
 triangle = dolfinx.mesh.CellType.triangle
 quad = dolfinx.mesh.CellType.quadrilateral
