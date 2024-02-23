@@ -536,7 +536,7 @@ def write_function(
 
     # If mode is append, check if we have written the function to file before
     name = u.name
-    if not Path(filename).is_file():
+    if not Path(filename).exists():
         mode = adios2.Mode.Write
 
     first_write = True
