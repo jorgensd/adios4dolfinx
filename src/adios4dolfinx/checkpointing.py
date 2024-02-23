@@ -536,12 +536,14 @@ def write_function(
 
     # If mode is append, check if we have written the function to file before
     name = u.name
+    if not Path(filename).is_file():
+        mode = adios2.Mode.Write
 
+    first_write = True
     if mode == adios2.Mode.Append:
         # First open the file in read-mode to check if the function has been written before
         read_file = io.Open(str(filename), adios2.Mode.Read)
         io.SetEngine(engine)
-        first_write = True
         for _ in range(read_file.Steps()):
             read_file.BeginStep()
             if name in io.AvailableAttributes():
