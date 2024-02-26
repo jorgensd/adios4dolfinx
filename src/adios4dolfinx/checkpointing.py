@@ -35,13 +35,13 @@ __all__ = [
 ]
 
 
-def snapshot_checkpoint(uh: dolfinx.fem.Function, file: Path, mode: adios2.Mode):
+def snapshot_checkpoint(uh: dolfinx.fem.Function, filename: Union[Path, str], mode: adios2.Mode):
     """Read or write a snapshot checkpoint
 
     This checkpoint is only meant to be used on the same mesh during the same simulation.
 
     :param uh: The function to write data from or read to
-    :param file: The file to write to or read from
+    :param filename: The file to write to or read from
     :param mode: Either read or write
     """
     # Create ADIOS IO
@@ -51,7 +51,7 @@ def snapshot_checkpoint(uh: dolfinx.fem.Function, file: Path, mode: adios2.Mode)
     io.SetEngine("BP4")
     if mode not in [adios2.Mode.Write, adios2.Mode.Read]:
         raise ValueError("Got invalid mode {mode}")
-    adios_file = io.Open(str(file), mode)
+    adios_file = io.Open(str(filename), mode)
 
     if mode == adios2.Mode.Write:
         dofmap = uh.function_space.dofmap
@@ -219,7 +219,7 @@ def write_meshtags(filename: Union[Path, str], mesh: dolfinx.mesh.Mesh, meshtags
     outfile.Close()
 
 
-def read_meshtags(filename: str, mesh: dolfinx.mesh.Mesh, meshtag_name: str,
+def read_meshtags(filename: Union[Path, str], mesh: dolfinx.mesh.Mesh, meshtag_name: str,
                   engine: str = "BP4") -> dolfinx.mesh.MeshTags:
     """
     Read meshtags from file and return a :class:`dolfinx.mesh.MeshTags` object.
@@ -307,7 +307,7 @@ def read_meshtags(filename: str, mesh: dolfinx.mesh.Mesh, meshtag_name: str,
     return mt
 
 
-def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4", time: float = 0.,
+def read_function(u: dolfinx.fem.Function, filename: Union[Path, str], engine: str = "BP4", time: float = 0.,
                   legacy: bool = False):
     """
     Read checkpoint from file and fill it into `u`.
@@ -427,14 +427,14 @@ def read_function(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4", 
 
 
 def read_mesh(
-    comm: MPI.Intracomm, file: Path, engine: str, ghost_mode: dolfinx.mesh.GhostMode
+    comm: MPI.Intracomm, filename: Union[Path, str], engine: str, ghost_mode: dolfinx.mesh.GhostMode
 ) -> dolfinx.mesh.Mesh:
     """
     Read an ADIOS2 mesh into DOLFINx.
 
     Args:
         comm: The MPI communciator to distribute the mesh over
-        file: Path to input file
+        filename: Path to input file
         engine: ADIOS engine to use for reading (BP4, BP5 or HDF5)
         ghost_mode: Ghost mode to use for mesh
     Returns:
@@ -443,26 +443,26 @@ def read_mesh(
     adios = adios2.ADIOS(comm)
     io = adios.DeclareIO("MeshReader")
     io.SetEngine(engine)
-    infile = io.Open(str(file), adios2.Mode.Read)
+    infile = io.Open(str(filename), adios2.Mode.Read)
     infile.BeginStep()
 
     # Get mesh cell type
     if "CellType" not in io.AvailableAttributes().keys():
-        raise KeyError(f"Mesh cell type not found at CellType in {file}")
+        raise KeyError(f"Mesh cell type not found at CellType in {filename}")
     celltype = io.InquireAttribute("CellType")
     cell_type = celltype.DataString()[0]
 
     # Get basix info
     if "LagrangeVariant" not in io.AvailableAttributes().keys():
-        raise KeyError(f"Mesh LagrangeVariant not found in {file}")
+        raise KeyError(f"Mesh LagrangeVariant not found in {filename}")
     lvar = io.InquireAttribute("LagrangeVariant").Data()[0]
     if "Degree" not in io.AvailableAttributes().keys():
-        raise KeyError(f"Mesh degree not found in {file}")
+        raise KeyError(f"Mesh degree not found in {filename}")
     degree = io.InquireAttribute("Degree").Data()[0]
 
     # Get mesh geometry
     if "Points" not in io.AvailableVariables().keys():
-        raise KeyError(f"Mesh coordinates not found at Points in {file}")
+        raise KeyError(f"Mesh coordinates not found at Points in {filename}")
     geometry = io.InquireVariable("Points")
     x_shape = geometry.Shape()
     geometry_range = compute_local_range(comm, x_shape[0])
@@ -476,7 +476,7 @@ def read_mesh(
     infile.Get(geometry, mesh_geometry, adios2.Mode.Deferred)
     # Get mesh topology (distributed)
     if "Topology" not in io.AvailableVariables().keys():
-        raise KeyError("Mesh topology not found at Topology in {file}")
+        raise KeyError(f"Mesh topology not found at Topology in {filename}")
     topology = io.InquireVariable("Topology")
     shape = topology.Shape()
     local_range = compute_local_range(comm, shape[0])
@@ -510,7 +510,7 @@ def read_mesh(
 
 def write_function(
     u: dolfinx.fem.Function,
-    filename: Path,
+    filename: Union[Path, str],
     engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Append,
     time: float = 0.0
