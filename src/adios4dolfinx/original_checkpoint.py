@@ -97,6 +97,20 @@ class MeshData():
     lagrange_variant: int
 
 
+@dataclass
+class FunctionData():
+    cell_permutations: npt.NDArray[np.uint32]
+    local_cell_range: Tuple[int, int]
+    num_cells_global: int
+    dofmap_array: npt.NDArray[np.int64]
+    dofmap_offsets: npt.NDArray[np.int32]
+    dofmap_range: Tuple[int, int]
+    global_dofs_in_dofmap: int
+    values: npt.NDArray[np.floating]
+    dof_range: Tuple[int, int]
+    num_dofs_global: int
+
+
 def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     """
     Store data locally on output process
@@ -242,7 +256,7 @@ def write_mesh_input_order(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str 
     gdim = mesh_data.local_geometry.shape[1]
     assert gdim == mesh.geometry.dim
     adios = adios2.ADIOS(mesh.comm)
-    io = adios.DeclareIO("MeshWriter")
+    io = adios.DeclareIO("OriginalMeshWriter")
     io.SetEngine("BP4")
     outfile = io.Open(str(filename), adios2.Mode.Write)
 
@@ -277,11 +291,13 @@ def write_mesh_input_order(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str 
     outfile.PerformPuts()
     outfile.EndStep()
     outfile.Close()
+    assert adios.RemoveIO("OriginalMeshWriter")
 
 
-def write_function_on_input_mesh(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4"):
+
+def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionData:
     """
-    Write function to be used with original mesh
+    Create data object to save with ADIOS2
     """
     mesh = u.function_space.mesh
 
@@ -367,6 +383,7 @@ def write_function_on_input_mesh(u: dolfinx.fem.Function, filename: Path, engine
                                                  num_dofs_per_cell).copy()
     final_dofmap = np.empty_like(shaped_dofmap)
     final_dofmap[local_cell_index] = shaped_dofmap
+    final_dofmap = final_dofmap.reshape(-1)
 
     # Get offsets of dofmap
     num_cells_local = local_cell_range[1] - local_cell_range[0]
@@ -376,54 +393,67 @@ def write_function_on_input_mesh(u: dolfinx.fem.Function, filename: Path, engine
     local_dofmap_offsets[:] *= num_dofs_per_cell
     local_dofmap_offsets[:] += dofmap_imap.local_range[0]
 
+    num_dofs_local = dofmap.index_map.size_local * dofmap.index_map_bs
+    num_dofs_global = dofmap.index_map.size_global * dofmap.index_map_bs
+    local_range = dofmap.index_map.local_range * dofmap.index_map_bs
+    return FunctionData(cell_permutations=cell_permutation_info, local_cell_range=local_cell_range,
+                        num_cells_global=num_cells_global, dofmap_array=final_dofmap,
+                        dofmap_offsets=local_dofmap_offsets,
+                        values=u.x.array[:num_dofs_local].copy(),
+                        dof_range=local_range,
+                        num_dofs_global=num_dofs_global,
+                        dofmap_range=dofmap_imap.local_range
+                        global_dofs_in_dofmap=dofmap_imap.size_global)
+
+
+def write_function_on_input_mesh(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4",
+                                 mode: adios2.Mode = adios2.Mode.append, time:float=0.0):
+    mesh = u.function_space.mesh
+    function_data = create_function_data_on_original_mesh(u)
+
     adios = adios2.ADIOS(mesh.comm)
-    io = adios.DeclareIO("MeshWriter")
-    io.SetEngine("BP4")
-    outfile = io.Open(str(filename), adios2.Mode.Write)
+    io = adios.DeclareIO("OriginalFunctionWriter")
+    io.SetEngine(engine)
+    outfile = io.Open(str(filename), mode)
 
     # Add mesh permutations
     pvar = io.DefineVariable(
         "CellPermutations",
-        cell_permutation_info,
-        shape=[num_cells_global],
-        start=[local_cell_range[0]],
-        count=[local_cell_range[1]-local_cell_range[0]],
+        function_data.cell_permutations,
+        shape=[function_data.num_cells_global],
+        start=[function_data.local_cell_range[0]],
+        count=[function_data.local_cell_range[1]-function_data.local_cell_range[0]],
     )
-    outfile.Put(pvar, cell_permutation_info)
-
+    outfile.Put(pvar, function_data.cell_permutations)
     dofmap_var = io.DefineVariable(
         f"{u.name}_dofmap",
-        np.zeros(num_dofs_local_dmap, dtype=np.int64),
-        shape=[dofmap_imap.size_global],
-        start=[dofmap_imap.local_range[0]],
-        count=[dofmap_imap.size_local],
+        function_data.dofmap_array,
+        shape=[function_data.global_dofs_in_dofmap],
+        start=[function_data.dofmap_range[0]],
+        count=[function_data.dofmap_range[1] - function_data.dofmap_range[0]],
     )
-    outfile.Put(dofmap_var, final_dofmap)
+    outfile.Put(dofmap_var, function_data.dofmap_array)
 
     xdofmap_var = io.DefineVariable(
         f"{u.name}_XDofmap",
-        local_dofmap_offsets,
-        shape=[num_cells_global + 1],
-        start=[local_cell_range[0]],
-        count=[num_cells_local + 1],
+        function_data.dofmap_offsets,
+        shape=[function_data.num_cells_global + 1],
+        start=[function_data.local_cell_range[0]],
+        count=[function_data.local_cell_range[1] - function_data.local_cell_range[0] + 1],
     )
-    outfile.Put(xdofmap_var, local_dofmap_offsets)
+    outfile.Put(xdofmap_var, function_data.dofmap_offsets)
 
-    # Write local part of vector
-    num_dofs_local = dofmap.index_map.size_local * dofmap.index_map_bs
-    num_dofs_global = dofmap.index_map.size_global * dofmap.index_map_bs
-    local_start = dofmap.index_map.local_range[0] * dofmap.index_map_bs
     val_var = io.DefineVariable(
         f"{u.name}_values",
-        np.zeros(num_dofs_local, dtype=u.dtype),
-        shape=[num_dofs_global],
-        start=[local_start],
-        count=[num_dofs_local],
+        function_data.values,
+        shape=[function_data.num_dofs_global],
+        start=[function_data.dof_range[0]],
+        count=[function_data.dof_range[1] - function_data.dof_range[0]],
     )
-    outfile.Put(val_var, u.x.array[:num_dofs_local])
+    outfile.Put(val_var, function_data.values)
 
     # Add time step to file
-    t_arr = np.array([0.0], dtype=np.float64)
+    t_arr = np.array([time], dtype=np.float64)
     time_var = io.DefineVariable(
         f"{u.name}_time",
         t_arr,
@@ -436,4 +466,4 @@ def write_function_on_input_mesh(u: dolfinx.fem.Function, filename: Path, engine
     outfile.PerformPuts()
     outfile.EndStep()
     outfile.Close()
-    assert adios.RemoveIO("MeshWriter")
+    assert adios.RemoveIO("OriginalFunctionWriter")
