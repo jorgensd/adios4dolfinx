@@ -6,8 +6,8 @@ from pathlib import Path
 
 
 comm = MPI.COMM_WORLD
-domain = dolfinx.mesh.create_unit_cube(
-    comm, 2, 1, 2, ghost_mode=dolfinx.mesh.GhostMode.shared_facet)
+domain = dolfinx.mesh.create_unit_square(
+    comm, 2,2, ghost_mode=dolfinx.mesh.GhostMode.shared_facet)
 
 num_cells_local = domain.topology.index_map(domain.topology.dim).size_local
 original_cell_index = domain.topology.original_cell_index[:num_cells_local]
@@ -80,8 +80,9 @@ topology_to_owner_comm.Neighbor_alltoallv(
   [recv_dofmap, recv_size_dofmap, MPI.INT64_T]
 )
 
-
-sorted_recv_dofmap = recv_dofmap.reshape(-1, num_nodes_per_cell)[local_cell_index]
+recv_dofmap = recv_dofmap.reshape(-1, num_nodes_per_cell)
+sorted_recv_dofmap = np.empty_like(recv_dofmap)
+sorted_recv_dofmap[local_cell_index] = recv_dofmap
 
 original_cell_index = domain.topology.original_cell_index
 num_cells_global = domain.topology.index_map(domain.topology.dim).size_global
@@ -95,8 +96,6 @@ output_node_owner = adios4dolfinx.utils.index_owner(domain.comm, original_node_i
 unique_node_owners, out_size_node = np.unique(output_node_owner[:num_owned_nodes], return_counts=True)
 geometry_to_owner_comm = comm.Create_dist_graph(
   [domain.comm.rank], [len(unique_node_owners)], unique_node_owners, reorder=False)
-
-
 source_geom, dest_geom, _ = geometry_to_owner_comm.Get_dist_neighbors()
 assert np.allclose(dest_geom, unique_node_owners)
 
@@ -137,8 +136,11 @@ recv_indices = np.empty(recv_size.sum()//3, dtype=np.int64)
 geometry_to_owner_comm.Neighbor_alltoallv([send_indices, out_size_node, MPI.INT64_T], [recv_indices, recv_size//3, MPI.INT64_T])
 local_node_range = adios4dolfinx.utils.compute_local_range(domain.comm, domain.geometry.index_map().size_global)
 recv_indices -= local_node_range[0]
-geometry = recv_nodes.reshape(-1, 3)[recv_indices]
-
+# Sort geometry based on input index
+recv_nodes = recv_nodes.reshape(-1, 3)
+geometry = np.empty_like(recv_nodes)
+geometry[recv_indices, :] = recv_nodes
+geometry = geometry[:, :domain.geometry.dim].copy()
 
 # Create index map for cells
 cell_imap = dolfinx.common.IndexMap(comm,local_cell_range[1]-local_cell_range[0], np.empty(0, dtype=np.int64), np.empty(0, dtype=np.int32))
@@ -166,72 +168,60 @@ new_topology.create_entity_permutations()
 cell_permutation_info = new_topology.get_cell_permutation_info()
 
 
-# # 
-# import adios2
-# adios = adios2.ADIOS(domin.comm)
-# io = adios.DeclareIO("MeshWriter")
-# io.SetEngine("BP4")
-# outfile = io.Open(str("test_origina.bp"), adios2.Mode.Write)
-#   # Write geometry
-#   pointvar = io.DefineVariable(
-#       "Points",
-#       local_points,
-#       shape=[num_xdofs_global, gdim],
-#       start=[local_range[0], 0],
-#       count=[num_xdofs_local, gdim],
-#   )
-#   outfile.Put(pointvar, local_points, adios2.Mode.Sync)
+# 
+fn = "test_origina.bp"
+import adios2
+adios = adios2.ADIOS(domain.comm)
+io = adios.DeclareIO("MeshWriter")
+io.SetEngine("BP4")
+outfile = io.Open(str(fn), adios2.Mode.Write)
+# Write geometry
+pointvar = io.DefineVariable(
+    "Points",
+    geometry,
+    shape=[domain.geometry.index_map().size_global, domain.geometry.dim],
+    start=[local_node_range[0], 0],
+    count=[geometry.shape[0], geometry.shape[1]],
+)
+outfile.Put(pointvar, geometry, adios2.Mode.Sync)
 
-#     # Write celltype
-#     io.DefineAttribute("CellType", mesh.topology.cell_name())
+# Write celltype
+io.DefineAttribute("CellType", domain.topology.cell_name())
 
-#     # Write basix properties
-#     cmap = mesh.geometry.cmap
-#     io.DefineAttribute("Degree", np.array([cmap.degree], dtype=np.int32))
-#     io.DefineAttribute("LagrangeVariant", np.array([cmap.variant], dtype=np.int32))
+# Write basix properties
+cmap = domain.geometry.cmap
+io.DefineAttribute("Degree", np.array([cmap.degree], dtype=np.int32))
+io.DefineAttribute("LagrangeVariant", np.array([cmap.variant], dtype=np.int32))
 
-#     # Write topology
-#     g_imap = mesh.geometry.index_map()
-#     g_dmap = mesh.geometry.dofmap
-#     num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
-#     num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
-#     start_cell = mesh.topology.index_map(mesh.topology.dim).local_range[0]
-#     geom_layout = cmap.create_dof_layout()
-#     num_dofs_per_cell = geom_layout.num_entity_closure_dofs(mesh.topology.dim)
+# Write topology
 
-#     dofs_out = np.zeros((num_cells_local, num_dofs_per_cell), dtype=np.int64)
-#     assert g_dmap.shape[1] == num_dofs_per_cell
-#     dofs_out[:, :] = np.asarray(
-#         g_imap.local_to_global(g_dmap[:num_cells_local, :].reshape(-1))
-#     ).reshape(dofs_out.shape)
+dvar = io.DefineVariable(
+    "Topology",
+    sorted_recv_dofmap,
+    shape=[num_cells_global, sorted_recv_dofmap.shape[1]],
+    start=[local_cell_range[0], 0],
+    count=[num_cells_local, sorted_recv_dofmap.shape[1]],
+)
+outfile.Put(dvar, sorted_recv_dofmap)
 
-#     dvar = io.DefineVariable(
-#         "Topology",
-#         dofs_out,
-#         shape=[num_cells_global, num_dofs_per_cell],
-#         start=[start_cell, 0],
-#         count=[num_cells_local, num_dofs_per_cell],
-#     )
-#     outfile.Put(dvar, dofs_out)
+# Add mesh permutations
+pvar = io.DefineVariable(
+    "CellPermutations",
+  cell_permutation_info,
+    shape=[num_cells_global],
+    start=[local_cell_range[0]],
+    count=[num_cells_local],
+)
+outfile.Put(pvar, cell_permutation_info)
+outfile.PerformPuts()
+outfile.EndStep()
+outfile.Close()
+assert adios.RemoveIO("MeshWriter")
 
-#     # Add mesh permutations
-#     mesh.topology.create_entity_permutations()
-#     cell_perm = mesh.topology.get_cell_permutation_info()
-#     pvar = io.DefineVariable(
-#         "CellPermutations",
-#         cell_perm,
-#         shape=[num_cells_global],
-#         start=[start_cell],
-#         count=[num_cells_local],
-#     )
-#     outfile.Put(pvar, cell_perm)
-#     outfile.PerformPuts()
-#     outfile.EndStep()
-#     outfile.Close()
-#     assert adios.RemoveIO("MeshWriter")
-
-
-
+MPI.COMM_WORLD.Barrier()
+import ufl
+in_mesh = adios4dolfinx.read_mesh(MPI.COMM_WORLD, fn, "BP4", dolfinx.mesh.GhostMode.none)
+print(dolfinx.fem.assemble_scalar(dolfinx.fem.form(1*ufl.dx(domain=in_mesh))), dolfinx.fem.assemble_scalar(dolfinx.fem.form(1*ufl.dx(domain=domain))))
 
 # print(domain.comm.rank, local_node_map.reshape(sorted_recv_dofmap.shape))
 # Gather all indices on root0
