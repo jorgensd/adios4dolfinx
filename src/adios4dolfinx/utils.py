@@ -54,9 +54,9 @@ def index_owner(
     r = N % size
 
     owner = np.empty_like(indices, dtype=np.int32)
-    owner[indices < r * n + 1] = indices[indices < r * n + 1] // (n + 1)
-    owner[indices >= r * n + 1] = r + (indices[indices >= r * n + 1] - r * (n + 1)) // n
-
+    inc_remainder = indices  < (n+1) * r
+    owner[inc_remainder] =  indices[inc_remainder] // (n+1)
+    owner[~inc_remainder] = r + (indices[~inc_remainder] - r * (n + 1)) // n
     return owner
 
 

@@ -41,6 +41,7 @@ insert_position += send_offsets[proc_col]
 # Compute number of recieving cells
 recv_size = np.zeros_like(source, dtype=np.int32)
 topology_to_owner_comm.Neighbor_alltoall(out_size, recv_size)
+assert recv_size.sum() == local_cell_range[1] - local_cell_range[0]
 
 # Pack cells and send
 send_cells = np.empty(len(insert_position), dtype=np.int64)
@@ -79,11 +80,9 @@ topology_to_owner_comm.Neighbor_alltoallv(
   [send_dofmap, send_sizes_dofmap, MPI.INT64_T],
   [recv_dofmap, recv_size_dofmap, MPI.INT64_T]
 )
-
 recv_dofmap = recv_dofmap.reshape(-1, num_nodes_per_cell)
 sorted_recv_dofmap = np.empty_like(recv_dofmap)
 sorted_recv_dofmap[local_cell_index] = recv_dofmap
-
 original_cell_index = domain.topology.original_cell_index
 num_cells_global = domain.topology.index_map(domain.topology.dim).size_global
 output_cell_owner = adios4dolfinx.utils.index_owner(domain.comm, original_cell_index, num_cells_global)
@@ -167,7 +166,7 @@ new_topology.set_connectivity(dolfinx.graph.adjacencylist(np.arange(node_imap.si
 new_topology.create_entity_permutations()
 cell_permutation_info = new_topology.get_cell_permutation_info()
 
-
+assert(local_node_range[1] - local_node_range[0] == geometry.shape[0])
 # 
 fn = "test_origina.bp"
 import adios2
@@ -194,13 +193,13 @@ io.DefineAttribute("Degree", np.array([cmap.degree], dtype=np.int32))
 io.DefineAttribute("LagrangeVariant", np.array([cmap.variant], dtype=np.int32))
 
 # Write topology
-
+assert sorted_recv_dofmap.shape[0] == local_cell_range[1] - local_cell_range[0]
 dvar = io.DefineVariable(
     "Topology",
     sorted_recv_dofmap,
     shape=[num_cells_global, sorted_recv_dofmap.shape[1]],
     start=[local_cell_range[0], 0],
-    count=[num_cells_local, sorted_recv_dofmap.shape[1]],
+    count=[local_cell_range[1]-local_cell_range[0], sorted_recv_dofmap.shape[1]],
 )
 outfile.Put(dvar, sorted_recv_dofmap)
 
@@ -221,7 +220,8 @@ assert adios.RemoveIO("MeshWriter")
 MPI.COMM_WORLD.Barrier()
 import ufl
 in_mesh = adios4dolfinx.read_mesh(MPI.COMM_WORLD, fn, "BP4", dolfinx.mesh.GhostMode.none)
-print(dolfinx.fem.assemble_scalar(dolfinx.fem.form(1*ufl.dx(domain=in_mesh))), dolfinx.fem.assemble_scalar(dolfinx.fem.form(1*ufl.dx(domain=domain))))
+assert np.allclose(in_mesh.comm.allreduce(dolfinx.fem.assemble_scalar(dolfinx.fem.form(1*ufl.dx(domain=in_mesh))), op=MPI.SUM), 
+                   domain.comm.allreduce(dolfinx.fem.assemble_scalar(dolfinx.fem.form(1*ufl.dx(domain=domain))), op=MPI.SUM))
 
 # print(domain.comm.rank, local_node_map.reshape(sorted_recv_dofmap.shape))
 # Gather all indices on root0
