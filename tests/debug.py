@@ -5,18 +5,19 @@ import dolfinx
 from pathlib import Path
 
 def g(x): 
-  return (x[1]+x[0])
-family = "DG"
-degree = 0
-shape = ()
+  return (-x[1], x[0])
+family = "N1curl"
+degree = 1
+#shape = (2, )
+shape = None
 comm = MPI.COMM_WORLD
 domain = dolfinx.mesh.create_rectangle(
     comm, [[1, 3], [5,7]], [2,2], ghost_mode=dolfinx.mesh.GhostMode.shared_facet)
 V = dolfinx.fem.functionspace(domain, (family, degree, shape))
 u = dolfinx.fem.Function(V)
 u.interpolate(g)
-
-
+# with dolfinx.io.VTXWriter(u.function_space.mesh.comm, "test.bp", [u], engine="BP4") as bp:
+#    bp.write(0.0)
 num_cells_local = domain.topology.index_map(domain.topology.dim).size_local
 original_cell_index = domain.topology.original_cell_index[:num_cells_local]
 num_cells_global = domain.topology.index_map(domain.topology.dim).size_global
@@ -173,7 +174,8 @@ new_topology.set_connectivity(dolfinx.graph.adjacencylist(np.arange(node_imap.si
 # Create cell permutations
 new_topology.create_entity_permutations()
 cell_permutation_info = new_topology.get_cell_permutation_info()
-
+print(cell_permutation_info)
+breakpoint()
 assert(local_node_range[1] - local_node_range[0] == geometry.shape[0])
 # 
 fn = "test_origina.bp"
@@ -264,8 +266,10 @@ topology_to_owner_comm.Neighbor_alltoallv(
 )
 
 
-final_dofmap = recv_function_dofmap.reshape(local_cell_range[1]-local_cell_range[0], num_dofs_per_cell).copy()
-final_dofmap = final_dofmap[local_cell_index, :]
+shaped_dofmap = recv_function_dofmap.reshape(local_cell_range[1]-local_cell_range[0], num_dofs_per_cell).copy()
+final_dofmap = np.empty_like(shaped_dofmap)
+final_dofmap[local_cell_index] = shaped_dofmap
+
 # Get offsets of dofmap
 num_cells_local = local_cell_range[1] - local_cell_range[0]
 num_dofs_local_dmap = num_cells_local * num_dofs_per_cell
@@ -324,18 +328,20 @@ assert adios.RemoveIO("MeshWriter")
 
 MPI.COMM_WORLD.Barrier()
 import ufl
-in_mesh = adios4dolfinx.read_mesh(MPI.COMM_WORLD, fn, "BP4", dolfinx.mesh.GhostMode.none)
-V_in = dolfinx.fem.functionspace(in_mesh, (family, degree, shape))
+# in_mesh = adios4dolfinx.read_mesh(MPI.COMM_WORLD, fn, "BP4", dolfinx.mesh.GhostMode.none)
+# V_in = dolfinx.fem.functionspace(in_mesh, (family, degree, shape))
+in_mesh = domain
+V_in = V
+
 u_in = dolfinx.fem.Function(V_in)
+
 adios4dolfinx.read_function(u_in, fn)
 u_ex = dolfinx.fem.Function(V_in)
 u_ex.interpolate(g)
 u_ex.name = "exact"
-
-with dolfinx.io.XDMFFile(in_mesh.comm, "test.xdmf", "w") as xdmf:
-    xdmf.write_mesh(in_mesh)
-    xdmf.write_function(u_in)
-    xdmf.write_function(u_ex)
+# with dolfinx.io.VTXWriter(u_in.function_space.mesh.comm, "test_in.bp", [u_in], engine="BP4") as bp:
+#    bp.write(0.0)
+    # xdmf.write_function(u_ex)
 np.testing.assert_allclose(u_in.x.array, u_ex.x.array)
 
 # assert np.allclose(in_mesh.comm.allreduce(dolfinx.fem.assemble_scalar(dolfinx.fem.form(1*ufl.dx(domain=in_mesh))), op=MPI.SUM), 
