@@ -8,10 +8,11 @@
 from importlib.metadata import metadata
 
 from .checkpointing import (read_function, read_mesh, read_meshtags,
-                            snapshot_checkpoint, write_function, write_mesh,
+                            write_function, write_mesh,
                             write_meshtags)
 from .legacy_readers import (read_function_from_legacy_h5,
                              read_mesh_from_legacy_h5)
+from .snapshot import snapshot_checkpoint
 
 meta = metadata("adios4dolfinx")
 __version__ = meta["Version"]

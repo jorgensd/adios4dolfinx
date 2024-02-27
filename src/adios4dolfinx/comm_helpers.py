@@ -11,6 +11,7 @@ __all__ = [
     "send_dofmap_and_recv_values",
     "send_and_recv_cell_perm",
     "send_dofs_and_recv_values",
+    "numpy_to_mpi"
 ]
 """
 Helpers for sending and receiving values for checkpointing
