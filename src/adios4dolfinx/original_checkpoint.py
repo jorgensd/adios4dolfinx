@@ -178,7 +178,7 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     del send_geometry_dofmap_msg, recv_geometry_dofmap_msg
 
     # Reshape dofmap and sort by original cell index
-    recv_dofmap = recv_dofmap.reshape(-1, num_nodes_per_cell)
+    recv_dofmap = recv_geometry_dofmap.reshape(-1, num_nodes_per_cell)
     sorted_recv_dofmap = np.empty_like(recv_dofmap)
     sorted_recv_dofmap[local_cell_index] = recv_dofmap
 
@@ -201,7 +201,7 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     unrolled_nodes_positiion = unroll_insert_position(send_nodes_position, 3)
 
     send_coordinates = np.empty_like(unrolled_nodes_positiion, dtype=mesh.geometry.x.dtype)
-    send_coordinates[send_nodes_position] = mesh.geometry.x[:num_owned_nodes, :].reshape(-1)
+    send_coordinates[unrolled_nodes_positiion] = mesh.geometry.x[:num_owned_nodes, :].reshape(-1)
 
     # Send and recieve geometry sizes
     send_coordinate_sizes = send_nodes_per_proc * 3
@@ -210,9 +210,9 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
 
     # Send node coordinates
     recv_coordinates = np.empty(recv_coordinate_sizes.sum(), dtype=mesh.geometry.x.dtype)
-    mpi_type = numpy_to_mpi[recv_coordinates.dtype]
+    mpi_type = numpy_to_mpi[recv_coordinates.dtype.type]
     send_coord_msg = [send_coordinates, send_coordinate_sizes, mpi_type]
-    recv_coord_msg = [recv_coordinates]
+    recv_coord_msg = [recv_coordinates, recv_coordinate_sizes, mpi_type]
     geometry_to_owner_comm.Neighbor_alltoallv(send_coord_msg, recv_coord_msg)
     del send_coord_msg, recv_coord_msg
 
@@ -231,7 +231,7 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
 
     # Sort geometry based on input index and strip to gdim
     gdim = mesh.geometry.dim
-    recv_nodes = recv_nodes.reshape(-1, 3)
+    recv_nodes = recv_coordinates.reshape(-1, 3)
     geometry = np.empty_like(recv_nodes)
     geometry[recv_indices, :] = recv_nodes
     geometry = geometry[:, :gdim].copy()
@@ -332,14 +332,14 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
     send_cells_msg = [send_cells, send_cells_per_proc, MPI.INT64_T]
     recv_cells_msg = [recv_cells, recv_cells_per_proc, MPI.INT64_T]
     cell_to_output_comm.Neighbor_alltoallv(send_cells_msg, recv_cells_msg)
-    del send_cells_msg, recv_cells_msg, send_cells
+    del send_cells_msg, recv_cells_msg
 
     # Map received cells to the local index
     local_cell_index = recv_cells - local_cell_range[0]
 
     # Pack and send cell permutation info
     mesh.topology.create_entity_permutations()
-    cell_permutation_info = mesh.topology.get_cell_permutation_info()[:num_cells_local]
+    cell_permutation_info = mesh.topology.get_cell_permutation_info()[:num_owned_cells]
     send_perm = np.empty_like(send_cells, dtype=np.uint32)
     send_perm[cell_insert_position] = cell_permutation_info
     recv_perm = np.empty_like(recv_cells, dtype=np.uint32)
@@ -351,14 +351,14 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
 
     # 2. Extract function data (array is the same, keeping global indices from DOLFINx)
     # Dofmap is moved by the original cell index similar to the mesh geometry dofmap
-    dofmap = V.dofmap
+    dofmap = u.function_space.dofmap
     dmap = dofmap.list
     num_dofs_per_cell = dmap.shape[1]
     dofmap_bs = dofmap.bs
     index_map_bs = dofmap.index_map_bs
 
     # Unroll dofmap for block size
-    unrolled_dofmap = unroll_dofmap(dofmap.list[:num_cells_local, :], dofmap_bs)
+    unrolled_dofmap = unroll_dofmap(dofmap.list[:num_owned_cells, :], dofmap_bs)
     dmap_loc = (unrolled_dofmap // index_map_bs).reshape(-1)
     dmap_rem = (unrolled_dofmap % index_map_bs).reshape(-1)
 
@@ -402,12 +402,12 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
                         values=u.x.array[:num_dofs_local].copy(),
                         dof_range=local_range,
                         num_dofs_global=num_dofs_global,
-                        dofmap_range=dofmap_imap.local_range
+                        dofmap_range=dofmap_imap.local_range,
                         global_dofs_in_dofmap=dofmap_imap.size_global)
 
 
 def write_function_on_input_mesh(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4",
-                                 mode: adios2.Mode = adios2.Mode.append, time:float=0.0):
+                                 mode: adios2.Mode = adios2.Mode.Append, time:float=0.0):
     mesh = u.function_space.mesh
     function_data = create_function_data_on_original_mesh(u)
 

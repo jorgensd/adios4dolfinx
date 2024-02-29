@@ -20,6 +20,7 @@ domain = dolfinx.mesh.create_rectangle(
 V = dolfinx.fem.functionspace(domain, (family, degree, shape))
 u = dolfinx.fem.Function(V)
 u.interpolate(g)
+u.name = "u"
 # with dolfinx.io.VTXWriter(u.function_space.mesh.comm, "test.bp", [u], engine="BP4") as bp:
 #    bp.write(0.0)
 num_cells_local = domain.topology.index_map(domain.topology.dim).size_local
@@ -326,7 +327,7 @@ in_mesh = domain
 V_in = V
 
 u_in = dolfinx.fem.Function(V_in)
-
+u_in.name = "u"
 adios4dolfinx.read_function(u_in, fn)
 u_ex = dolfinx.fem.Function(V_in)
 u_ex.interpolate(g)
@@ -336,6 +337,17 @@ u_ex.name = "exact"
 # xdmf.write_function(u_ex)
 np.testing.assert_allclose(u_in.x.array, u_ex.x.array, atol=1e-13)
 
+
+adios4dolfinx.write_mesh_input_order(domain, "test_in.bp", "BP4")
+adios4dolfinx.write_function_on_input_mesh(u, "test_in.bp", "BP4")
+MPI.COMM_WORLD.Barrier()
+
+
+u_file = dolfinx.fem.Function(V_in)
+u_file.name = "u"
+adios4dolfinx.read_function(u_file, "test_in.bp")
+
+np.testing.assert_allclose(u_file.x.array, u_ex.x.array, atol=1e-13)
 # assert np.allclose(in_mesh.comm.allreduce(dolfinx.fem.assemble_scalar(dolfinx.fem.form(1*ufl.dx(domain=in_mesh))), op=MPI.SUM),
 #                    domain.comm.allreduce(dolfinx.fem.assemble_scalar(dolfinx.fem.form(1*ufl.dx(domain=domain))), op=MPI.SUM))
 

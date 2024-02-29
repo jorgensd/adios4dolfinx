@@ -8,10 +8,11 @@
 from importlib.metadata import metadata
 
 from .checkpointing import (read_function, read_mesh, read_meshtags,
-                            write_function, write_mesh,
-                            write_meshtags)
+                            write_function, write_mesh, write_meshtags)
 from .legacy_readers import (read_function_from_legacy_h5,
                              read_mesh_from_legacy_h5)
+from .original_checkpoint import (write_function_on_input_mesh,
+                                  write_mesh_input_order)
 from .snapshot import snapshot_checkpoint
 
 meta = metadata("adios4dolfinx")
@@ -31,4 +32,6 @@ __all__ = [
     "write_function",
     "read_function",
     "snapshot_checkpoint",
+    "write_function_on_input_mesh",
+    "write_mesh_input_order"
 ]
