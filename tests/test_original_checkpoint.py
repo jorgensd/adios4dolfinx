@@ -39,7 +39,7 @@ def create_simplex_mesh_2D():
         cell_type=dolfinx.mesh.CellType.triangle,
         dtype=np.float64,
     )
-    fname = Path(f"output/original_mesh_2D_simplex.xdmf")
+    fname = Path("output/original_mesh_2D_simplex.xdmf")
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "w") as xdmf:
         xdmf.write_mesh(mesh)
     return fname
@@ -55,7 +55,7 @@ def create_simplex_mesh_3D():
         cell_type=dolfinx.mesh.CellType.tetrahedron,
         dtype=np.float64,
     )
-    fname = Path(f"output/original_mesh_3D_simplex.xdmf")
+    fname = Path("output/original_mesh_3D_simplex.xdmf")
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "w") as xdmf:
         xdmf.write_mesh(mesh)
     return fname
@@ -70,7 +70,7 @@ def create_non_simplex_mesh_2D():
         cell_type=dolfinx.mesh.CellType.quadrilateral,
         dtype=np.float64,
     )
-    fname = Path(f"output/original_mesh_2D_non_simplex.xdmf")
+    fname = Path("output/original_mesh_2D_non_simplex.xdmf")
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "w") as xdmf:
         xdmf.write_mesh(mesh)
     return fname
@@ -86,7 +86,7 @@ def create_non_simplex_mesh_3D():
         cell_type=dolfinx.mesh.CellType.hexahedron,
         dtype=np.float64,
     )
-    fname = Path(f"output/original_mesh_3D_non_simplex.xdmf")
+    fname = Path("output/original_mesh_3D_non_simplex.xdmf")
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "w") as xdmf:
         xdmf.write_mesh(mesh)
     return fname
@@ -98,7 +98,7 @@ def create_2D_mesh(request):
     mesh = dolfinx.mesh.create_unit_square(
         MPI.COMM_WORLD, 5, 7, cell_type=cell_type, dtype=dtype
     )
-    fname = Path(f"output/original_mesh_2D_{dtype}_{cell_type}.xdmf")
+    fname = Path("output/original_mesh_2D_{dtype}_{cell_type}.xdmf")
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "w") as xdmf:
         xdmf.write_mesh(mesh)
     return fname
@@ -110,7 +110,7 @@ def create_3D_mesh(request):
     mesh = dolfinx.mesh.create_unit_cube(
         MPI.COMM_WORLD, 5, 7, 3, cell_type=cell_type, dtype=dtype
     )
-    fname = Path(f"output/original_mesh_3D_{dtype}_{cell_type}.xdmf")
+    fname = Path("output/original_mesh_3D_{dtype}_{cell_type}.xdmf")
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "w") as xdmf:
         xdmf.write_mesh(mesh)
     return fname
@@ -197,7 +197,7 @@ def read_function(
     u_ex.interpolate(f)
     u_ex.x.scatter_forward()
     atol = 10 * np.finfo(u_dtype).resolution
-    np.testing.assert_allclose(u.x.array, u_ex.x.array, atol=atol)
+    np.testing.assert_allclose(u.x.array, u_ex.x.array, atol=atol)  # type: ignore
 
 
 def write_function_vector(
@@ -274,7 +274,7 @@ def read_function_vector(
     u_ex.interpolate(f)
     u_ex.x.scatter_forward()
     atol = 10 * np.finfo(u_dtype).resolution
-    np.testing.assert_allclose(u.x.array, u_ex.x.array, atol=atol)
+    np.testing.assert_allclose(u.x.array, u_ex.x.array, atol=atol)  # type: ignore
 
 
 @pytest.mark.skipif(MPI.COMM_WORLD.size > 1, reason="Test uses ipythonparallel for MPI")

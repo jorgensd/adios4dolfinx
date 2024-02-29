@@ -109,7 +109,7 @@ class FunctionData:
     local_cell_range: Tuple[int, int]
     num_cells_global: int
     dofmap_array: npt.NDArray[np.int64]
-    dofmap_offsets: npt.NDArray[np.int32]
+    dofmap_offsets: npt.NDArray[np.int64]
     dofmap_range: Tuple[int, int]
     global_dofs_in_dofmap: int
     values: npt.NDArray[np.floating]
