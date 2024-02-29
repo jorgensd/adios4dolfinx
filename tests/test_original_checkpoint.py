@@ -118,7 +118,7 @@ def create_3D_mesh(request):
 
 @pytest.fixture(scope="module")
 def cluster():
-    cluster = ipp.Cluster(engines="mpi", n=3)
+    cluster = ipp.Cluster(engines="mpi", n=2)
     rc = cluster.start_and_connect_sync()
     yield rc
     cluster.stop_cluster_sync()
