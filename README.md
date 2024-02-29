@@ -38,9 +38,10 @@ python3 -m pip install git+https://github.com/jorgensd/adios4dolfinx@v0.7.2
 - Reading and writing meshes, using `adios4dolfinx.read/write_mesh`
 - Reading and writing meshtags associated to meshes `adios4dolfinx.read/write_meshtags`
 - Reading checkpoints for any element (serial and parallel, arbitrary number of functions and timesteps per file). Use `adios4dolfinx.read/write_function`.
+- Writing standalone function checkpoints relating to "original meshes", i.e. meshes read from `XDMFFile`. Use `adios4dolfinx.write_function_on_input_mesh` for this.
 
 > [!IMPORTANT]  
-> For a checkpoint to be valid, you first have to store the mesh with `write_mesh`, then use `write_function` to append to the checkpoint file.
+> For checkpoints written with `write_function` to be valid, you first have to store the mesh with `write_mesh` to the checkpoint file.
 
 > [!IMPORTANT]  
 > A checkpoint file supports multiple functions and multiple time steps, as long as the functions are associated with the same mesh
