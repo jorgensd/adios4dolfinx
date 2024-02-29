@@ -210,6 +210,11 @@ def write_function_vector(
     name: str,
 ) -> Path:
     """Convenience function for writing function to file on the original input mesh"""
+    from mpi4py import MPI
+    import basix.ufl
+    import dolfinx
+    import adios4dolfinx
+    assert MPI.COMM_WORLD.size > 1
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "r") as xdmf:
         mesh = xdmf.read_mesh()
     el = basix.ufl.element(
@@ -250,10 +255,7 @@ def read_function_vector(
     """
     Convenience function for reading mesh with IPython-parallel and compare to exact solution
     """
-    from mpi4py import MPI
-    import dolfinx
-    import adios4dolfinx
-    assert MPI.COMM_WORLD.size > 1
+
     if mesh_fname.suffix == ".xdmf":
         with dolfinx.io.XDMFFile(MPI.COMM_WORLD, mesh_fname, "r") as xdmf:
             mesh = xdmf.read_mesh()
