@@ -212,12 +212,10 @@ def write_function_vector(
     """Convenience function for writing function to file on the original input mesh"""
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "r") as xdmf:
         mesh = xdmf.read_mesh()
-    breakpoint()
     el = basix.ufl.element(
         family, mesh.ufl_cell().cellname(), degree, dtype=mesh.geometry.x.dtype
     )
     V = dolfinx.fem.functionspace(mesh, el)
-    print(mesh.geometry.x.dtype, dtype)
     uh = dolfinx.fem.Function(V, dtype=dtype)
     uh.interpolate(f)
     uh.name = name
