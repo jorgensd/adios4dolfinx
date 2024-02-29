@@ -54,8 +54,8 @@ def index_owner(
     r = N % size
 
     owner = np.empty_like(indices, dtype=np.int32)
-    inc_remainder = indices  < (n+1) * r
-    owner[inc_remainder] =  indices[inc_remainder] // (n+1)
+    inc_remainder = indices < (n + 1) * r
+    owner[inc_remainder] = indices[inc_remainder] // (n + 1)
     owner[~inc_remainder] = r + (indices[~inc_remainder] - r * (n + 1)) // n
     return owner
 
@@ -67,8 +67,9 @@ def unroll_dofmap(dofs: npt.NDArray[np.int32], bs: int) -> npt.NDArray[np.int32]
     is of size `(num_cells, bs*num_dofs_per_cell)`
     """
     num_cells, num_dofs_per_cell = dofs.shape
-    unrolled_dofmap = np.repeat(dofs, bs).reshape(
-        num_cells, num_dofs_per_cell * bs) * bs
+    unrolled_dofmap = (
+        np.repeat(dofs, bs).reshape(num_cells, num_dofs_per_cell * bs) * bs
+    )
     unrolled_dofmap += np.tile(np.arange(bs), num_dofs_per_cell)
     return unrolled_dofmap
 
@@ -101,7 +102,9 @@ def compute_dofmap_pos(
     markers = unrolled_dofmap < num_owned_dofs
     local_indices = np.broadcast_to(np.arange(markers.shape[1]), markers.shape)
     cell_indicator = np.broadcast_to(
-        np.arange(num_owned_cells, dtype=np.int32).reshape(-1, 1), (num_owned_cells, markers.shape[1]))
+        np.arange(num_owned_cells, dtype=np.int32).reshape(-1, 1),
+        (num_owned_cells, markers.shape[1]),
+    )
     indicator = unrolled_dofmap[markers].reshape(-1)
     local_cell[indicator] = cell_indicator[markers].reshape(-1)
     dof_pos[indicator] = local_indices[markers].reshape(-1)

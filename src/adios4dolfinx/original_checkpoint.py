@@ -21,14 +21,14 @@ from .utils import compute_local_range, index_owner, unroll_dofmap
 
 adios2 = resolve_adios_scope(adios2)
 
-__all__ = [
-    "write_function_on_input_mesh",
-    "write_mesh_input_order"
-]
+__all__ = ["write_function_on_input_mesh", "write_mesh_input_order"]
 
 
-def compute_insert_position(data_owner: npt.NDArray[np.int32], destination_ranks: npt.NDArray[np.int32],
-                            out_size: npt.NDArray[np.int32]) -> npt.NDArray[np.int32]:
+def compute_insert_position(
+    data_owner: npt.NDArray[np.int32],
+    destination_ranks: npt.NDArray[np.int32],
+    out_size: npt.NDArray[np.int32],
+) -> npt.NDArray[np.int32]:
     """
     Giving a list of ranks, compute the local insert position for each rank in a list sorted by destination ranks.
     This function is used for packing data from a given process to its destination processes.
@@ -41,14 +41,14 @@ def compute_insert_position(data_owner: npt.NDArray[np.int32], destination_ranks
             data_owner = [0, 1, 1, 0, 2, 3]
             destination_ranks = [2,0,3,1]
             out_size = [1, 2, 1, 2]
-            insert_position = compute_insert_position(data_owner, destination_ranks, out_size)    
+            insert_position = compute_insert_position(data_owner, destination_ranks, out_size)
 
         Insert position is then ``[1, 4, 5, 2, 0, 3]``
     """
-    process_pos_indicator = (data_owner.reshape(-1, 1) == destination_ranks)
+    process_pos_indicator = data_owner.reshape(-1, 1) == destination_ranks
 
     # Compute offsets for insertion based on input size
-    send_offsets = np.zeros(len(out_size)+1, dtype=np.intc)
+    send_offsets = np.zeros(len(out_size) + 1, dtype=np.intc)
     send_offsets[1:] = np.cumsum(out_size)
     assert send_offsets[-1] == len(data_owner)
 
@@ -62,7 +62,9 @@ def compute_insert_position(data_owner: npt.NDArray[np.int32], destination_ranks
     return insert_position
 
 
-def unroll_insert_position(insert_position: npt.NDArray[np.int32], block_size: int) -> npt.NDArray[np.int32]:
+def unroll_insert_position(
+    insert_position: npt.NDArray[np.int32], block_size: int
+) -> npt.NDArray[np.int32]:
     """
     Unroll insert position by a block size
 
@@ -83,12 +85,16 @@ def unroll_insert_position(insert_position: npt.NDArray[np.int32], block_size: i
 
 
 @dataclass
-class MeshData():
+class MeshData:
     local_geometry: npt.NDArray[np.floating]  # 2 dimensional array of node coordinates
-    local_geometry_pos: Tuple[int, int]  # Insert range on current process for geometry nodes
+    local_geometry_pos: Tuple[
+        int, int
+    ]  # Insert range on current process for geometry nodes
     num_nodes_global: int  # Number of nodes in global geometry array
 
-    local_topology: npt.NDArray[np.int64]  # 2 dimensional connecitivty array for mesh topology
+    local_topology: npt.NDArray[
+        np.int64
+    ]  # 2 dimensional connecitivty array for mesh topology
     local_topology_pos: Tuple[int, int]  # Insert range on current process for topology
     num_cells_global: int  # NUmber of cells in global topology
 
@@ -98,7 +104,7 @@ class MeshData():
 
 
 @dataclass
-class FunctionData():
+class FunctionData:
     cell_permutations: npt.NDArray[np.uint32]
     local_cell_range: Tuple[int, int]
     num_cells_global: int
@@ -129,9 +135,15 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
 
     # Compute outgoing edges from current process to outputting process
     # Computes the number of cells sent to each process at the same time
-    cell_destinations, send_cells_per_proc = np.unique(output_cell_owner, return_counts=True)
+    cell_destinations, send_cells_per_proc = np.unique(
+        output_cell_owner, return_counts=True
+    )
     cell_to_output_comm = mesh.comm.Create_dist_graph(
-        [mesh.comm.rank], [len(cell_destinations)], cell_destinations.tolist(), reorder=False)
+        [mesh.comm.rank],
+        [len(cell_destinations)],
+        cell_destinations.tolist(),
+        reorder=False,
+    )
     cell_sources, cell_dests, _ = cell_to_output_comm.Get_dist_neighbors()
     assert np.allclose(cell_dests, cell_destinations)
 
@@ -141,7 +153,9 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     assert recv_cells_per_proc.sum() == local_cell_range[1] - local_cell_range[0]
 
     # Pack and send cell indices (used for mapping topology dofmap later)
-    cell_insert_position = compute_insert_position(output_cell_owner, cell_destinations, send_cells_per_proc)
+    cell_insert_position = compute_insert_position(
+        output_cell_owner, cell_destinations, send_cells_per_proc
+    )
     send_cells = np.empty_like(cell_insert_position, dtype=np.int64)
     send_cells[cell_insert_position] = original_cell_index
     recv_cells = np.empty(recv_cells_per_proc.sum(), dtype=np.int64)
@@ -163,7 +177,9 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     global_geometry_dofmap = original_node_index[local_geometry_dofmap.reshape(-1)]
 
     # Unroll insert position for geometry dofmap
-    dofmap_insert_position = unroll_insert_position(cell_insert_position, num_nodes_per_cell)
+    dofmap_insert_position = unroll_insert_position(
+        cell_insert_position, num_nodes_per_cell
+    )
 
     # Create and commmnicate connecitivity in original geometry indices
     send_geometry_dofmap = np.empty_like(dofmap_insert_position, dtype=np.int64)
@@ -174,7 +190,9 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     recv_geometry_dofmap = np.empty(recv_sizes_dofmap.sum(), dtype=np.int64)
     send_geometry_dofmap_msg = [send_geometry_dofmap, send_sizes_dofmap, MPI.INT64_T]
     recv_geometry_dofmap_msg = [recv_geometry_dofmap, recv_sizes_dofmap, MPI.INT64_T]
-    cell_to_output_comm.Neighbor_alltoallv(send_geometry_dofmap_msg, recv_geometry_dofmap_msg)
+    cell_to_output_comm.Neighbor_alltoallv(
+        send_geometry_dofmap_msg, recv_geometry_dofmap_msg
+    )
     del send_geometry_dofmap_msg, recv_geometry_dofmap_msg
 
     # Reshape dofmap and sort by original cell index
@@ -187,29 +205,47 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     # Also create number of outgoing cells at the same time
     num_owned_nodes = mesh.geometry.index_map().size_local
     num_nodes_global = mesh.geometry.index_map().size_global
-    output_node_owner = index_owner(mesh.comm, original_node_index[:num_owned_nodes], num_nodes_global)
+    output_node_owner = index_owner(
+        mesh.comm, original_node_index[:num_owned_nodes], num_nodes_global
+    )
 
-    node_destinations, send_nodes_per_proc = np.unique(output_node_owner, return_counts=True)
+    node_destinations, send_nodes_per_proc = np.unique(
+        output_node_owner, return_counts=True
+    )
     geometry_to_owner_comm = mesh.comm.Create_dist_graph(
-        [mesh.comm.rank], [len(node_destinations)], node_destinations.tolist(), reorder=False)
+        [mesh.comm.rank],
+        [len(node_destinations)],
+        node_destinations.tolist(),
+        reorder=False,
+    )
 
     node_sources, node_dests, _ = geometry_to_owner_comm.Get_dist_neighbors()
     assert np.allclose(node_dests, node_destinations)
 
     # Compute send node insert positions
-    send_nodes_position = compute_insert_position(output_node_owner, node_destinations, send_nodes_per_proc)
+    send_nodes_position = compute_insert_position(
+        output_node_owner, node_destinations, send_nodes_per_proc
+    )
     unrolled_nodes_positiion = unroll_insert_position(send_nodes_position, 3)
 
-    send_coordinates = np.empty_like(unrolled_nodes_positiion, dtype=mesh.geometry.x.dtype)
-    send_coordinates[unrolled_nodes_positiion] = mesh.geometry.x[:num_owned_nodes, :].reshape(-1)
+    send_coordinates = np.empty_like(
+        unrolled_nodes_positiion, dtype=mesh.geometry.x.dtype
+    )
+    send_coordinates[unrolled_nodes_positiion] = mesh.geometry.x[
+        :num_owned_nodes, :
+    ].reshape(-1)
 
     # Send and recieve geometry sizes
     send_coordinate_sizes = send_nodes_per_proc * 3
     recv_coordinate_sizes = np.zeros_like(node_sources, dtype=np.int32)
-    geometry_to_owner_comm.Neighbor_alltoall(send_coordinate_sizes, recv_coordinate_sizes)
+    geometry_to_owner_comm.Neighbor_alltoall(
+        send_coordinate_sizes, recv_coordinate_sizes
+    )
 
     # Send node coordinates
-    recv_coordinates = np.empty(recv_coordinate_sizes.sum(), dtype=mesh.geometry.x.dtype)
+    recv_coordinates = np.empty(
+        recv_coordinate_sizes.sum(), dtype=mesh.geometry.x.dtype
+    )
     mpi_type = numpy_to_mpi[recv_coordinates.dtype.type]
     send_coord_msg = [send_coordinates, send_coordinate_sizes, mpi_type]
     recv_coord_msg = [recv_coordinates, recv_coordinate_sizes, mpi_type]
@@ -220,9 +256,9 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     send_nodes = np.empty(num_owned_nodes, dtype=np.int64)
     send_nodes[send_nodes_position] = original_node_index[:num_owned_nodes]
 
-    recv_indices = np.empty(recv_coordinate_sizes.sum()//3, dtype=np.int64)
+    recv_indices = np.empty(recv_coordinate_sizes.sum() // 3, dtype=np.int64)
     send_nodes_msg = [send_nodes, send_nodes_per_proc, MPI.INT64_T]
-    recv_nodes_msg = [recv_indices, recv_coordinate_sizes//3, MPI.INT64_T]
+    recv_nodes_msg = [recv_indices, recv_coordinate_sizes // 3, MPI.INT64_T]
     geometry_to_owner_comm.Neighbor_alltoallv(send_nodes_msg, recv_nodes_msg)
 
     # Compute local ording of received nodes
@@ -235,19 +271,24 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     geometry = np.empty_like(recv_nodes)
     geometry[recv_indices, :] = recv_nodes
     geometry = geometry[:, :gdim].copy()
-    assert (local_node_range[1] - local_node_range[0] == geometry.shape[0])
+    assert local_node_range[1] - local_node_range[0] == geometry.shape[0]
     cmap = mesh.geometry.cmap
-    return MeshData(local_geometry=geometry,
-                    local_geometry_pos=local_node_range,
-                    num_nodes_global=num_nodes_global,
-                    local_topology=sorted_recv_dofmap,
-                    local_topology_pos=local_cell_range,
-                    num_cells_global=num_cells_global,
-                    cell_type=mesh.topology.cell_name(),
-                    degree=cmap.degree, lagrange_variant=cmap.variant)
+    return MeshData(
+        local_geometry=geometry,
+        local_geometry_pos=local_node_range,
+        num_nodes_global=num_nodes_global,
+        local_topology=sorted_recv_dofmap,
+        local_topology_pos=local_cell_range,
+        num_cells_global=num_cells_global,
+        cell_type=mesh.topology.cell_name(),
+        degree=cmap.degree,
+        lagrange_variant=cmap.variant,
+    )
 
 
-def write_mesh_input_order(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
+def write_mesh_input_order(
+    mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"
+):
     """
     Write mesh to checkpoint file in original input ordering
     """
@@ -275,7 +316,9 @@ def write_mesh_input_order(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str 
 
     # Write basix properties
     io.DefineAttribute("Degree", np.array([mesh_data.degree], dtype=np.int32))
-    io.DefineAttribute("LagrangeVariant", np.array([mesh_data.lagrange_variant], dtype=np.int32))
+    io.DefineAttribute(
+        "LagrangeVariant", np.array([mesh_data.lagrange_variant], dtype=np.int32)
+    )
 
     # Write topology
     num_dofs_per_cell = mesh_data.local_topology.shape[1]
@@ -284,15 +327,17 @@ def write_mesh_input_order(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str 
         mesh_data.local_topology,
         shape=[mesh_data.num_cells_global, num_dofs_per_cell],
         start=[mesh_data.local_topology_pos[0], 0],
-        count=[mesh_data.local_topology_pos[1]-mesh_data.local_topology_pos[0],
-               num_dofs_per_cell])
+        count=[
+            mesh_data.local_topology_pos[1] - mesh_data.local_topology_pos[0],
+            num_dofs_per_cell,
+        ],
+    )
 
     outfile.Put(dvar, mesh_data.local_topology)
     outfile.PerformPuts()
     outfile.EndStep()
     outfile.Close()
     assert adios.RemoveIO("OriginalMeshWriter")
-
 
 
 def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionData:
@@ -313,9 +358,15 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
 
     # Compute outgoing edges from current process to outputting process
     # Computes the number of cells sent to each process at the same time
-    cell_destinations, send_cells_per_proc = np.unique(output_cell_owner, return_counts=True)
+    cell_destinations, send_cells_per_proc = np.unique(
+        output_cell_owner, return_counts=True
+    )
     cell_to_output_comm = mesh.comm.Create_dist_graph(
-        [mesh.comm.rank], [len(cell_destinations)], cell_destinations.tolist(), reorder=False)
+        [mesh.comm.rank],
+        [len(cell_destinations)],
+        cell_destinations.tolist(),
+        reorder=False,
+    )
     cell_sources, cell_dests, _ = cell_to_output_comm.Get_dist_neighbors()
     assert np.allclose(cell_dests, cell_destinations)
 
@@ -325,7 +376,9 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
     assert recv_cells_per_proc.sum() == local_cell_range[1] - local_cell_range[0]
 
     # Pack and send cell indices (used for mapping topology dofmap later)
-    cell_insert_position = compute_insert_position(output_cell_owner, cell_destinations, send_cells_per_proc)
+    cell_insert_position = compute_insert_position(
+        output_cell_owner, cell_destinations, send_cells_per_proc
+    )
     send_cells = np.empty_like(cell_insert_position, dtype=np.int64)
     send_cells[cell_insert_position] = original_cell_index
     recv_cells = np.empty(recv_cells_per_proc.sum(), dtype=np.int64)
@@ -364,9 +417,13 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
 
     # Convert imap index to global index
     imap_global = dofmap.index_map.local_to_global(dmap_loc)
-    dofmap_global = (imap_global * index_map_bs + dmap_rem).reshape(unrolled_dofmap.shape)
+    dofmap_global = (imap_global * index_map_bs + dmap_rem).reshape(
+        unrolled_dofmap.shape
+    )
     num_dofs_per_cell = dofmap_global.shape[1]
-    dofmap_insert_position = unroll_insert_position(cell_insert_position, num_dofs_per_cell)
+    dofmap_insert_position = unroll_insert_position(
+        cell_insert_position, num_dofs_per_cell
+    )
 
     # Create and send array for global dofmap
     send_function_dofmap = np.empty(len(dofmap_insert_position), dtype=np.int64)
@@ -376,11 +433,12 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
     recv_function_dofmap = np.empty(recv_size_dofmap.sum(), dtype=np.int64)
     cell_to_output_comm.Neighbor_alltoallv(
         [send_function_dofmap, send_sizes_dofmap, MPI.INT64_T],
-        [recv_function_dofmap, recv_size_dofmap, MPI.INT64_T]
+        [recv_function_dofmap, recv_size_dofmap, MPI.INT64_T],
     )
 
-    shaped_dofmap = recv_function_dofmap.reshape(local_cell_range[1]-local_cell_range[0],
-                                                 num_dofs_per_cell).copy()
+    shaped_dofmap = recv_function_dofmap.reshape(
+        local_cell_range[1] - local_cell_range[0], num_dofs_per_cell
+    ).copy()
     final_dofmap = np.empty_like(shaped_dofmap)
     final_dofmap[local_cell_index] = shaped_dofmap
     final_dofmap = final_dofmap.reshape(-1)
@@ -395,19 +453,30 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
 
     num_dofs_local = dofmap.index_map.size_local * dofmap.index_map_bs
     num_dofs_global = dofmap.index_map.size_global * dofmap.index_map_bs
-    local_range = np.asarray(dofmap.index_map.local_range, dtype=np.int64) * dofmap.index_map_bs
-    return FunctionData(cell_permutations=cell_permutation_info, local_cell_range=local_cell_range,
-                        num_cells_global=num_cells_global, dofmap_array=final_dofmap,
-                        dofmap_offsets=local_dofmap_offsets,
-                        values=u.x.array[:num_dofs_local].copy(),
-                        dof_range=local_range,
-                        num_dofs_global=num_dofs_global,
-                        dofmap_range=dofmap_imap.local_range,
-                        global_dofs_in_dofmap=dofmap_imap.size_global)
+    local_range = (
+        np.asarray(dofmap.index_map.local_range, dtype=np.int64) * dofmap.index_map_bs
+    )
+    return FunctionData(
+        cell_permutations=cell_permutation_info,
+        local_cell_range=local_cell_range,
+        num_cells_global=num_cells_global,
+        dofmap_array=final_dofmap,
+        dofmap_offsets=local_dofmap_offsets,
+        values=u.x.array[:num_dofs_local].copy(),
+        dof_range=local_range,
+        num_dofs_global=num_dofs_global,
+        dofmap_range=dofmap_imap.local_range,
+        global_dofs_in_dofmap=dofmap_imap.size_global,
+    )
 
 
-def write_function_on_input_mesh(u: dolfinx.fem.Function, filename: Path, engine: str = "BP4",
-                                 mode: adios2.Mode = adios2.Mode.Append, time:float=0.0):
+def write_function_on_input_mesh(
+    u: dolfinx.fem.Function,
+    filename: Path,
+    engine: str = "BP4",
+    mode: adios2.Mode = adios2.Mode.Append,
+    time: float = 0.0,
+):
     mesh = u.function_space.mesh
     function_data = create_function_data_on_original_mesh(u)
 
@@ -422,7 +491,7 @@ def write_function_on_input_mesh(u: dolfinx.fem.Function, filename: Path, engine
         function_data.cell_permutations,
         shape=[function_data.num_cells_global],
         start=[function_data.local_cell_range[0]],
-        count=[function_data.local_cell_range[1]-function_data.local_cell_range[0]],
+        count=[function_data.local_cell_range[1] - function_data.local_cell_range[0]],
     )
     outfile.Put(pvar, function_data.cell_permutations)
     dofmap_var = io.DefineVariable(
@@ -439,7 +508,9 @@ def write_function_on_input_mesh(u: dolfinx.fem.Function, filename: Path, engine
         function_data.dofmap_offsets,
         shape=[function_data.num_cells_global + 1],
         start=[function_data.local_cell_range[0]],
-        count=[function_data.local_cell_range[1] - function_data.local_cell_range[0] + 1],
+        count=[
+            function_data.local_cell_range[1] - function_data.local_cell_range[0] + 1
+        ],
     )
     outfile.Put(xdofmap_var, function_data.dofmap_offsets)
 
