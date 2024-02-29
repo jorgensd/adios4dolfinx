@@ -395,7 +395,7 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
 
     num_dofs_local = dofmap.index_map.size_local * dofmap.index_map_bs
     num_dofs_global = dofmap.index_map.size_global * dofmap.index_map_bs
-    local_range = dofmap.index_map.local_range * dofmap.index_map_bs
+    local_range = np.asarray(dofmap.index_map.local_range, dtype=np.int64) * dofmap.index_map_bs
     return FunctionData(cell_permutations=cell_permutation_info, local_cell_range=local_cell_range,
                         num_cells_global=num_cells_global, dofmap_array=final_dofmap,
                         dofmap_offsets=local_dofmap_offsets,
