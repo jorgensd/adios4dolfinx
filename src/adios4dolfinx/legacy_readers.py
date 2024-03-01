@@ -18,7 +18,7 @@ import ufl
 
 from .adios2_helpers import adios_to_numpy_dtype, read_array, resolve_adios_scope
 from .comm_helpers import send_dofs_and_recv_values
-from .utils import compute_dofmap_pos, compute_local_range, index_owner
+from .utils import compute_dofmap_pos, compute_local_range, index_owner, compute_insert_position
 
 adios2 = resolve_adios_scope(adios2)
 
@@ -152,6 +152,7 @@ def send_cells_and_receive_dofmap_index(
     comm: MPI.Intracomm,
     source_ranks: npt.NDArray[np.int32],
     dest_ranks: npt.NDArray[np.int32],
+    dest_size: npt.NDArray[np.int32],
     output_owners: npt.NDArray[np.int32],
     input_cells: npt.NDArray[np.int64],
     dofmap_pos: npt.NDArray[np.int32],
@@ -166,51 +167,35 @@ def send_cells_and_receive_dofmap_index(
     in input file.
     """
 
-    # Compute amount of data to send to each process
-    owners_transposed = output_owners.reshape(-1, 1)
-    process_pos_indicator = owners_transposed == np.asarray(dest_ranks)
-    out_size = np.count_nonzero(process_pos_indicator, axis=0).astype(np.int32)
 
     recv_size = np.zeros(len(source_ranks), dtype=np.int32)
     mesh_to_data_comm = comm.Create_dist_graph_adjacent(
         source_ranks.tolist(), dest_ranks.tolist(), reorder=False
     )
     # Send sizes to create data structures for receiving from NeighAlltoAllv
-    mesh_to_data_comm.Neighbor_alltoall(out_size, recv_size)
+    mesh_to_data_comm.Neighbor_alltoall(dest_size, recv_size)
 
-    # Sort output for sending
-    offsets = np.zeros(len(out_size) + 1, dtype=np.intc)
-    offsets[1:] = np.cumsum(out_size)
-    out_cells = np.zeros(offsets[-1], dtype=np.int64)
-    out_pos = np.zeros(offsets[-1], dtype=np.int32)
+    # Sort output for sending and fill send data
+    out_cells = np.zeros(len(output_owners), dtype=np.int64)
+    out_pos = np.zeros(len(output_owners), dtype=np.int32)
     proc_to_dof = np.zeros_like(input_cells, dtype=np.int32)
-
-    # Fill outgoing data
-    proc_row, proc_col = np.nonzero(process_pos_indicator)
-    assert np.allclose(proc_row, np.arange(len(process_pos_indicator), dtype=np.int32))
-    cum_pos = np.cumsum(process_pos_indicator, axis=0)
-    insert_position = cum_pos[np.arange(len(proc_col), dtype=np.int32), proc_col] - 1
-    insertion_array = offsets[proc_col] + insert_position
+    insertion_array = compute_insert_position(output_owners, dest_ranks, dest_size)
     out_cells[insertion_array] = input_cells
     out_pos[insertion_array] = dofmap_pos
     proc_to_dof[insertion_array] = np.arange(len(input_cells), dtype=np.int32)
-    del cum_pos, insert_position, insertion_array
+    del insertion_array
 
     # Prepare data-structures for receiving
     total_incoming = sum(recv_size)
     inc_cells = np.zeros(total_incoming, dtype=np.int64)
     inc_pos = np.zeros(total_incoming, dtype=np.intc)
 
-    # Compute incoming offset
-    inc_offsets = np.zeros(len(recv_size) + 1, dtype=np.intc)
-    inc_offsets[1:] = np.cumsum(recv_size)
-
     # Send data
-    s_msg = [out_cells, out_size, MPI.INT64_T]
+    s_msg = [out_cells, dest_size, MPI.INT64_T]
     r_msg = [inc_cells, recv_size, MPI.INT64_T]
     mesh_to_data_comm.Neighbor_alltoallv(s_msg, r_msg)
 
-    s_msg = [out_pos, out_size, MPI.INT32_T]
+    s_msg = [out_pos, dest_size, MPI.INT32_T]
     r_msg = [inc_pos, recv_size, MPI.INT32_T]
     mesh_to_data_comm.Neighbor_alltoallv(s_msg, r_msg)
     mesh_to_data_comm.Free()
@@ -231,9 +216,9 @@ def send_cells_and_receive_dofmap_index(
         dest_ranks.tolist(), source_ranks.tolist(), reorder=False
     )
 
-    incoming_global_dofs = np.zeros(sum(out_size), dtype=np.int64)
+    incoming_global_dofs = np.zeros(sum(dest_size), dtype=np.int64)
     s_msg = [input_dofs, recv_size, MPI.INT64_T]
-    r_msg = [incoming_global_dofs, out_size, MPI.INT64_T]
+    r_msg = [incoming_global_dofs, dest_size, MPI.INT64_T]
     data_to_mesh_comm.Neighbor_alltoallv(s_msg, r_msg)
 
     # Sort incoming global dofs as they were inputted
@@ -369,7 +354,7 @@ def read_function_from_legacy_h5(
     # 1.1 Compute mesh->input communicator
     num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
     owners = index_owner(mesh.comm, input_cells, num_cells_global)
-    unique_owners = np.unique(owners)
+    unique_owners, owner_count = np.unique(owners, return_counts=True)
     # FIXME: In C++ use NBX to find neighbourhood
     _tmp_comm = mesh.comm.Create_dist_graph(
         [mesh.comm.rank], [len(unique_owners)], unique_owners, reorder=False
@@ -394,6 +379,7 @@ def read_function_from_legacy_h5(
         np.asarray(source, dtype=np.int32),
         np.asarray(dest, dtype=np.int32),
         owners,
+        owner_count.astype(np.int32),
         input_cells,
         dof_pos,
         num_cells_global,

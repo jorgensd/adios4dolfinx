@@ -304,7 +304,7 @@ def read_function(
     input_cells = V.mesh.topology.original_cell_index[local_cells]
     num_cells_global = V.mesh.topology.index_map(V.mesh.topology.dim).size_global
     owners = index_owner(V.mesh.comm, input_cells, num_cells_global)
-    unique_owners = np.unique(owners)
+    unique_owners, owner_count = np.unique(owners, return_counts=True)
     # FIXME: In C++ use NBX to find neighbourhood
     sub_comm = V.mesh.comm.Create_dist_graph(
         [V.mesh.comm.rank], [len(unique_owners)], unique_owners, reorder=False
@@ -317,6 +317,7 @@ def read_function(
         np.asarray(source, dtype=np.int32),
         np.asarray(dest, dtype=np.int32),
         owners,
+        owner_count.astype(np.int32),
         input_cells,
         dof_pos,
         num_cells_global,
