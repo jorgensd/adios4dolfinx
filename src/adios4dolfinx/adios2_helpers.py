@@ -110,9 +110,7 @@ def read_cell_perms(
 
         # Get local selection
         local_cell_range = compute_local_range(comm, num_cells_global)
-        perm_var.SetSelection(
-            [[local_cell_range[0]], [local_cell_range[1] - local_cell_range[0]]]
-        )
+        perm_var.SetSelection([[local_cell_range[0]], [local_cell_range[1] - local_cell_range[0]]])
         in_perm = np.empty(
             local_cell_range[1] - local_cell_range[0],
             dtype=adios_to_numpy_dtype[perm_var.Type()],
@@ -193,9 +191,7 @@ def read_dofmap(
             raise KeyError(f"Dof offsets not found at {dofmap} in {filename}")
         cell_dofs = adios_file.io.InquireVariable(dofmap)
         cell_dofs.SetSelection([[in_offsets[0]], [in_offsets[-1] - in_offsets[0]]])
-        in_dofmap = np.empty(
-            in_offsets[-1] - in_offsets[0], dtype=cell_dofs.Type().strip("_t")
-        )
+        in_dofmap = np.empty(in_offsets[-1] - in_offsets[0], dtype=cell_dofs.Type().strip("_t"))
         adios_file.file.Get(cell_dofs, in_dofmap, adios2.Mode.Sync)
 
         in_dofmap = in_dofmap.astype(np.int64)
@@ -255,9 +251,7 @@ def read_array(
                     arr = adios_file.io.InquireVariable(time_name)
                     time_shape = arr.Shape()
                     arr.SetSelection([[0], [time_shape[0]]])
-                    times = np.empty(
-                        time_shape[0], dtype=adios_to_numpy_dtype[arr.Type()]
-                    )
+                    times = np.empty(time_shape[0], dtype=adios_to_numpy_dtype[arr.Type()])
                     adios_file.file.Get(arr, times, adios2.Mode.Sync)
                     if times[0] == time:
                         break
@@ -269,9 +263,7 @@ def read_array(
                 adios_file.file.EndStep()
 
             if time_name not in adios_file.io.AvailableVariables().keys():
-                raise KeyError(
-                    f"No data associated with {time_name}={time} found in {filename}"
-                )
+                raise KeyError(f"No data associated with {time_name}={time} found in {filename}")
 
             if array_name not in adios_file.io.AvailableVariables().keys():
                 raise KeyError(f"No array found at {time=} for {array_name}")
@@ -283,13 +275,9 @@ def read_array(
 
         if len(arr_shape) == 1:
             arr.SetSelection([[arr_range[0]], [arr_range[1] - arr_range[0]]])
-            vals = np.empty(
-                arr_range[1] - arr_range[0], dtype=adios_to_numpy_dtype[arr.Type()]
-            )
+            vals = np.empty(arr_range[1] - arr_range[0], dtype=adios_to_numpy_dtype[arr.Type()])
         else:
-            arr.SetSelection(
-                [[arr_range[0], 0], [arr_range[1] - arr_range[0], arr_shape[1]]]
-            )
+            arr.SetSelection([[arr_range[0], 0], [arr_range[1] - arr_range[0], arr_shape[1]]])
             vals = np.empty(
                 (arr_range[1] - arr_range[0], arr_shape[1]),
                 dtype=adios_to_numpy_dtype[arr.Type()],
