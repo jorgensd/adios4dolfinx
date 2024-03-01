@@ -28,7 +28,7 @@ def test_legacy_mesh():
     path = (pathlib.Path("legacy") / "mesh.h5").absolute()
     if not path.exists():
         pytest.skip(f"{path} does not exist")
-    mesh = read_mesh_from_legacy_h5(comm=comm, filename=path, group="/mesh")
+    mesh = read_mesh_from_legacy_h5(filename=path, comm=comm, group="/mesh")
     assert mesh.topology.dim == 3
     volume = mesh.comm.allreduce(
         dolfinx.fem.assemble_scalar(dolfinx.fem.form(1 * ufl.dx(domain=mesh))),
@@ -51,7 +51,7 @@ def test_read_legacy_mesh_from_checkpoint():
     filename = (pathlib.Path("legacy") / "mesh_checkpoint.h5").absolute()
     if not filename.exists():
         pytest.skip(f"{filename} does not exist")
-    mesh = read_mesh_from_legacy_h5(comm=comm, filename=filename, group="/Mesh/mesh")
+    mesh = read_mesh_from_legacy_h5(filename=filename, comm=comm, group="/Mesh/mesh")
     assert mesh.topology.dim == 3
     volume = mesh.comm.allreduce(
         dolfinx.fem.assemble_scalar(dolfinx.fem.form(1 * ufl.dx(domain=mesh))),
@@ -74,7 +74,7 @@ def test_legacy_function():
     path = (pathlib.Path("legacy") / "mesh.h5").absolute()
     if not path.exists():
         pytest.skip(f"{path} does not exist")
-    mesh = read_mesh_from_legacy_h5(comm, path, "/mesh")
+    mesh = read_mesh_from_legacy_h5(path, comm, "/mesh")
     V = dolfinx.fem.functionspace(mesh, ("DG", 2))
     u = ufl.TrialFunction(V)
     v = ufl.TestFunction(V)
@@ -88,7 +88,7 @@ def test_legacy_function():
     problem.solve()
 
     u_in = dolfinx.fem.Function(V)
-    read_function_from_legacy_h5(mesh.comm, path, u_in, group="v")
+    read_function_from_legacy_h5(path, mesh.comm, u_in, group="v")
     np.testing.assert_allclose(uh.x.array, u_in.x.array, atol=1e-14)
 
     W = dolfinx.fem.functionspace(mesh, ("DG", 2, (mesh.geometry.dim,)))
@@ -106,7 +106,7 @@ def test_read_legacy_function_from_checkpoint():
     path = (pathlib.Path("legacy") / "mesh_checkpoint.h5").absolute()
     if not path.exists():
         pytest.skip(f"{path} does not exist")
-    mesh = read_mesh_from_legacy_h5(comm, path, "/Mesh/mesh")
+    mesh = read_mesh_from_legacy_h5(path, comm, "/Mesh/mesh")
 
     V = dolfinx.fem.functionspace(mesh, ("DG", 2))
     u = ufl.TrialFunction(V)
