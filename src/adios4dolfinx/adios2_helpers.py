@@ -1,7 +1,6 @@
-from pathlib import Path
-from typing import Tuple, Union
-from typing import NamedTuple
 from contextlib import contextmanager
+from pathlib import Path
+from typing import NamedTuple, Tuple, Union
 
 from mpi4py import MPI
 

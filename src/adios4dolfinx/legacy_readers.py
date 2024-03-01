@@ -16,7 +16,7 @@ import numpy as np
 import numpy.typing as npt
 import ufl
 
-from .adios2_helpers import adios_to_numpy_dtype, read_array, resolve_adios_scope, Adios
+from .adios2_helpers import Adios, adios_to_numpy_dtype, read_array, resolve_adios_scope
 from .comm_helpers import send_dofs_and_recv_values
 from .utils import (
     compute_dofmap_pos,
@@ -304,7 +304,7 @@ def read_mesh_from_legacy_h5(
             cell_type = celltype.DataString()[0]
 
         # Get mesh geometry
-        mesh_geometry = read_mesh_geometry(io=adios_file.io, infile=infile, group=group)
+        mesh_geometry = read_mesh_geometry(io=adios_file.io, infile=adios_file.file, group=group)
 
     # Create DOLFINx mesh
     element = basix.ufl.element(

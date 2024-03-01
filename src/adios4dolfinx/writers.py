@@ -12,7 +12,7 @@ from mpi4py import MPI
 import adios2
 import numpy as np
 
-from .adios2_helpers import resolve_adios_scope, Adios
+from .adios2_helpers import Adios, resolve_adios_scope
 from .structures import FunctionData, MeshData
 
 adios2 = resolve_adios_scope(adios2)
