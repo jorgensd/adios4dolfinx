@@ -294,8 +294,6 @@ def read_mesh_from_legacy_h5(
         if not filename.is_file():
             raise FileNotFoundError(f"File {filename} does not exist")
 
-        # Open ADIOS2 Reader
-        infile = adios_file.io.Open(str(filename), adios2.Mode.Read)
         # Get mesh topology (distributed)
         if f"{group}/topology" not in adios_file.io.AvailableVariables().keys():
             raise KeyError(f"Mesh topology not found at '{group}/topology'")
@@ -310,7 +308,7 @@ def read_mesh_from_legacy_h5(
             (local_range[1] - local_range[0], shape[1]),
             dtype=topology.Type().strip("_t"),
         )
-        infile.Get(topology, mesh_topology, adios2.Mode.Sync)
+        adios_file.file.Get(topology, mesh_topology, adios2.Mode.Sync)
 
         # Get mesh cell type
         if f"{group}/topology/celltype" in adios_file.io.AvailableAttributes().keys():
