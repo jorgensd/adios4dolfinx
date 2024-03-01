@@ -16,9 +16,14 @@ import numpy as np
 import numpy.typing as npt
 import ufl
 
-from .adios2_helpers import adios_to_numpy_dtype, read_array, resolve_adios_scope
+from .adios2_helpers import adios_to_numpy_dtype, read_array, resolve_adios_scope, Adios
 from .comm_helpers import send_dofs_and_recv_values
-from .utils import compute_dofmap_pos, compute_insert_position, compute_local_range, index_owner
+from .utils import (
+    compute_dofmap_pos,
+    compute_insert_position,
+    compute_local_range,
+    index_owner,
+)
 
 adios2 = resolve_adios_scope(adios2)
 
@@ -64,86 +69,96 @@ def read_dofmap_legacy(
 
     # Open ADIOS engine
     adios = adios2.ADIOS(comm)
-    io = adios.DeclareIO("DofmapReader")
-    io.SetEngine(engine)
-    infile = io.Open(str(filename), adios2.Mode.Read)
+    with Adios(
+        adios=adios,
+        filename=filename,
+        mode=adios2.Mode.Read,
+        engine=engine,
+        io_name="DofmapReader",
+    ) as adios_file:
+        for i in range(adios_file.file.Steps()):
+            adios_file.file.BeginStep()
+            if dofmap_offsets in adios_file.io.AvailableVariables().keys():
+                break
+            adios_file.file.EndStep()
 
-    for i in range(infile.Steps()):
-        infile.BeginStep()
-        if dofmap_offsets in io.AvailableVariables().keys():
-            break
-        infile.EndStep()
+        d_offsets = adios_file.io.InquireVariable(dofmap_offsets)
+        shape = d_offsets.Shape()
 
-    d_offsets = io.InquireVariable(dofmap_offsets)
-    shape = d_offsets.Shape()
+        # As the offsets are one longer than the number of cells, we need to read in with an overlap
+        if len(shape) == 1:
+            d_offsets.SetSelection(
+                [[local_cell_range[0]], [local_cell_range[1] + 1 - local_cell_range[0]]]
+            )
+            in_offsets = np.empty(
+                local_cell_range[1] + 1 - local_cell_range[0],
+                dtype=d_offsets.Type().strip("_t"),
+            )
+        else:
+            d_offsets.SetSelection(
+                [
+                    [local_cell_range[0], 0],
+                    [local_cell_range[1] + 1 - local_cell_range[0], shape[1]],
+                ]
+            )
+            in_offsets = np.empty(
+                (local_cell_range[1] + 1 - local_cell_range[0], shape[1]),
+                dtype=d_offsets.Type().strip("_t"),
+            )
 
-    # As the offsets are one longer than the number of cells, we need to read in with an overlap
-    if len(shape) == 1:
-        d_offsets.SetSelection(
-            [[local_cell_range[0]], [local_cell_range[1] + 1 - local_cell_range[0]]]
+        in_offsets = in_offsets.squeeze()
+        adios_file.file.Get(d_offsets, in_offsets, adios2.Mode.Sync)
+        # Get the relevant part of the dofmap
+        if dofmap not in adios_file.io.AvailableVariables().keys():
+            raise KeyError(f"Dof offsets not found at {dofmap}")
+        cell_dofs = adios_file.io.InquireVariable(dofmap)
+
+        if len(shape) == 1:
+            cell_dofs.SetSelection([[in_offsets[0]], [in_offsets[-1] - in_offsets[0]]])
+            in_dofmap = np.empty(
+                in_offsets[-1] - in_offsets[0], dtype=cell_dofs.Type().strip("_t")
+            )
+        else:
+            cell_dofs.SetSelection(
+                [[in_offsets[0], 0], [in_offsets[-1] - in_offsets[0], shape[1]]]
+            )
+            in_dofmap = np.empty(
+                (in_offsets[-1] - in_offsets[0], shape[1]),
+                dtype=cell_dofs.Type().strip("_t"),
+            )
+            assert shape[1] == 1
+
+        adios_file.file.Get(cell_dofs, in_dofmap, adios2.Mode.Sync)
+
+        in_dofmap = in_dofmap.reshape(-1).astype(np.int64)
+
+        # Map xxxyyyzzz to xyzxyz
+        mapped_dofmap = np.empty_like(in_dofmap)
+        for i in range(len(in_offsets) - 1):
+            pos_begin, pos_end = (
+                in_offsets[i] - in_offsets[0],
+                in_offsets[i + 1] - in_offsets[0],
+            )
+            dofs_i = in_dofmap[pos_begin:pos_end]
+            assert (pos_end - pos_begin) % bs == 0
+            num_dofs_local = int((pos_end - pos_begin) // bs)
+            for k in range(bs):
+                for j in range(num_dofs_local):
+                    mapped_dofmap[int(pos_begin + j * bs + k)] = dofs_i[
+                        int(num_dofs_local * k + j)
+                    ]
+
+        # Extract dofmap data
+        global_dofs = np.zeros_like(cells, dtype=np.int64)
+        input_cell_positions = cells - local_cell_range[0]
+        read_pos = (
+            in_offsets[input_cell_positions].astype(np.int32) + dof_pos - in_offsets[0]
         )
-        in_offsets = np.empty(
-            local_cell_range[1] + 1 - local_cell_range[0],
-            dtype=d_offsets.Type().strip("_t"),
-        )
-    else:
-        d_offsets.SetSelection(
-            [
-                [local_cell_range[0], 0],
-                [local_cell_range[1] + 1 - local_cell_range[0], shape[1]],
-            ]
-        )
-        in_offsets = np.empty(
-            (local_cell_range[1] + 1 - local_cell_range[0], shape[1]),
-            dtype=d_offsets.Type().strip("_t"),
-        )
+        global_dofs = mapped_dofmap[read_pos]
+        del input_cell_positions, read_pos
 
-    in_offsets = in_offsets.squeeze()
-    infile.Get(d_offsets, in_offsets, adios2.Mode.Sync)
-    # Get the relevant part of the dofmap
-    if dofmap not in io.AvailableVariables().keys():
-        raise KeyError(f"Dof offsets not found at {dofmap}")
-    cell_dofs = io.InquireVariable(dofmap)
+        adios_file.file.EndStep()
 
-    if len(shape) == 1:
-        cell_dofs.SetSelection([[in_offsets[0]], [in_offsets[-1] - in_offsets[0]]])
-        in_dofmap = np.empty(in_offsets[-1] - in_offsets[0], dtype=cell_dofs.Type().strip("_t"))
-    else:
-        cell_dofs.SetSelection([[in_offsets[0], 0], [in_offsets[-1] - in_offsets[0], shape[1]]])
-        in_dofmap = np.empty(
-            (in_offsets[-1] - in_offsets[0], shape[1]),
-            dtype=cell_dofs.Type().strip("_t"),
-        )
-        assert shape[1] == 1
-
-    infile.Get(cell_dofs, in_dofmap, adios2.Mode.Sync)
-
-    in_dofmap = in_dofmap.reshape(-1).astype(np.int64)
-
-    # Map xxxyyyzzz to xyzxyz
-    mapped_dofmap = np.empty_like(in_dofmap)
-    for i in range(len(in_offsets) - 1):
-        pos_begin, pos_end = (
-            in_offsets[i] - in_offsets[0],
-            in_offsets[i + 1] - in_offsets[0],
-        )
-        dofs_i = in_dofmap[pos_begin:pos_end]
-        assert (pos_end - pos_begin) % bs == 0
-        num_dofs_local = int((pos_end - pos_begin) // bs)
-        for k in range(bs):
-            for j in range(num_dofs_local):
-                mapped_dofmap[int(pos_begin + j * bs + k)] = dofs_i[int(num_dofs_local * k + j)]
-
-    # Extract dofmap data
-    global_dofs = np.zeros_like(cells, dtype=np.int64)
-    input_cell_positions = cells - local_cell_range[0]
-    read_pos = in_offsets[input_cell_positions].astype(np.int32) + dof_pos - in_offsets[0]
-    global_dofs = mapped_dofmap[read_pos]
-    del input_cell_positions, read_pos
-
-    infile.EndStep()
-    infile.Close()
-    adios.RemoveIO("DofmapReader")
     return global_dofs
 
 
@@ -238,7 +253,9 @@ def read_mesh_geometry(io: adios2.ADIOS, infile: adios2.Engine, group: str):
     geometry = io.InquireVariable(geometry_key)
     shape = geometry.Shape()
     local_range = compute_local_range(MPI.COMM_WORLD, shape[0])
-    geometry.SetSelection([[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]])
+    geometry.SetSelection(
+        [[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]]
+    )
     mesh_geometry = np.empty(
         (local_range[1] - local_range[0], shape[1]),
         dtype=adios_to_numpy_dtype[geometry.Type()],
@@ -265,40 +282,43 @@ def read_mesh_from_legacy_h5(
     """
     # Create ADIOS2 reader
     adios = adios2.ADIOS(comm)
-    io = adios.DeclareIO("Mesh reader")
+    with Adios(
+        adios=adios,
+        filename=filename,
+        mode=adios2.Mode.Read,
+        io_name="Mesh reader",
+        engine="HDF5",
+    ) as adios_file:
+        # Make sure we use the HDF5File and check that the file is present
+        filename = pathlib.Path(filename).with_suffix(".h5")
+        if not filename.is_file():
+            raise FileNotFoundError(f"File {filename} does not exist")
 
-    io.SetEngine("HDF5")
+        # Open ADIOS2 Reader
+        infile = adios_file.io.Open(str(filename), adios2.Mode.Read)
+        # Get mesh topology (distributed)
+        if f"{group}/topology" not in adios_file.io.AvailableVariables().keys():
+            raise KeyError(f"Mesh topology not found at '{group}/topology'")
+        topology = adios_file.io.InquireVariable(f"{group}/topology")
+        shape = topology.Shape()
+        local_range = compute_local_range(MPI.COMM_WORLD, shape[0])
+        topology.SetSelection(
+            [[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]]
+        )
 
-    # Make sure we use the HDF5File and check that the file is present
-    filename = pathlib.Path(filename).with_suffix(".h5")
-    if not filename.is_file():
-        raise FileNotFoundError(f"File {filename} does not exist")
+        mesh_topology = np.empty(
+            (local_range[1] - local_range[0], shape[1]),
+            dtype=topology.Type().strip("_t"),
+        )
+        infile.Get(topology, mesh_topology, adios2.Mode.Sync)
 
-    # Open ADIOS2 Reader
-    infile = io.Open(str(filename), adios2.Mode.Read)
-    # Get mesh topology (distributed)
-    if f"{group}/topology" not in io.AvailableVariables().keys():
-        raise KeyError(f"Mesh topology not found at '{group}/topology'")
-    topology = io.InquireVariable(f"{group}/topology")
-    shape = topology.Shape()
-    local_range = compute_local_range(MPI.COMM_WORLD, shape[0])
-    topology.SetSelection([[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]])
+        # Get mesh cell type
+        if f"{group}/topology/celltype" in adios_file.io.AvailableAttributes().keys():
+            celltype = adios_file.io.InquireAttribute(f"{group}/topology/celltype")
+            cell_type = celltype.DataString()[0]
 
-    mesh_topology = np.empty(
-        (local_range[1] - local_range[0], shape[1]), dtype=topology.Type().strip("_t")
-    )
-    infile.Get(topology, mesh_topology, adios2.Mode.Sync)
-
-    # Get mesh cell type
-    if f"{group}/topology/celltype" in io.AvailableAttributes().keys():
-        celltype = io.InquireAttribute(f"{group}/topology/celltype")
-        cell_type = celltype.DataString()[0]
-
-    # Get mesh geometry
-    mesh_geometry = read_mesh_geometry(io=io, infile=infile, group=group)
-
-    infile.Close()
-    assert adios.RemoveIO("Mesh reader")
+        # Get mesh geometry
+        mesh_geometry = read_mesh_geometry(io=adios_file.io, infile=infile, group=group)
 
     # Create DOLFINx mesh
     element = basix.ufl.element(
@@ -309,7 +329,9 @@ def read_mesh_from_legacy_h5(
         shape=(mesh_geometry.shape[1],),
     )
     domain = ufl.Mesh(element)
-    return dolfinx.mesh.create_mesh(MPI.COMM_WORLD, mesh_topology, mesh_geometry, domain)
+    return dolfinx.mesh.create_mesh(
+        MPI.COMM_WORLD, mesh_topology, mesh_geometry, domain
+    )
 
 
 def read_function_from_legacy_h5(

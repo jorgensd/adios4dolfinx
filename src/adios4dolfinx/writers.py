@@ -40,7 +40,9 @@ def write_mesh(
 
     gdim = mesh.local_geometry.shape[1]
     adios = adios2.ADIOS(comm)
-    with Adios(adios=adios, filename=filename, mode=mode, engine=engine) as adios_file:
+    with Adios(
+        adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name
+    ) as adios_file:
 
         # Write geometry
         pointvar = adios_file.io.DefineVariable(
@@ -101,58 +103,56 @@ def write_function(
         io_name: Internal name used for the ADIOS IO object
     """
     adios = adios2.ADIOS(comm)
-    # TODO: add context manager here?
-    io = adios.DeclareIO(io_name)
-    io.SetEngine(engine)
-    outfile = io.Open(str(filename), mode)
 
-    # Add mesh permutations
-    pvar = io.DefineVariable(
-        "CellPermutations",
-        u.cell_permutations,
-        shape=[u.num_cells_global],
-        start=[u.local_cell_range[0]],
-        count=[u.local_cell_range[1] - u.local_cell_range[0]],
-    )
-    outfile.Put(pvar, u.cell_permutations)
-    dofmap_var = io.DefineVariable(
-        f"{u.name}_dofmap",
-        u.dofmap_array,
-        shape=[u.global_dofs_in_dofmap],
-        start=[u.dofmap_range[0]],
-        count=[u.dofmap_range[1] - u.dofmap_range[0]],
-    )
-    outfile.Put(dofmap_var, u.dofmap_array)
+    with Adios(
+        adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name
+    ) as adios_file:
 
-    xdofmap_var = io.DefineVariable(
-        f"{u.name}_XDofmap",
-        u.dofmap_offsets,
-        shape=[u.num_cells_global + 1],
-        start=[u.local_cell_range[0]],
-        count=[u.local_cell_range[1] - u.local_cell_range[0] + 1],
-    )
-    outfile.Put(xdofmap_var, u.dofmap_offsets)
+        # Add mesh permutations
+        pvar = adios_file.io.DefineVariable(
+            "CellPermutations",
+            u.cell_permutations,
+            shape=[u.num_cells_global],
+            start=[u.local_cell_range[0]],
+            count=[u.local_cell_range[1] - u.local_cell_range[0]],
+        )
+        adios_file.file.Put(pvar, u.cell_permutations)
+        dofmap_var = adios_file.io.DefineVariable(
+            f"{u.name}_dofmap",
+            u.dofmap_array,
+            shape=[u.global_dofs_in_dofmap],
+            start=[u.dofmap_range[0]],
+            count=[u.dofmap_range[1] - u.dofmap_range[0]],
+        )
+        adios_file.file.Put(dofmap_var, u.dofmap_array)
 
-    val_var = io.DefineVariable(
-        f"{u.name}_values",
-        u.values,
-        shape=[u.num_dofs_global],
-        start=[u.dof_range[0]],
-        count=[u.dof_range[1] - u.dof_range[0]],
-    )
-    outfile.Put(val_var, u.values)
+        xdofmap_var = adios_file.io.DefineVariable(
+            f"{u.name}_XDofmap",
+            u.dofmap_offsets,
+            shape=[u.num_cells_global + 1],
+            start=[u.local_cell_range[0]],
+            count=[u.local_cell_range[1] - u.local_cell_range[0] + 1],
+        )
+        adios_file.file.Put(xdofmap_var, u.dofmap_offsets)
 
-    # Add time step to file
-    t_arr = np.array([time], dtype=np.float64)
-    time_var = io.DefineVariable(
-        f"{u.name}_time",
-        t_arr,
-        shape=[1],
-        start=[0],
-        count=[1 if comm.rank == 0 else 0],
-    )
-    outfile.Put(time_var, t_arr)
-    outfile.PerformPuts()
-    outfile.EndStep()
-    outfile.Close()
-    assert adios.RemoveIO(io_name)
+        val_var = adios_file.io.DefineVariable(
+            f"{u.name}_values",
+            u.values,
+            shape=[u.num_dofs_global],
+            start=[u.dof_range[0]],
+            count=[u.dof_range[1] - u.dof_range[0]],
+        )
+        adios_file.file.Put(val_var, u.values)
+
+        # Add time step to file
+        t_arr = np.array([time], dtype=np.float64)
+        time_var = adios_file.io.DefineVariable(
+            f"{u.name}_time",
+            t_arr,
+            shape=[1],
+            start=[0],
+            count=[1 if comm.rank == 0 else 0],
+        )
+        adios_file.file.Put(time_var, t_arr)
+        adios_file.file.PerformPuts()
+        adios_file.file.EndStep()
