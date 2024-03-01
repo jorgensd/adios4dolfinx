@@ -211,6 +211,7 @@ def read_function(
     engine: str = "BP4",
     time: float = 0.0,
     legacy: bool = False,
+    name: str | None = None,
 ):
     """
     Read checkpoint from file and fill it into `u`.
@@ -224,7 +225,8 @@ def read_function(
     mesh = u.function_space.mesh
     comm = mesh.comm
     adios = adios2.ADIOS(comm)
-    name = u.name
+    if name is None:
+        name = u.name
     # ----------------------Step 1---------------------------------
     # Compute index of input cells and get cell permutation
     num_owned_cells = mesh.topology.index_map(mesh.topology.dim).size_local
