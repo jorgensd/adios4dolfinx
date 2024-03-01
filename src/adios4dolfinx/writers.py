@@ -43,7 +43,6 @@ def write_mesh(
     with Adios(
         adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name
     ) as adios_file:
-
         # Write geometry
         pointvar = adios_file.io.DefineVariable(
             "Points",
@@ -107,7 +106,6 @@ def write_function(
     with Adios(
         adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name
     ) as adios_file:
-
         # Add mesh permutations
         pvar = adios_file.io.DefineVariable(
             "CellPermutations",

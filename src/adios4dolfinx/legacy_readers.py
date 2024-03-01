@@ -115,13 +115,9 @@ def read_dofmap_legacy(
 
         if len(shape) == 1:
             cell_dofs.SetSelection([[in_offsets[0]], [in_offsets[-1] - in_offsets[0]]])
-            in_dofmap = np.empty(
-                in_offsets[-1] - in_offsets[0], dtype=cell_dofs.Type().strip("_t")
-            )
+            in_dofmap = np.empty(in_offsets[-1] - in_offsets[0], dtype=cell_dofs.Type().strip("_t"))
         else:
-            cell_dofs.SetSelection(
-                [[in_offsets[0], 0], [in_offsets[-1] - in_offsets[0], shape[1]]]
-            )
+            cell_dofs.SetSelection([[in_offsets[0], 0], [in_offsets[-1] - in_offsets[0], shape[1]]])
             in_dofmap = np.empty(
                 (in_offsets[-1] - in_offsets[0], shape[1]),
                 dtype=cell_dofs.Type().strip("_t"),
@@ -144,16 +140,12 @@ def read_dofmap_legacy(
             num_dofs_local = int((pos_end - pos_begin) // bs)
             for k in range(bs):
                 for j in range(num_dofs_local):
-                    mapped_dofmap[int(pos_begin + j * bs + k)] = dofs_i[
-                        int(num_dofs_local * k + j)
-                    ]
+                    mapped_dofmap[int(pos_begin + j * bs + k)] = dofs_i[int(num_dofs_local * k + j)]
 
         # Extract dofmap data
         global_dofs = np.zeros_like(cells, dtype=np.int64)
         input_cell_positions = cells - local_cell_range[0]
-        read_pos = (
-            in_offsets[input_cell_positions].astype(np.int32) + dof_pos - in_offsets[0]
-        )
+        read_pos = in_offsets[input_cell_positions].astype(np.int32) + dof_pos - in_offsets[0]
         global_dofs = mapped_dofmap[read_pos]
         del input_cell_positions, read_pos
 
@@ -253,9 +245,7 @@ def read_mesh_geometry(io: adios2.ADIOS, infile: adios2.Engine, group: str):
     geometry = io.InquireVariable(geometry_key)
     shape = geometry.Shape()
     local_range = compute_local_range(MPI.COMM_WORLD, shape[0])
-    geometry.SetSelection(
-        [[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]]
-    )
+    geometry.SetSelection([[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]])
     mesh_geometry = np.empty(
         (local_range[1] - local_range[0], shape[1]),
         dtype=adios_to_numpy_dtype[geometry.Type()],
@@ -300,9 +290,7 @@ def read_mesh_from_legacy_h5(
         topology = adios_file.io.InquireVariable(f"{group}/topology")
         shape = topology.Shape()
         local_range = compute_local_range(MPI.COMM_WORLD, shape[0])
-        topology.SetSelection(
-            [[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]]
-        )
+        topology.SetSelection([[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]])
 
         mesh_topology = np.empty(
             (local_range[1] - local_range[0], shape[1]),
@@ -327,9 +315,7 @@ def read_mesh_from_legacy_h5(
         shape=(mesh_geometry.shape[1],),
     )
     domain = ufl.Mesh(element)
-    return dolfinx.mesh.create_mesh(
-        MPI.COMM_WORLD, mesh_topology, mesh_geometry, domain
-    )
+    return dolfinx.mesh.create_mesh(MPI.COMM_WORLD, mesh_topology, mesh_geometry, domain)
 
 
 def read_function_from_legacy_h5(
