@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import itertools
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from mpi4py import MPI
 
