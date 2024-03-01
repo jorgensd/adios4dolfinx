@@ -11,14 +11,18 @@ __all__ = [
     "send_dofmap_and_recv_values",
     "send_and_recv_cell_perm",
     "send_dofs_and_recv_values",
-    "numpy_to_mpi"
+    "numpy_to_mpi",
 ]
 """
 Helpers for sending and receiving values for checkpointing
 """
 
-numpy_to_mpi = {np.float64: MPI.DOUBLE, np.float32: MPI.FLOAT,
-                np.complex64: MPI.COMPLEX, np.complex128: MPI.DOUBLE_COMPLEX}
+numpy_to_mpi = {
+    np.float64: MPI.DOUBLE,
+    np.float32: MPI.FLOAT,
+    np.complex64: MPI.COMPLEX,
+    np.complex128: MPI.DOUBLE_COMPLEX,
+}
 
 
 def send_dofmap_and_recv_values(
@@ -56,7 +60,7 @@ def send_dofmap_and_recv_values(
     # This becomes a (num_dofs, num_dest_ranks) matrix where the (i,j) entry
     # is True if dof i is owned by dest_rank_j
     owners_transposed = output_owners.reshape(-1, 1)
-    process_pos_indicator = (owners_transposed == dest_ranks)
+    process_pos_indicator = owners_transposed == dest_ranks
 
     # Compute number of dofs owned by each rank
     out_size = np.count_nonzero(process_pos_indicator, axis=0).astype(np.int32)
@@ -121,7 +125,7 @@ def send_dofmap_and_recv_values(
 
     # Map values based on input cells and dofmap
     local_cells = inc_cells - local_input_range[0]
-    values_to_distribute = values[dofmap_offsets[local_cells]+inc_pos]
+    values_to_distribute = values[dofmap_offsets[local_cells] + inc_pos]
 
     # Send input dofs back to owning process
     data_to_mesh_comm = comm.Create_dist_graph_adjacent(
@@ -167,7 +171,7 @@ def send_and_recv_cell_perm(
     # This becomes a (num_cells, num_dest_ranks) matrix where the (i,j) entry
     # is True if cell i is owned by dest[j]
     owners_transposed = cell_owners.reshape(-1, 1)
-    process_pos_indicator = (owners_transposed == np.asarray(dest))
+    process_pos_indicator = owners_transposed == np.asarray(dest)
 
     # Compute number of cells owned by each rank
     out_size = np.count_nonzero(process_pos_indicator, axis=0).astype(np.int32)
@@ -253,7 +257,7 @@ def send_dofs_and_recv_values(
     # This becomes a (num_dofs, num_dest_ranks) matrix where the (i,j) entry
     # is True if dof i is owned by dest_rank[j]
     owners_transposed = dofmap_owners.reshape(-1, 1)
-    process_pos_indicator = (owners_transposed == dest_ranks)
+    process_pos_indicator = owners_transposed == dest_ranks
 
     # Compute number of dofs owned by each rank
     out_size = np.count_nonzero(process_pos_indicator, axis=0).astype(np.int32)

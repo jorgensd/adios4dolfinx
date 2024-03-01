@@ -115,7 +115,6 @@ def test_checkpointing_meshtags_1D(mesh_1D, read_comm, read_mode):
     # unique number (their initial global index).
     org_maps = []
     for dim in range(mesh.topology.dim + 1):
-
         mesh.topology.create_connectivity(dim, mesh.topology.dim)
         e_map = mesh.topology.index_map(dim)
         num_entities_local = e_map.size_local
@@ -183,7 +182,6 @@ def test_checkpointing_meshtags_2D(mesh_2D, read_comm, read_mode):
 
     org_maps = []
     for dim in range(mesh.topology.dim + 1):
-
         mesh.topology.create_connectivity(dim, mesh.topology.dim)
         e_map = mesh.topology.index_map(dim)
         num_entities_local = e_map.size_local
@@ -240,7 +238,6 @@ def test_checkpointing_meshtags_3D(mesh_3D, read_comm, read_mode):
 
     org_maps = []
     for dim in range(mesh.topology.dim + 1):
-
         mesh.topology.create_connectivity(dim, mesh.topology.dim)
         e_map = mesh.topology.index_map(dim)
         num_entities_local = e_map.size_local

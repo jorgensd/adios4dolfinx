@@ -24,7 +24,7 @@ def create_reference_data(
     function_name: str,
     family: str,
     degree: int,
-    function_name_vec: str
+    function_name_vec: str,
 ) -> dolfin.Function:
     mesh = dolfin.UnitCubeMesh(1, 1, 1)
     V = dolfin.FunctionSpace(mesh, family, degree)
@@ -33,7 +33,9 @@ def create_reference_data(
 
     f0 = ufl.conditional(ufl.gt(x[0], 0.5), x[1], 2 * x[0])
     v0 = dolfin.project(f0, V)
-    w0 = dolfin.interpolate(dolfin.Expression(("x[0]", "3*x[2]", "7*x[1]"), degree=1), W)
+    w0 = dolfin.interpolate(
+        dolfin.Expression(("x[0]", "3*x[2]", "7*x[1]"), degree=1), W
+    )
 
     v1 = dolfin.interpolate(dolfin.Expression("x[0]", degree=1), V)
     w1 = dolfin.interpolate(dolfin.Expression(("x[0]", "0", "x[1]"), degree=1), W)
@@ -71,7 +73,7 @@ def verify_hdf5(
     function_name: str,
     family: str,
     degree: int,
-    function_name_vec: str
+    function_name_vec: str,
 ):
     mesh = dolfin.Mesh()
     with dolfin.HDF5File(mesh.mpi_comm(), str(h5_file), "r") as hdf:
@@ -97,7 +99,7 @@ def verify_xdmf(
     function_name: str,
     family: str,
     degree: int,
-    function_name_vec: str
+    function_name_vec: str,
 ):
     mesh = dolfin.Mesh()
     with dolfin.XDMFFile(mesh.mpi_comm(), str(xdmf_file)) as xdmf:
@@ -145,14 +147,28 @@ if __name__ == "__main__":
         inputs.f_name,
         inputs.family,
         inputs.degree,
-        inputs.f_name_vec
-
+        inputs.f_name_vec,
     )
 
     verify_hdf5(
-        v0_ref, w0_ref, h5_filename, inputs.name, inputs.f_name, inputs.family, inputs.degree, inputs.f_name_vec,
+        v0_ref,
+        w0_ref,
+        h5_filename,
+        inputs.name,
+        inputs.f_name,
+        inputs.family,
+        inputs.degree,
+        inputs.f_name_vec,
     )
 
     verify_xdmf(
-        v0_ref, w0_ref, v1_ref, w1_ref, xdmf_filename, inputs.f_name, inputs.family, inputs.degree, inputs.f_name_vec,
+        v0_ref,
+        w0_ref,
+        v1_ref,
+        w1_ref,
+        xdmf_filename,
+        inputs.f_name,
+        inputs.family,
+        inputs.degree,
+        inputs.f_name_vec,
     )

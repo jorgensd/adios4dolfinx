@@ -15,13 +15,12 @@ import numpy as np
 import numpy.typing as npt
 import ufl
 
-from .adios2_helpers import (adios_to_numpy_dtype, read_array,
-                             resolve_adios_scope)
+from .adios2_helpers import adios_to_numpy_dtype, read_array, resolve_adios_scope
 from .comm_helpers import send_dofs_and_recv_values
-from .utils import (compute_dofmap_pos, compute_local_range,
-                    index_owner)
+from .utils import compute_dofmap_pos, compute_local_range, index_owner
 
 import adios2
+
 adios2 = resolve_adios_scope(adios2)
 
 __all__ = [
@@ -39,7 +38,7 @@ def read_dofmap_legacy(
     engine: str,
     cells: npt.NDArray[np.int64],
     dof_pos: npt.NDArray[np.int32],
-    bs: int
+    bs: int,
 ) -> npt.NDArray[np.int64]:
     """
     Read dofmap with given communicator, split in continuous chunks based on number of
@@ -89,7 +88,10 @@ def read_dofmap_legacy(
         )
     else:
         d_offsets.SetSelection(
-            [[local_cell_range[0], 0], [local_cell_range[1] + 1 - local_cell_range[0], shape[1]]]
+            [
+                [local_cell_range[0], 0],
+                [local_cell_range[1] + 1 - local_cell_range[0], shape[1]],
+            ]
         )
         in_offsets = np.empty(
             (local_cell_range[1] + 1 - local_cell_range[0], shape[1]),
@@ -109,9 +111,12 @@ def read_dofmap_legacy(
             in_offsets[-1] - in_offsets[0], dtype=cell_dofs.Type().strip("_t")
         )
     else:
-        cell_dofs.SetSelection([[in_offsets[0], 0], [in_offsets[-1] - in_offsets[0], shape[1]]])
+        cell_dofs.SetSelection(
+            [[in_offsets[0], 0], [in_offsets[-1] - in_offsets[0], shape[1]]]
+        )
         in_dofmap = np.empty(
-            (in_offsets[-1] - in_offsets[0], shape[1]), dtype=cell_dofs.Type().strip("_t")
+            (in_offsets[-1] - in_offsets[0], shape[1]),
+            dtype=cell_dofs.Type().strip("_t"),
         )
         assert shape[1] == 1
 
@@ -121,19 +126,26 @@ def read_dofmap_legacy(
 
     # Map xxxyyyzzz to xyzxyz
     mapped_dofmap = np.empty_like(in_dofmap)
-    for i in range(len(in_offsets)-1):
-        pos_begin, pos_end = in_offsets[i]-in_offsets[0], in_offsets[i+1]-in_offsets[0]
+    for i in range(len(in_offsets) - 1):
+        pos_begin, pos_end = (
+            in_offsets[i] - in_offsets[0],
+            in_offsets[i + 1] - in_offsets[0],
+        )
         dofs_i = in_dofmap[pos_begin:pos_end]
         assert (pos_end - pos_begin) % bs == 0
-        num_dofs_local = int((pos_end-pos_begin)//bs)
+        num_dofs_local = int((pos_end - pos_begin) // bs)
         for k in range(bs):
             for j in range(num_dofs_local):
-                mapped_dofmap[int(pos_begin + j*bs+k)] = dofs_i[int(num_dofs_local*k+j)]
+                mapped_dofmap[int(pos_begin + j * bs + k)] = dofs_i[
+                    int(num_dofs_local * k + j)
+                ]
 
     # Extract dofmap data
     global_dofs = np.zeros_like(cells, dtype=np.int64)
     input_cell_positions = cells - local_cell_range[0]
-    read_pos = in_offsets[input_cell_positions].astype(np.int32) + dof_pos - in_offsets[0]
+    read_pos = (
+        in_offsets[input_cell_positions].astype(np.int32) + dof_pos - in_offsets[0]
+    )
     global_dofs = mapped_dofmap[read_pos]
     del input_cell_positions, read_pos
 
@@ -155,7 +167,7 @@ def send_cells_and_receive_dofmap_index(
     dofmap_path: str,
     xdofmap_path: str,
     engine: str,
-    bs: int
+    bs: int,
 ) -> npt.NDArray[np.int64]:
     """
     Given a set of positions in input dofmap, give the global input index of this dofmap entry
@@ -164,7 +176,7 @@ def send_cells_and_receive_dofmap_index(
 
     # Compute amount of data to send to each process
     owners_transposed = output_owners.reshape(-1, 1)
-    process_pos_indicator = (owners_transposed == np.asarray(dest_ranks))
+    process_pos_indicator = owners_transposed == np.asarray(dest_ranks)
     out_size = np.count_nonzero(process_pos_indicator, axis=0).astype(np.int32)
 
     recv_size = np.zeros(len(source_ranks), dtype=np.int32)
@@ -220,7 +232,7 @@ def send_cells_and_receive_dofmap_index(
         engine,
         inc_cells,
         inc_pos,
-        bs
+        bs,
     )
     # Send input dofs back to owning process
     data_to_mesh_comm = comm.Create_dist_graph_adjacent(
@@ -241,7 +253,6 @@ def send_cells_and_receive_dofmap_index(
 
 
 def read_mesh_geometry(io: adios2.ADIOS, infile: adios2.Engine, group: str):
-
     for geometry_key in [f"{group}/geometry", f"{group}/coordinates"]:
         if geometry_key in io.AvailableVariables().keys():
             break
@@ -255,14 +266,19 @@ def read_mesh_geometry(io: adios2.ADIOS, infile: adios2.Engine, group: str):
         [[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]]
     )
     mesh_geometry = np.empty(
-        (local_range[1] - local_range[0], shape[1]), dtype=adios_to_numpy_dtype[geometry.Type()])
+        (local_range[1] - local_range[0], shape[1]),
+        dtype=adios_to_numpy_dtype[geometry.Type()],
+    )
 
     infile.Get(geometry, mesh_geometry, adios2.Mode.Sync)
     return mesh_geometry
 
 
 def read_mesh_from_legacy_h5(
-    comm: MPI.Intracomm, filename: pathlib.Path, group: str, cell_type: str = "tetrahedron"
+    comm: MPI.Intracomm,
+    filename: pathlib.Path,
+    group: str,
+    cell_type: str = "tetrahedron",
 ) -> dolfinx.mesh.Mesh:
     """
     Read mesh from `h5`-file generated by legacy DOLFIN `HDF5File.write` or `XDMF.write_checkpoint`.
@@ -396,7 +412,7 @@ def read_function_from_legacy_h5(
         f"/{group}/cell_dofs",
         f"/{group}/x_cell_dofs",
         "HDF5",
-        bs
+        bs,
     )
 
     # ----------------------Step 3---------------------------------
@@ -408,8 +424,9 @@ def read_function_from_legacy_h5(
 
     # Read input data
     adios = adios2.ADIOS(comm)
-    local_array, starting_pos = read_array(adios, filename, f"/{group}/{vector_group}", "HDF5",
-                                           comm, legacy=True)
+    local_array, starting_pos = read_array(
+        adios, filename, f"/{group}/{vector_group}", "HDF5", comm, legacy=True
+    )
 
     # Send global dof indices to correct input process, and receive value of given dof
     local_values = send_dofs_and_recv_values(

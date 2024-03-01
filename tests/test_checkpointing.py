@@ -7,22 +7,38 @@ import numpy as np
 import pytest
 from mpi4py import MPI
 
-from .test_utils import read_function, write_function, get_dtype, read_function_time_dep, write_function_time_dep
+from .test_utils import (
+    read_function,
+    write_function,
+    get_dtype,
+    read_function_time_dep,
+    write_function_time_dep,
+)
 
 dtypes = [np.float64, np.float32]  # Mesh geometry dtypes
 write_comm = [MPI.COMM_SELF, MPI.COMM_WORLD]  # Communicators for creating mesh
 
-two_dimensional_cell_types = [dolfinx.mesh.CellType.triangle, dolfinx.mesh.CellType.quadrilateral]
-three_dimensional_cell_types = [dolfinx.mesh.CellType.tetrahedron, dolfinx.mesh.CellType.hexahedron]
+two_dimensional_cell_types = [
+    dolfinx.mesh.CellType.triangle,
+    dolfinx.mesh.CellType.quadrilateral,
+]
+three_dimensional_cell_types = [
+    dolfinx.mesh.CellType.tetrahedron,
+    dolfinx.mesh.CellType.hexahedron,
+]
 
 two_dim_combinations = itertools.product(dtypes, two_dimensional_cell_types, write_comm)
-three_dim_combinations = itertools.product(dtypes, three_dimensional_cell_types, write_comm)
+three_dim_combinations = itertools.product(
+    dtypes, three_dimensional_cell_types, write_comm
+)
 
 
 @pytest.fixture(params=two_dim_combinations, scope="module")
 def mesh_2D(request):
     dtype, cell_type, write_comm = request.param
-    mesh = dolfinx.mesh.create_unit_square(write_comm, 10, 10, cell_type=cell_type, dtype=dtype)
+    mesh = dolfinx.mesh.create_unit_square(
+        write_comm, 10, 10, cell_type=cell_type, dtype=dtype
+    )
     return mesh
 
 
@@ -30,7 +46,9 @@ def mesh_2D(request):
 def mesh_3D(request):
     dtype, cell_type, write_comm = request.param
     M = 5
-    mesh = dolfinx.mesh.create_unit_cube(write_comm, M, M, M, cell_type=cell_type, dtype=dtype)
+    mesh = dolfinx.mesh.create_unit_cube(
+        write_comm, M, M, M, cell_type=cell_type, dtype=dtype
+    )
     return mesh
 
 
@@ -42,12 +60,14 @@ def test_read_write_P_2D(read_comm, family, degree, complex, mesh_2D):
     mesh = mesh_2D
     f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
 
-    el = basix.ufl.element(family,
-                           mesh.ufl_cell().cellname(),
-                           degree,
-                           basix.LagrangeVariant.gll_warped,
-                           shape=(mesh.geometry.dim, ),
-                           dtype=mesh.geometry.x.dtype)
+    el = basix.ufl.element(
+        family,
+        mesh.ufl_cell().cellname(),
+        degree,
+        basix.LagrangeVariant.gll_warped,
+        shape=(mesh.geometry.dim,),
+        dtype=mesh.geometry.x.dtype,
+    )
 
     def f(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
@@ -67,17 +87,19 @@ def test_read_write_P_2D(read_comm, family, degree, complex, mesh_2D):
 def test_read_write_P_3D(read_comm, family, degree, complex, mesh_3D):
     mesh = mesh_3D
     f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
-    el = basix.ufl.element(family,
-                           mesh.ufl_cell().cellname(),
-                           degree,
-                           basix.LagrangeVariant.gll_warped,
-                           shape=(mesh.geometry.dim, ))
+    el = basix.ufl.element(
+        family,
+        mesh.ufl_cell().cellname(),
+        degree,
+        basix.LagrangeVariant.gll_warped,
+        shape=(mesh.geometry.dim,),
+    )
 
     def f(x):
         values = np.empty((3, x.shape[1]), dtype=f_dtype)
-        values[0] = np.pi + x[0] + 2j*x[2]
+        values[0] = np.pi + x[0] + 2j * x[2]
         values[1] = x[1] + 2 * x[0]
-        values[2] = 1j*x[1] + np.cos(x[2])
+        values[2] = 1j * x[1] + np.cos(x[2])
         return values
 
     hash = write_function(mesh, el, f, f_dtype)
@@ -94,12 +116,14 @@ def test_read_write_P_2D_time(read_comm, family, degree, complex, mesh_2D):
     mesh = mesh_2D
     f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
 
-    el = basix.ufl.element(family,
-                           mesh.ufl_cell().cellname(),
-                           degree,
-                           basix.LagrangeVariant.gll_warped,
-                           shape=(mesh.geometry.dim, ),
-                           dtype=mesh.geometry.x.dtype)
+    el = basix.ufl.element(
+        family,
+        mesh.ufl_cell().cellname(),
+        degree,
+        basix.LagrangeVariant.gll_warped,
+        shape=(mesh.geometry.dim,),
+        dtype=mesh.geometry.x.dtype,
+    )
 
     def f0(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
@@ -109,8 +133,8 @@ def test_read_write_P_2D_time(read_comm, family, degree, complex, mesh_2D):
 
     def f1(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
-        values[0] = 2*np.full(x.shape[1], np.pi) + x[0] + x[1] * 1j
-        values[1] = -x[0] + 3j * x[1] + 2*x[1]
+        values[0] = 2 * np.full(x.shape[1], np.pi) + x[0] + x[1] * 1j
+        values[1] = -x[0] + 3j * x[1] + 2 * x[1]
         return values
 
     t0 = 0.8
@@ -127,24 +151,26 @@ def test_read_write_P_2D_time(read_comm, family, degree, complex, mesh_2D):
 def test_read_write_P_3D_time(read_comm, family, degree, complex, mesh_3D):
     mesh = mesh_3D
     f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
-    el = basix.ufl.element(family,
-                           mesh.ufl_cell().cellname(),
-                           degree,
-                           basix.LagrangeVariant.gll_warped,
-                           shape=(mesh.geometry.dim, ))
+    el = basix.ufl.element(
+        family,
+        mesh.ufl_cell().cellname(),
+        degree,
+        basix.LagrangeVariant.gll_warped,
+        shape=(mesh.geometry.dim,),
+    )
 
     def f(x):
         values = np.empty((3, x.shape[1]), dtype=f_dtype)
-        values[0] = np.pi + x[0] + 2j*x[2]
+        values[0] = np.pi + x[0] + 2j * x[2]
         values[1] = x[1] + 2 * x[0]
-        values[2] = 1j*x[1] + np.cos(x[2])
+        values[2] = 1j * x[1] + np.cos(x[2])
         return values
 
     def g(x):
         values = np.empty((3, x.shape[1]), dtype=f_dtype)
-        values[0] = x[0] + np.pi * 2j*x[2]
-        values[1] = 1j*x[2] + 2 * x[0]
-        values[2] = x[0] + 1j*np.cos(x[1])
+        values[0] = x[0] + np.pi * 2j * x[2]
+        values[1] = 1j * x[2] + 2 * x[0]
+        values[2] = x[0] + 1j * np.cos(x[1])
         return values
 
     t0 = 0.1

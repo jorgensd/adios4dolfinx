@@ -12,13 +12,18 @@ import numpy as np
 
 from .adios2_helpers import resolve_adios_scope
 from .structures import FunctionData, MeshData
+
 adios2 = resolve_adios_scope(adios2)
 
 
 def write_mesh(
-        comm: MPI.Intracomm,
-        mesh: MeshData, filename: Path, engine: str = "BP4",
-        mode: adios2.Mode=adios2.Mode.Write, io_name:str = "MeshWriter"):
+    comm: MPI.Intracomm,
+    mesh: MeshData,
+    filename: Path,
+    engine: str = "BP4",
+    mode: adios2.Mode = adios2.Mode.Write,
+    io_name: str = "MeshWriter",
+):
     """
     Write a mesh to file using ADIOS2
 
@@ -44,8 +49,7 @@ def write_mesh(
         mesh.local_geometry,
         shape=[mesh.num_nodes_global, gdim],
         start=[mesh.local_geometry_pos[0], 0],
-        count=[mesh.local_geometry_pos[1] -
-               mesh.local_geometry_pos[0], gdim],
+        count=[mesh.local_geometry_pos[1] - mesh.local_geometry_pos[0], gdim],
     )
     outfile.Put(pointvar, mesh.local_geometry, adios2.Mode.Sync)
 
@@ -55,8 +59,7 @@ def write_mesh(
     # Write basix properties
     io.DefineAttribute("Degree", np.array([mesh.degree], dtype=np.int32))
     io.DefineAttribute(
-        "LagrangeVariant", np.array(
-            [mesh.lagrange_variant], dtype=np.int32)
+        "LagrangeVariant", np.array([mesh.lagrange_variant], dtype=np.int32)
     )
 
     # Write topology
@@ -80,13 +83,14 @@ def write_mesh(
 
 
 def write_function(
-        comm: MPI.Intracomm,
-        u: FunctionData,
-        filename: Path,
-        engine: str = "BP4",
-        mode: adios2.Mode = adios2.Mode.Append,
-        time: float = 0.0,
-        io_name: str = "FunctionWriter"):
+    comm: MPI.Intracomm,
+    u: FunctionData,
+    filename: Path,
+    engine: str = "BP4",
+    mode: adios2.Mode = adios2.Mode.Append,
+    time: float = 0.0,
+    io_name: str = "FunctionWriter",
+):
     """
     Write a function to file using ADIOS2
 
@@ -111,8 +115,7 @@ def write_function(
         u.cell_permutations,
         shape=[u.num_cells_global],
         start=[u.local_cell_range[0]],
-        count=[u.local_cell_range[1] -
-               u.local_cell_range[0]],
+        count=[u.local_cell_range[1] - u.local_cell_range[0]],
     )
     outfile.Put(pvar, u.cell_permutations)
     dofmap_var = io.DefineVariable(
@@ -129,10 +132,7 @@ def write_function(
         u.dofmap_offsets,
         shape=[u.num_cells_global + 1],
         start=[u.local_cell_range[0]],
-        count=[
-            u.local_cell_range[1] -
-            u.local_cell_range[0] + 1
-        ],
+        count=[u.local_cell_range[1] - u.local_cell_range[0] + 1],
     )
     outfile.Put(xdofmap_var, u.dofmap_offsets)
 

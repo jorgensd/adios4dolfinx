@@ -15,8 +15,13 @@ import numpy as np
 from .adios2_helpers import resolve_adios_scope
 from .comm_helpers import numpy_to_mpi
 from .structures import FunctionData, MeshData
-from .utils import (compute_insert_position, compute_local_range, index_owner,
-                    unroll_dofmap, unroll_insert_position)
+from .utils import (
+    compute_insert_position,
+    compute_local_range,
+    index_owner,
+    unroll_dofmap,
+    unroll_insert_position,
+)
 from .writers import write_function, write_mesh
 
 adios2 = resolve_adios_scope(adios2)
@@ -37,8 +42,7 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
 
     # Compute owner of cells on this process based on the original cell index
     num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
-    output_cell_owner = index_owner(
-        mesh.comm, original_cell_index, num_cells_global)
+    output_cell_owner = index_owner(mesh.comm, original_cell_index, num_cells_global)
     local_cell_range = compute_local_range(mesh.comm, num_cells_global)
 
     # Compute outgoing edges from current process to outputting process
@@ -62,10 +66,8 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     if len(recv_cells_per_proc) == 0:
         recv_cells_per_proc = np.zeros(1, dtype=np.int32)
     send_cells_per_proc = send_cells_per_proc.astype(np.int32)
-    cell_to_output_comm.Neighbor_alltoall(
-        send_cells_per_proc, recv_cells_per_proc)
-    assert recv_cells_per_proc.sum(
-    ) == local_cell_range[1] - local_cell_range[0]
+    cell_to_output_comm.Neighbor_alltoall(send_cells_per_proc, recv_cells_per_proc)
+    assert recv_cells_per_proc.sum() == local_cell_range[1] - local_cell_range[0]
     # Pack and send cell indices (used for mapping topology dofmap later)
     cell_insert_position = compute_insert_position(
         output_cell_owner, cell_destinations, send_cells_per_proc
@@ -96,17 +98,14 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     )
 
     # Create and commmnicate connecitivity in original geometry indices
-    send_geometry_dofmap = np.empty_like(
-        dofmap_insert_position, dtype=np.int64)
+    send_geometry_dofmap = np.empty_like(dofmap_insert_position, dtype=np.int64)
     send_geometry_dofmap[dofmap_insert_position] = global_geometry_dofmap
     del global_geometry_dofmap
     send_sizes_dofmap = send_cells_per_proc * num_nodes_per_cell
     recv_sizes_dofmap = recv_cells_per_proc * num_nodes_per_cell
     recv_geometry_dofmap = np.empty(recv_sizes_dofmap.sum(), dtype=np.int64)
-    send_geometry_dofmap_msg = [
-        send_geometry_dofmap, send_sizes_dofmap, MPI.INT64_T]
-    recv_geometry_dofmap_msg = [
-        recv_geometry_dofmap, recv_sizes_dofmap, MPI.INT64_T]
+    send_geometry_dofmap_msg = [send_geometry_dofmap, send_sizes_dofmap, MPI.INT64_T]
+    recv_geometry_dofmap_msg = [recv_geometry_dofmap, recv_sizes_dofmap, MPI.INT64_T]
     cell_to_output_comm.Neighbor_alltoallv(
         send_geometry_dofmap_msg, recv_geometry_dofmap_msg
     )
@@ -216,8 +215,7 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
 
     # Compute owner of cells on this process based on the original cell index
     num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
-    output_cell_owner = index_owner(
-        mesh.comm, original_cell_index, num_cells_global)
+    output_cell_owner = index_owner(mesh.comm, original_cell_index, num_cells_global)
     local_cell_range = compute_local_range(mesh.comm, num_cells_global)
 
     # Compute outgoing edges from current process to outputting process
@@ -237,10 +235,8 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
     # Compute number of recieving cells
     recv_cells_per_proc = np.zeros_like(cell_sources, dtype=np.int32)
     send_cells_per_proc = send_cells_per_proc.astype(np.int32)
-    cell_to_output_comm.Neighbor_alltoall(
-        send_cells_per_proc, recv_cells_per_proc)
-    assert recv_cells_per_proc.sum(
-    ) == local_cell_range[1] - local_cell_range[0]
+    cell_to_output_comm.Neighbor_alltoall(send_cells_per_proc, recv_cells_per_proc)
+    assert recv_cells_per_proc.sum() == local_cell_range[1] - local_cell_range[0]
 
     # Pack and send cell indices (used for mapping topology dofmap later)
     cell_insert_position = compute_insert_position(
@@ -259,8 +255,7 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
 
     # Pack and send cell permutation info
     mesh.topology.create_entity_permutations()
-    cell_permutation_info = mesh.topology.get_cell_permutation_info()[
-        :num_owned_cells]
+    cell_permutation_info = mesh.topology.get_cell_permutation_info()[:num_owned_cells]
     send_perm = np.empty_like(send_cells, dtype=np.uint32)
     send_perm[cell_insert_position] = cell_permutation_info
     recv_perm = np.empty_like(recv_cells, dtype=np.uint32)
@@ -279,8 +274,7 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
     index_map_bs = dofmap.index_map_bs
 
     # Unroll dofmap for block size
-    unrolled_dofmap = unroll_dofmap(
-        dofmap.list[:num_owned_cells, :], dofmap_bs)
+    unrolled_dofmap = unroll_dofmap(dofmap.list[:num_owned_cells, :], dofmap_bs)
     dmap_loc = (unrolled_dofmap // index_map_bs).reshape(-1)
     dmap_rem = (unrolled_dofmap % index_map_bs).reshape(-1)
 
@@ -295,8 +289,7 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
     )
 
     # Create and send array for global dofmap
-    send_function_dofmap = np.empty(
-        len(dofmap_insert_position), dtype=np.int64)
+    send_function_dofmap = np.empty(len(dofmap_insert_position), dtype=np.int64)
     send_function_dofmap[dofmap_insert_position] = dofmap_global.reshape(-1)
     send_sizes_dofmap = send_cells_per_proc * num_dofs_per_cell
     recv_size_dofmap = recv_cells_per_proc * num_dofs_per_cell
@@ -324,8 +317,7 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
     num_dofs_local = dofmap.index_map.size_local * dofmap.index_map_bs
     num_dofs_global = dofmap.index_map.size_global * dofmap.index_map_bs
     local_range = (
-        np.asarray(dofmap.index_map.local_range,
-                   dtype=np.int64) * dofmap.index_map_bs
+        np.asarray(dofmap.index_map.local_range, dtype=np.int64) * dofmap.index_map_bs
     )
     return FunctionData(
         cell_permutations=cell_permutation_info,
@@ -338,7 +330,7 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
         num_dofs_global=num_dofs_global,
         dofmap_range=dofmap_imap.local_range,
         global_dofs_in_dofmap=dofmap_imap.size_global,
-        name=u.name
+        name=u.name,
     )
 
 
@@ -358,11 +350,19 @@ def write_function_on_input_mesh(
         engine: The ADIOS2 engine to use
         mode: The ADIOS2 mode to use (write or append)
         time: Time-stamp associated with function at current write step
-    
+
     """
     mesh = u.function_space.mesh
     function_data = create_function_data_on_original_mesh(u)
-    write_function(mesh.comm, function_data, filename, engine, mode, time, io_name="OriginalFunctionWriter")
+    write_function(
+        mesh.comm,
+        function_data,
+        filename,
+        engine,
+        mode,
+        time,
+        io_name="OriginalFunctionWriter",
+    )
 
 
 def write_mesh_input_order(

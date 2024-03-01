@@ -11,6 +11,7 @@ from adios4dolfinx.adios2_helpers import resolve_adios_scope
 from adios4dolfinx import snapshot_checkpoint
 
 import adios2
+
 adios2 = resolve_adios_scope(adios2)
 
 

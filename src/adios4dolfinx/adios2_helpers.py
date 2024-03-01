@@ -25,9 +25,13 @@ Helpers reading/writing data with ADIOS2
 
 __all__ = ["read_array", "read_dofmap", "read_cell_perms", "adios_to_numpy_dtype"]
 
-adios_to_numpy_dtype = {"float": np.float32, "double": np.float64,
-                        "float complex": np.complex64, "double complex": np.complex128,
-                        "uint32_t": np.uint32}
+adios_to_numpy_dtype = {
+    "float": np.float32,
+    "double": np.float64,
+    "float complex": np.complex64,
+    "double complex": np.complex128,
+    "uint32_t": np.uint32,
+}
 
 
 def read_cell_perms(
@@ -83,7 +87,8 @@ def read_cell_perms(
         [[local_cell_range[0]], [local_cell_range[1] - local_cell_range[0]]]
     )
     in_perm = np.empty(
-        local_cell_range[1] - local_cell_range[0], dtype=adios_to_numpy_dtype[perm_var.Type()]
+        local_cell_range[1] - local_cell_range[0],
+        dtype=adios_to_numpy_dtype[perm_var.Type()],
     )
     infile.Get(perm_var, in_perm, adios2.Mode.Sync)
     infile.EndStep()
@@ -174,10 +179,15 @@ def read_dofmap(
 
 
 def read_array(
-        adios: adios2.ADIOS,
-        filename: Union[Path, str], array_name: str, engine: str, comm: MPI.Intracomm,
-        time: float = 0., time_name: str = "",
-        legacy: bool = False) -> Tuple[npt.NDArray[valid_function_types], int]:
+    adios: adios2.ADIOS,
+    filename: Union[Path, str],
+    array_name: str,
+    engine: str,
+    comm: MPI.Intracomm,
+    time: float = 0.0,
+    time_name: str = "",
+    legacy: bool = False,
+) -> Tuple[npt.NDArray[valid_function_types], int]:
     """
     Read an array from file, return the global starting position of the local array
 
@@ -217,12 +227,16 @@ def read_array(
                 if times[0] == time:
                     break
             if i == infile.Steps() - 1:
-                raise KeyError(f"No data associated with {time_name}={time} found in {filename}")
+                raise KeyError(
+                    f"No data associated with {time_name}={time} found in {filename}"
+                )
 
             infile.EndStep()
 
         if time_name not in io.AvailableVariables().keys():
-            raise KeyError(f"No data associated with {time_name}={time} found in {filename}")
+            raise KeyError(
+                f"No data associated with {time_name}={time} found in {filename}"
+            )
 
         if array_name not in io.AvailableVariables().keys():
             raise KeyError(f"No array found at {time=} for {array_name}")
@@ -234,10 +248,17 @@ def read_array(
 
     if len(arr_shape) == 1:
         arr.SetSelection([[arr_range[0]], [arr_range[1] - arr_range[0]]])
-        vals = np.empty(arr_range[1] - arr_range[0], dtype=adios_to_numpy_dtype[arr.Type()])
+        vals = np.empty(
+            arr_range[1] - arr_range[0], dtype=adios_to_numpy_dtype[arr.Type()]
+        )
     else:
-        arr.SetSelection([[arr_range[0], 0], [arr_range[1] - arr_range[0], arr_shape[1]]])
-        vals = np.empty((arr_range[1] - arr_range[0], arr_shape[1]), dtype=adios_to_numpy_dtype[arr.Type()])
+        arr.SetSelection(
+            [[arr_range[0], 0], [arr_range[1] - arr_range[0], arr_shape[1]]]
+        )
+        vals = np.empty(
+            (arr_range[1] - arr_range[0], arr_shape[1]),
+            dtype=adios_to_numpy_dtype[arr.Type()],
+        )
         assert arr_shape[1] == 1
 
     infile.Get(arr, vals, adios2.Mode.Sync)

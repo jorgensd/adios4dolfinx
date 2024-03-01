@@ -14,17 +14,25 @@ import dolfinx
 import numpy as np
 import ufl
 
-from .adios2_helpers import (adios_to_numpy_dtype, read_array, read_cell_perms,
-                             read_dofmap, resolve_adios_scope)
-from .comm_helpers import (send_and_recv_cell_perm,
-                           send_dofmap_and_recv_values,
-                           send_dofs_and_recv_values)
+from .adios2_helpers import (
+    adios_to_numpy_dtype,
+    read_array,
+    read_cell_perms,
+    read_dofmap,
+    resolve_adios_scope,
+)
+from .comm_helpers import (
+    send_and_recv_cell_perm,
+    send_dofmap_and_recv_values,
+    send_dofs_and_recv_values,
+)
 from .utils import compute_dofmap_pos, compute_local_range, index_owner, unroll_dofmap
 from .structures import MeshData, FunctionData
 from .writers import write_mesh as _internal_mesh_writer
 from .writers import write_function as _internal_function_writer
 
 import adios2
+
 adios2 = resolve_adios_scope(adios2)
 
 __all__ = [
@@ -33,12 +41,16 @@ __all__ = [
     "read_function",
     "write_mesh",
     "read_meshtags",
-    "write_meshtags"
+    "write_meshtags",
 ]
 
 
-def write_meshtags(filename: Union[Path, str], mesh: dolfinx.mesh.Mesh, meshtags: dolfinx.mesh.MeshTags,
-                   engine: Optional[str] = "BP4"):
+def write_meshtags(
+    filename: Union[Path, str],
+    mesh: dolfinx.mesh.Mesh,
+    meshtags: dolfinx.mesh.MeshTags,
+    engine: Optional[str] = "BP4",
+):
     """
     Write meshtags associated with input mesh to file.
 
@@ -56,7 +68,7 @@ def write_meshtags(filename: Union[Path, str], mesh: dolfinx.mesh.Mesh, meshtags
     dim = meshtags.dim
     num_tag_entities_local = mesh.topology.index_map(dim).size_local
     local_tag_entities = tag_entities[tag_entities < num_tag_entities_local]
-    local_values = meshtags.values[:len(local_tag_entities)]
+    local_values = meshtags.values[: len(local_tag_entities)]
 
     num_saved_tag_entities = len(local_tag_entities)
     local_start = mesh.comm.exscan(num_saved_tag_entities, op=MPI.SUM)
@@ -66,9 +78,12 @@ def write_meshtags(filename: Union[Path, str], mesh: dolfinx.mesh.Mesh, meshtags
     num_dofs_per_entity = dof_layout.num_entity_closure_dofs(dim)
 
     entities_to_geometry = dolfinx.cpp.mesh.entities_to_geometry(
-        mesh._cpp_object, dim, tag_entities, False)
+        mesh._cpp_object, dim, tag_entities, False
+    )
 
-    indices = mesh.geometry.index_map().local_to_global(entities_to_geometry.reshape(-1))
+    indices = mesh.geometry.index_map().local_to_global(
+        entities_to_geometry.reshape(-1)
+    )
 
     adios = adios2.ADIOS(mesh.comm)
     io = adios.DeclareIO("MeshTagWriter")
@@ -76,7 +91,7 @@ def write_meshtags(filename: Union[Path, str], mesh: dolfinx.mesh.Mesh, meshtags
     outfile = io.Open(str(filename), adios2.Mode.Append)
     # Write meshtag topology
     topology_var = io.DefineVariable(
-        meshtags.name+"_topology",
+        meshtags.name + "_topology",
         indices,
         shape=[global_num_tag_entities, num_dofs_per_entity],
         start=[local_start, 0],
@@ -86,7 +101,7 @@ def write_meshtags(filename: Union[Path, str], mesh: dolfinx.mesh.Mesh, meshtags
 
     # Write meshtag topology
     values_var = io.DefineVariable(
-        meshtags.name+"_values",
+        meshtags.name + "_values",
         local_values,
         shape=[global_num_tag_entities],
         start=[local_start],
@@ -102,8 +117,12 @@ def write_meshtags(filename: Union[Path, str], mesh: dolfinx.mesh.Mesh, meshtags
     outfile.Close()
 
 
-def read_meshtags(filename: Union[Path, str], mesh: dolfinx.mesh.Mesh, meshtag_name: str,
-                  engine: str = "BP4") -> dolfinx.mesh.MeshTags:
+def read_meshtags(
+    filename: Union[Path, str],
+    mesh: dolfinx.mesh.Mesh,
+    meshtag_name: str,
+    engine: str = "BP4",
+) -> dolfinx.mesh.MeshTags:
     """
     Read meshtags from file and return a :class:`dolfinx.mesh.MeshTags` object.
 
@@ -153,7 +172,9 @@ def read_meshtags(filename: Union[Path, str], mesh: dolfinx.mesh.Mesh, meshtag_n
     topology.SetSelection(
         [[topology_range[0], 0], [topology_range[1] - topology_range[0], top_shape[1]]]
     )
-    mesh_entities = np.empty((topology_range[1] - topology_range[0], top_shape[1]), dtype=np.int64)
+    mesh_entities = np.empty(
+        (topology_range[1] - topology_range[0], top_shape[1]), dtype=np.int64
+    )
     infile.Get(topology, mesh_entities, adios2.Mode.Deferred)
 
     # Get mesh tags values
@@ -164,9 +185,7 @@ def read_meshtags(filename: Union[Path, str], mesh: dolfinx.mesh.Mesh, meshtag_n
     values = io.InquireVariable(values_name)
     val_shape = values.Shape()
     assert val_shape[0] == top_shape[0]
-    values.SetSelection(
-        [[topology_range[0]], [topology_range[1] - topology_range[0]]]
-    )
+    values.SetSelection([[topology_range[0]], [topology_range[1] - topology_range[0]]])
     tag_values = np.empty((topology_range[1] - topology_range[0]), dtype=np.int32)
     infile.Get(values, tag_values, adios2.Mode.Deferred)
 
@@ -176,7 +195,8 @@ def read_meshtags(filename: Union[Path, str], mesh: dolfinx.mesh.Mesh, meshtag_n
     assert adios.RemoveIO("MeshTagsReader")
 
     local_entities, local_values = dolfinx.cpp.io.distribute_entity_data(
-        mesh._cpp_object, int(dim), mesh_entities, tag_values)
+        mesh._cpp_object, int(dim), mesh_entities, tag_values
+    )
     mesh.topology.create_connectivity(dim, 0)
     mesh.topology.create_connectivity(dim, mesh.topology.dim)
 
@@ -190,8 +210,13 @@ def read_meshtags(filename: Union[Path, str], mesh: dolfinx.mesh.Mesh, meshtag_n
     return mt
 
 
-def read_function(u: dolfinx.fem.Function, filename: Union[Path, str], engine: str = "BP4", time: float = 0.,
-                  legacy: bool = False):
+def read_function(
+    u: dolfinx.fem.Function,
+    filename: Union[Path, str],
+    engine: str = "BP4",
+    time: float = 0.0,
+    legacy: bool = False,
+):
     """
     Read checkpoint from file and fill it into `u`.
 
@@ -248,8 +273,9 @@ def read_function(u: dolfinx.fem.Function, filename: Union[Path, str], engine: s
     else:
         array_path = f"{name}_values"
     time_name = f"{name}_time"
-    input_array, starting_pos = read_array(adios, filename, array_path, engine, comm, time, time_name,
-                                           legacy=legacy)
+    input_array, starting_pos = read_array(
+        adios, filename, array_path, engine, comm, time, time_name, legacy=legacy
+    )
     recv_array = send_dofs_and_recv_values(
         input_dofmap.array, dof_owner, comm, input_array, starting_pos
     )
@@ -270,14 +296,14 @@ def read_function(u: dolfinx.fem.Function, filename: Union[Path, str], engine: s
 
         # First invert input data to reference element then transform to current mesh
         for i, l_cell in enumerate(input_local_cell_index):
-            start, end = input_dofmap.offsets[l_cell:l_cell+2]
+            start, end = input_dofmap.offsets[l_cell : l_cell + 2]
             # FIXME: Tempoary cast uint32 to integer as transformations doesn't support uint32 with the switch
             # to nanobind
             element.pre_apply_transpose_dof_transformation(
-                recv_array[int(start):int(end)], int(input_perms[l_cell]), bs
+                recv_array[int(start) : int(end)], int(input_perms[l_cell]), bs
             )
             element.pre_apply_inverse_transpose_dof_transformation(
-                recv_array[int(start):int(end)], int(inc_perms[i]), bs
+                recv_array[int(start) : int(end)], int(inc_perms[i]), bs
             )
     # ------------------Step 6----------------------------------------
     # For each dof owned by a process, find the local position in the dofmap.
@@ -310,7 +336,10 @@ def read_function(u: dolfinx.fem.Function, filename: Union[Path, str], engine: s
 
 
 def read_mesh(
-    comm: MPI.Intracomm, filename: Union[Path, str], engine: str, ghost_mode: dolfinx.mesh.GhostMode
+    comm: MPI.Intracomm,
+    filename: Union[Path, str],
+    engine: str,
+    ghost_mode: dolfinx.mesh.GhostMode,
 ) -> dolfinx.mesh.Mesh:
     """
     Read an ADIOS2 mesh into DOLFINx.
@@ -422,19 +451,27 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
         g_imap.local_to_global(g_dmap[:num_cells_local, :].reshape(-1))
     ).reshape(dofs_out.shape)
 
-    mesh_data = MeshData(local_geometry=mesh.geometry.x[:num_xdofs_local, :gdim].copy(),
-                         local_geometry_pos=geometry_range,
-                         num_nodes_global=num_xdofs_global,
-                         local_topology=dofs_out,
-                         local_topology_pos=cell_range,
-                         num_cells_global=num_cells_global,
-                         cell_type=mesh.topology.cell_name(),
-                         degree=mesh.geometry.cmap.degree,
-                         lagrange_variant=mesh.geometry.cmap.variant)
+    mesh_data = MeshData(
+        local_geometry=mesh.geometry.x[:num_xdofs_local, :gdim].copy(),
+        local_geometry_pos=geometry_range,
+        num_nodes_global=num_xdofs_global,
+        local_topology=dofs_out,
+        local_topology_pos=cell_range,
+        num_cells_global=num_cells_global,
+        cell_type=mesh.topology.cell_name(),
+        degree=mesh.geometry.cmap.degree,
+        lagrange_variant=mesh.geometry.cmap.variant,
+    )
 
     # NOTE: Mode will become input again once we have variable geometry
-    _internal_mesh_writer(mesh.comm, mesh_data, filename, engine, mode=adios2.Mode.Write,
-                     io_name="MeshWriter")
+    _internal_mesh_writer(
+        mesh.comm,
+        mesh_data,
+        filename,
+        engine,
+        mode=adios2.Mode.Write,
+        io_name="MeshWriter",
+    )
 
 
 def write_function(
@@ -442,7 +479,7 @@ def write_function(
     filename: Union[Path, str],
     engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Append,
-    time: float = 0.0
+    time: float = 0.0,
 ):
     """
     Write function checkpoint to file.
@@ -476,7 +513,6 @@ def write_function(
     dmap_loc = (unrolled_dofmap // index_map_bs).reshape(-1)
     dmap_rem = (unrolled_dofmap % index_map_bs).reshape(-1)
 
-
     # Convert imap index to global index
     imap_global = dofmap.index_map.local_to_global(dmap_loc)
     dofmap_global = imap_global * index_map_bs + dmap_rem
@@ -486,23 +522,26 @@ def write_function(
     local_dofmap_offsets = np.arange(num_cells_local + 1, dtype=np.int64)
     local_dofmap_offsets[:] *= num_dofs_per_cell * dofmap_bs
     local_dofmap_offsets += dofmap_imap.local_range[0]
-    
-    
+
     num_dofs_global = dofmap.index_map.size_global * dofmap.index_map_bs
     local_dof_range = np.asarray(dofmap.index_map.local_range) * dofmap.index_map_bs
     num_dofs_local = local_dof_range[1] - local_dof_range[0]
 
     # Create internal data structure for function data to write to file
-    function_data = FunctionData(cell_permutations=cell_perm[:num_cells_local].copy(),
-                                 local_cell_range=local_cell_range,
-                                 num_cells_global=num_cells_global,
-                                 dofmap_array=dofmap_global,
-                                 dofmap_offsets=local_dofmap_offsets,
-                                 dofmap_range=dofmap_imap.local_range,
-                                 global_dofs_in_dofmap=dofmap_imap.size_global,
-                                 values=values[:num_dofs_local].copy(),
-                                 dof_range=local_dof_range,
-                                 num_dofs_global=num_dofs_global,
-                                 name=u.name,)
+    function_data = FunctionData(
+        cell_permutations=cell_perm[:num_cells_local].copy(),
+        local_cell_range=local_cell_range,
+        num_cells_global=num_cells_global,
+        dofmap_array=dofmap_global,
+        dofmap_offsets=local_dofmap_offsets,
+        dofmap_range=dofmap_imap.local_range,
+        global_dofs_in_dofmap=dofmap_imap.size_global,
+        values=values[:num_dofs_local].copy(),
+        dof_range=local_dof_range,
+        num_dofs_global=num_dofs_global,
+        name=u.name,
+    )
     # Write to file
-    _internal_function_writer(comm, function_data, filename, engine, mode, time, "FunctionWriter")
+    _internal_function_writer(
+        comm, function_data, filename, engine, mode, time, "FunctionWriter"
+    )

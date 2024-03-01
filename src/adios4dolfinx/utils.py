@@ -9,8 +9,14 @@ Vectorized numpy operations used internally in adios4dolfinx
 """
 
 
-__all__ = ["compute_local_range", "index_owner", "compute_dofmap_pos", "unroll_dofmap", "compute_insert_position",
-           "unroll_insert_position"]
+__all__ = [
+    "compute_local_range",
+    "index_owner",
+    "compute_dofmap_pos",
+    "unroll_dofmap",
+    "compute_insert_position",
+    "unroll_insert_position",
+]
 from typing import Tuple, Union
 
 from mpi4py import MPI
