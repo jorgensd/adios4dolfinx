@@ -8,6 +8,13 @@
 Vectorized numpy operations used internally in adios4dolfinx
 """
 
+from __future__ import annotations
+
+from mpi4py import MPI
+
+import dolfinx
+import numpy as np
+import numpy.typing as npt
 
 __all__ = [
     "compute_local_range",
@@ -17,13 +24,6 @@ __all__ = [
     "compute_insert_position",
     "unroll_insert_position",
 ]
-from __future__ import annotations
-
-from mpi4py import MPI
-
-import dolfinx
-import numpy as np
-import numpy.typing as npt
 
 valid_function_types = np.float32 | np.float64 | np.complex64 | np.complex128
 valid_real_types = np.float32 | np.float64
