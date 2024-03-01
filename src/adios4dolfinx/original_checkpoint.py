@@ -120,6 +120,7 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     )
 
     node_destinations, send_nodes_per_proc = np.unique(output_node_owner, return_counts=True)
+    send_nodes_per_proc = send_nodes_per_proc.astype(np.int32)
     geometry_to_owner_comm = mesh.comm.Create_dist_graph(
         [mesh.comm.rank],
         [len(node_destinations)],
@@ -205,6 +206,7 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
     # Compute outgoing edges from current process to outputting process
     # Computes the number of cells sent to each process at the same time
     cell_destinations, send_cells_per_proc = np.unique(output_cell_owner, return_counts=True)
+    send_cells_per_proc = send_cells_per_proc.astype(np.int32)
     cell_to_output_comm = mesh.comm.Create_dist_graph(
         [mesh.comm.rank],
         [len(cell_destinations)],

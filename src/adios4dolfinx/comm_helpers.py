@@ -141,6 +141,7 @@ def send_and_recv_cell_perm(
         comm: Rank of comm to generate neighbourhood communicator from
     """
     dest_ranks, dest_size = np.unique(cell_owners, return_counts=True)
+    dest_size = dest_size.astype(np.int32)
 
     mesh_to_data = comm.Create_dist_graph(
         [comm.rank], [len(dest_ranks)], dest_ranks.tolist(), reorder=False
@@ -199,6 +200,8 @@ def send_dofs_and_recv_values(
         array_start: The global starting index of `input_array`.
     """
     dest_ranks, dest_size = np.unique(dofmap_owners, return_counts=True)
+    dest_size = dest_size.astype(np.int32)
+
     dofmap_to_values = comm.Create_dist_graph(
         [comm.rank], [len(dest_ranks)], dest_ranks.tolist(), reorder=False
     )
