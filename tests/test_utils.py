@@ -53,7 +53,7 @@ def read_function(comm, el, f, hash, dtype, name="uh"):
     v_ex.interpolate(f)
 
     res = np.finfo(dtype).resolution
-    assert np.allclose(v.x.array, v_ex.x.array, atol=10 * res, rtol=10 * res)
+    np.testing.assert_allclose(v.x.array, v_ex.x.array, atol=10 * res, rtol=10 * res)
 
 
 def get_dtype(in_dtype: np.dtype, complex: bool):

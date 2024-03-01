@@ -20,6 +20,9 @@ from .comm_helpers import (send_and_recv_cell_perm,
                            send_dofmap_and_recv_values,
                            send_dofs_and_recv_values)
 from .utils import compute_dofmap_pos, compute_local_range, index_owner, unroll_dofmap
+from .structures import MeshData, FunctionData
+from .writers import write_mesh as _internal_mesh_writer
+from .writers import write_function as _internal_function_writer
 
 import adios2
 adios2 = resolve_adios_scope(adios2)
@@ -32,86 +35,6 @@ __all__ = [
     "read_meshtags",
     "write_meshtags"
 ]
-
-
-def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
-    """
-    Write a mesh to specified ADIOS2 format, see:
-    https://adios2.readthedocs.io/en/stable/engines/engines.html
-    for possible formats.
-
-    Args:
-        mesh: The mesh to write to file
-        filename: Path to save mesh (without file-extension)
-        engine: Adios2 Engine
-    """
-    num_xdofs_local = mesh.geometry.index_map().size_local
-    num_xdofs_global = mesh.geometry.index_map().size_global
-    local_range = mesh.geometry.index_map().local_range
-    gdim = mesh.geometry.dim
-
-    local_points = mesh.geometry.x[:num_xdofs_local, :gdim].copy()
-    adios = adios2.ADIOS(mesh.comm)
-    io = adios.DeclareIO("MeshWriter")
-    io.SetEngine(engine)
-    outfile = io.Open(str(filename), adios2.Mode.Write)
-    # Write geometry
-    pointvar = io.DefineVariable(
-        "Points",
-        local_points,
-        shape=[num_xdofs_global, gdim],
-        start=[local_range[0], 0],
-        count=[num_xdofs_local, gdim],
-    )
-    outfile.Put(pointvar, local_points, adios2.Mode.Sync)
-
-    # Write celltype
-    io.DefineAttribute("CellType", mesh.topology.cell_name())
-
-    # Write basix properties
-    cmap = mesh.geometry.cmap
-    io.DefineAttribute("Degree", np.array([cmap.degree], dtype=np.int32))
-    io.DefineAttribute("LagrangeVariant", np.array([cmap.variant], dtype=np.int32))
-
-    # Write topology
-    g_imap = mesh.geometry.index_map()
-    g_dmap = mesh.geometry.dofmap
-    num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
-    num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
-    start_cell = mesh.topology.index_map(mesh.topology.dim).local_range[0]
-    geom_layout = cmap.create_dof_layout()
-    num_dofs_per_cell = geom_layout.num_entity_closure_dofs(mesh.topology.dim)
-
-    dofs_out = np.zeros((num_cells_local, num_dofs_per_cell), dtype=np.int64)
-    assert g_dmap.shape[1] == num_dofs_per_cell
-    dofs_out[:, :] = np.asarray(
-        g_imap.local_to_global(g_dmap[:num_cells_local, :].reshape(-1))
-    ).reshape(dofs_out.shape)
-
-    dvar = io.DefineVariable(
-        "Topology",
-        dofs_out,
-        shape=[num_cells_global, num_dofs_per_cell],
-        start=[start_cell, 0],
-        count=[num_cells_local, num_dofs_per_cell],
-    )
-    outfile.Put(dvar, dofs_out)
-
-    # Add mesh permutations
-    mesh.topology.create_entity_permutations()
-    cell_perm = mesh.topology.get_cell_permutation_info()
-    pvar = io.DefineVariable(
-        "CellPermutations",
-        cell_perm,
-        shape=[num_cells_global],
-        start=[start_cell],
-        count=[num_cells_local],
-    )
-    outfile.Put(pvar, cell_perm)
-    outfile.PerformPuts()
-    outfile.EndStep()
-    outfile.Close()
-    assert adios.RemoveIO("MeshWriter")
 
 
 def write_meshtags(filename: Union[Path, str], mesh: dolfinx.mesh.Mesh, meshtags: dolfinx.mesh.MeshTags,
@@ -468,6 +391,52 @@ def read_mesh(
     )
 
 
+def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
+    """
+    Write a mesh to specified ADIOS2 format, see:
+    https://adios2.readthedocs.io/en/stable/engines/engines.html
+    for possible formats.
+
+    Args:
+        mesh: The mesh to write to file
+        filename: Path to save mesh (without file-extension)
+        engine: Adios2 Engine
+    """
+    num_xdofs_local = mesh.geometry.index_map().size_local
+    num_xdofs_global = mesh.geometry.index_map().size_global
+    geometry_range = mesh.geometry.index_map().local_range
+    gdim = mesh.geometry.dim
+
+    # Convert local connectivity to globa l connectivity
+    g_imap = mesh.geometry.index_map()
+    g_dmap = mesh.geometry.dofmap
+    num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
+    num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
+    cell_range = mesh.topology.index_map(mesh.topology.dim).local_range
+    cmap = mesh.geometry.cmap
+    geom_layout = cmap.create_dof_layout()
+    num_dofs_per_cell = geom_layout.num_entity_closure_dofs(mesh.topology.dim)
+    dofs_out = np.zeros((num_cells_local, num_dofs_per_cell), dtype=np.int64)
+    assert g_dmap.shape[1] == num_dofs_per_cell
+    dofs_out[:, :] = np.asarray(
+        g_imap.local_to_global(g_dmap[:num_cells_local, :].reshape(-1))
+    ).reshape(dofs_out.shape)
+
+    mesh_data = MeshData(local_geometry=mesh.geometry.x[:num_xdofs_local, :gdim].copy(),
+                         local_geometry_pos=geometry_range,
+                         num_nodes_global=num_xdofs_global,
+                         local_topology=dofs_out,
+                         local_topology_pos=cell_range,
+                         num_cells_global=num_cells_global,
+                         cell_type=mesh.topology.cell_name(),
+                         degree=mesh.geometry.cmap.degree,
+                         lagrange_variant=mesh.geometry.cmap.variant)
+
+    # NOTE: Mode will become input again once we have variable geometry
+    _internal_mesh_writer(mesh.comm, mesh_data, filename, engine, mode=adios2.Mode.Write,
+                     io_name="MeshWriter")
+
+
 def write_function(
     u: dolfinx.fem.Function,
     filename: Union[Path, str],
@@ -489,68 +458,16 @@ def write_function(
     values = u.x.array
     mesh = u.function_space.mesh
     comm = mesh.comm
-
-    adios = adios2.ADIOS(comm)
-    io = adios.DeclareIO("FunctionWriter")
-    io.SetEngine(engine)
-
-    # If mode is append, check if we have written the function to file before
-    name = u.name
-    if not Path(filename).exists():
-        mode = adios2.Mode.Write
-
-    first_write = True
-    if mode == adios2.Mode.Append:
-        # First open the file in read-mode to check if the function has been written before
-        read_file = io.Open(str(filename), adios2.Mode.Read)
-        io.SetEngine(engine)
-        for _ in range(read_file.Steps()):
-            read_file.BeginStep()
-            if name in io.AvailableAttributes():
-                first_write = False
-                break
-            read_file.EndStep()
-        read_file.Close()
-    outfile = io.Open(str(filename), mode)
-    io.DefineAttribute(name, name)
-    outfile.BeginStep()
-
-    # Add time step to file
-    t_arr = np.array([time], dtype=np.float64)
-    time_var = io.DefineVariable(
-        f"{name}_time",
-        t_arr,
-        shape=[1],
-        start=[0],
-        count=[1 if mesh.comm.rank == 0 else 0],
-    )
-    outfile.Put(time_var, t_arr)
-
-    # Write local part of vector
-    num_dofs_local = dofmap.index_map.size_local * dofmap.index_map_bs
-    num_dofs_global = dofmap.index_map.size_global * dofmap.index_map_bs
-    local_start = dofmap.index_map.local_range[0] * dofmap.index_map_bs
-    val_var = io.DefineVariable(
-        f"{name}_values",
-        np.zeros(num_dofs_local, dtype=u.dtype),
-        shape=[num_dofs_global],
-        start=[local_start],
-        count=[num_dofs_local],
-    )
-    outfile.Put(val_var, values[:num_dofs_local])
-
-    if not first_write:
-        outfile.PerformPuts()
-        outfile.EndStep()
-        outfile.Close()
-        assert adios.RemoveIO("FunctionWriter")
-        return
+    mesh.topology.create_entity_permutations()
+    cell_perm = mesh.topology.get_cell_permutation_info()
+    num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
+    local_cell_range = mesh.topology.index_map(mesh.topology.dim).local_range
+    num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
 
     # Convert local dofmap into global_dofmap
     dmap = dofmap.list
     num_dofs_per_cell = dmap.shape[1]
     dofmap_bs = dofmap.bs
-    num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
     num_dofs_local_dmap = num_cells_local * num_dofs_per_cell * dofmap_bs
     index_map_bs = dofmap.index_map_bs
 
@@ -559,36 +476,33 @@ def write_function(
     dmap_loc = (unrolled_dofmap // index_map_bs).reshape(-1)
     dmap_rem = (unrolled_dofmap % index_map_bs).reshape(-1)
 
-    local_dofmap_offsets = np.arange(num_cells_local + 1, dtype=np.int64)
-    local_dofmap_offsets[:] *= num_dofs_per_cell * dofmap_bs
 
     # Convert imap index to global index
     imap_global = dofmap.index_map.local_to_global(dmap_loc)
     dofmap_global = imap_global * index_map_bs + dmap_rem
-
-    # Get offsets of dofmap
     dofmap_imap = dolfinx.common.IndexMap(mesh.comm, num_dofs_local_dmap)
-    dofmap_var = io.DefineVariable(
-        f"{name}_dofmap",
-        np.zeros(num_dofs_local_dmap, dtype=np.int64),
-        shape=[dofmap_imap.size_global],
-        start=[dofmap_imap.local_range[0]],
-        count=[dofmap_imap.size_local],
-    )
-    outfile.Put(dofmap_var, dofmap_global)
 
-    num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
-    cell_start = mesh.topology.index_map(mesh.topology.dim).local_range[0]
+    # Compute dofmap offsets
+    local_dofmap_offsets = np.arange(num_cells_local + 1, dtype=np.int64)
+    local_dofmap_offsets[:] *= num_dofs_per_cell * dofmap_bs
     local_dofmap_offsets += dofmap_imap.local_range[0]
-    xdofmap_var = io.DefineVariable(
-        f"{name}_XDofmap",
-        np.zeros(num_cells_local + 1, dtype=np.int64),
-        shape=[num_cells_global + 1],
-        start=[cell_start],
-        count=[num_cells_local + 1],
-    )
-    outfile.Put(xdofmap_var, local_dofmap_offsets)
-    outfile.PerformPuts()
-    outfile.EndStep()
-    outfile.Close()
-    assert adios.RemoveIO("FunctionWriter")
+    
+    
+    num_dofs_global = dofmap.index_map.size_global * dofmap.index_map_bs
+    local_dof_range = np.asarray(dofmap.index_map.local_range) * dofmap.index_map_bs
+    num_dofs_local = local_dof_range[1] - local_dof_range[0]
+
+    # Create internal data structure for function data to write to file
+    function_data = FunctionData(cell_permutations=cell_perm[:num_cells_local].copy(),
+                                 local_cell_range=local_cell_range,
+                                 num_cells_global=num_cells_global,
+                                 dofmap_array=dofmap_global,
+                                 dofmap_offsets=local_dofmap_offsets,
+                                 dofmap_range=dofmap_imap.local_range,
+                                 global_dofs_in_dofmap=dofmap_imap.size_global,
+                                 values=values[:num_dofs_local].copy(),
+                                 dof_range=local_dof_range,
+                                 num_dofs_global=num_dofs_global,
+                                 name=u.name,)
+    # Write to file
+    _internal_function_writer(comm, function_data, filename, engine, mode, time, "FunctionWriter")

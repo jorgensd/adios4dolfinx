@@ -4,119 +4,24 @@
 #
 # SPDX-License-Identifier:    MIT
 
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple
 
 from mpi4py import MPI
 
 import adios2
 import dolfinx
 import numpy as np
-import numpy.typing as npt
 
 from .adios2_helpers import resolve_adios_scope
 from .comm_helpers import numpy_to_mpi
-from .utils import compute_local_range, index_owner, unroll_dofmap
+from .structures import FunctionData, MeshData
+from .utils import (compute_insert_position, compute_local_range, index_owner,
+                    unroll_dofmap, unroll_insert_position)
+from .writers import write_function, write_mesh
 
 adios2 = resolve_adios_scope(adios2)
 
 __all__ = ["write_function_on_input_mesh", "write_mesh_input_order"]
-
-
-def compute_insert_position(
-    data_owner: npt.NDArray[np.int32],
-    destination_ranks: npt.NDArray[np.int32],
-    out_size: npt.NDArray[np.int32],
-) -> npt.NDArray[np.int32]:
-    """
-    Giving a list of ranks, compute the local insert position for each rank in a list sorted by destination ranks.
-    This function is used for packing data from a given process to its destination processes.
-
-    Example:
-
-        .. highlight:: python
-        .. code-block:: python
-
-            data_owner = [0, 1, 1, 0, 2, 3]
-            destination_ranks = [2,0,3,1]
-            out_size = [1, 2, 1, 2]
-            insert_position = compute_insert_position(data_owner, destination_ranks, out_size)
-
-        Insert position is then ``[1, 4, 5, 2, 0, 3]``
-    """
-    process_pos_indicator = data_owner.reshape(-1, 1) == destination_ranks
-
-    # Compute offsets for insertion based on input size
-    send_offsets = np.zeros(len(out_size) + 1, dtype=np.intc)
-    send_offsets[1:] = np.cumsum(out_size)
-    assert send_offsets[-1] == len(data_owner)
-
-    # Compute local insert index on each process
-    proc_row, proc_col = np.nonzero(process_pos_indicator)
-    cum_pos = np.cumsum(process_pos_indicator, axis=0)
-    insert_position = cum_pos[proc_row, proc_col] - 1
-
-    # Add process offset for each local index
-    insert_position += send_offsets[proc_col]
-    return insert_position
-
-
-def unroll_insert_position(
-    insert_position: npt.NDArray[np.int32], block_size: int
-) -> npt.NDArray[np.int32]:
-    """
-    Unroll insert position by a block size
-
-    Example:
-
-
-        .. highlight:: python
-        .. code-block:: python
-
-            insert_position = [1, 4, 5, 2, 0, 3]
-            unrolled_ip = unroll_insert_position(insert_position, 3)
-
-        where ``unrolled_ip = [3, 4 ,5, 12, 13, 14, 15, 16, 17, 6, 7, 8, 0, 1, 2, 9, 10, 11]``
-    """
-    unrolled_ip = np.repeat(insert_position, block_size) * block_size
-    unrolled_ip += np.tile(np.arange(block_size), len(insert_position))
-    return unrolled_ip
-
-
-@dataclass
-class MeshData:
-    # 2 dimensional array of node coordinates
-    local_geometry: npt.NDArray[np.floating]
-    local_geometry_pos: Tuple[
-        int, int
-    ]  # Insert range on current process for geometry nodes
-    num_nodes_global: int  # Number of nodes in global geometry array
-
-    local_topology: npt.NDArray[
-        np.int64
-    ]  # 2 dimensional connecitivty array for mesh topology
-    # Insert range on current process for topology
-    local_topology_pos: Tuple[int, int]
-    num_cells_global: int  # NUmber of cells in global topology
-
-    cell_type: str
-    degree: int
-    lagrange_variant: int
-
-
-@dataclass
-class FunctionData:
-    cell_permutations: npt.NDArray[np.uint32]
-    local_cell_range: Tuple[int, int]
-    num_cells_global: int
-    dofmap_array: npt.NDArray[np.int64]
-    dofmap_offsets: npt.NDArray[np.int64]
-    dofmap_range: Tuple[int, int]
-    global_dofs_in_dofmap: int
-    values: npt.NDArray[np.floating]
-    dof_range: Tuple[int, int]
-    num_dofs_global: int
 
 
 def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
@@ -183,8 +88,7 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     original_node_index = mesh.geometry.input_global_indices
     _, num_nodes_per_cell = mesh.geometry.dofmap.shape
     local_geometry_dofmap = mesh.geometry.dofmap[:num_owned_cells, :]
-    global_geometry_dofmap = original_node_index[local_geometry_dofmap.reshape(
-        -1)]
+    global_geometry_dofmap = original_node_index[local_geometry_dofmap.reshape(-1)]
 
     # Unroll insert position for geometry dofmap
     dofmap_insert_position = unroll_insert_position(
@@ -297,62 +201,6 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
         degree=cmap.degree,
         lagrange_variant=cmap.variant,
     )
-
-
-def write_mesh_input_order(
-    mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"
-):
-    """
-    Write mesh to checkpoint file in original input ordering
-    """
-
-    mesh_data = create_original_mesh_data(mesh)
-    gdim = mesh_data.local_geometry.shape[1]
-    assert gdim == mesh.geometry.dim
-    adios = adios2.ADIOS(mesh.comm)
-    io = adios.DeclareIO("OriginalMeshWriter")
-    io.SetEngine("BP4")
-    outfile = io.Open(str(filename), adios2.Mode.Write)
-
-    # Write geometry
-    pointvar = io.DefineVariable(
-        "Points",
-        mesh_data.local_geometry,
-        shape=[mesh_data.num_nodes_global, gdim],
-        start=[mesh_data.local_geometry_pos[0], 0],
-        count=[mesh_data.local_geometry_pos[1] -
-               mesh_data.local_geometry_pos[0], gdim],
-    )
-    outfile.Put(pointvar, mesh_data.local_geometry, adios2.Mode.Sync)
-
-    # Write celltype
-    io.DefineAttribute("CellType", mesh_data.cell_type)
-
-    # Write basix properties
-    io.DefineAttribute("Degree", np.array([mesh_data.degree], dtype=np.int32))
-    io.DefineAttribute(
-        "LagrangeVariant", np.array(
-            [mesh_data.lagrange_variant], dtype=np.int32)
-    )
-
-    # Write topology
-    num_dofs_per_cell = mesh_data.local_topology.shape[1]
-    dvar = io.DefineVariable(
-        "Topology",
-        mesh_data.local_topology,
-        shape=[mesh_data.num_cells_global, num_dofs_per_cell],
-        start=[mesh_data.local_topology_pos[0], 0],
-        count=[
-            mesh_data.local_topology_pos[1] - mesh_data.local_topology_pos[0],
-            num_dofs_per_cell,
-        ],
-    )
-
-    outfile.Put(dvar, mesh_data.local_topology)
-    outfile.PerformPuts()
-    outfile.EndStep()
-    outfile.Close()
-    assert adios.RemoveIO("OriginalMeshWriter")
 
 
 def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionData:
@@ -490,6 +338,7 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
         num_dofs_global=num_dofs_global,
         dofmap_range=dofmap_imap.local_range,
         global_dofs_in_dofmap=dofmap_imap.size_global,
+        name=u.name
     )
 
 
@@ -500,66 +349,28 @@ def write_function_on_input_mesh(
     mode: adios2.Mode = adios2.Mode.Append,
     time: float = 0.0,
 ):
+    """
+    Write function checkpoint (to be read with the input mesh).
+
+    Parameters:
+        u: The function to checkpoint
+        filename: The filename to write to
+        engine: The ADIOS2 engine to use
+        mode: The ADIOS2 mode to use (write or append)
+        time: Time-stamp associated with function at current write step
+    
+    """
     mesh = u.function_space.mesh
     function_data = create_function_data_on_original_mesh(u)
+    write_function(mesh.comm, function_data, filename, engine, mode, time, io_name="OriginalFunctionWriter")
 
-    adios = adios2.ADIOS(mesh.comm)
-    io = adios.DeclareIO("OriginalFunctionWriter")
-    io.SetEngine(engine)
-    outfile = io.Open(str(filename), mode)
 
-    # Add mesh permutations
-    pvar = io.DefineVariable(
-        "CellPermutations",
-        function_data.cell_permutations,
-        shape=[function_data.num_cells_global],
-        start=[function_data.local_cell_range[0]],
-        count=[function_data.local_cell_range[1] -
-               function_data.local_cell_range[0]],
-    )
-    outfile.Put(pvar, function_data.cell_permutations)
-    dofmap_var = io.DefineVariable(
-        f"{u.name}_dofmap",
-        function_data.dofmap_array,
-        shape=[function_data.global_dofs_in_dofmap],
-        start=[function_data.dofmap_range[0]],
-        count=[function_data.dofmap_range[1] - function_data.dofmap_range[0]],
-    )
-    outfile.Put(dofmap_var, function_data.dofmap_array)
+def write_mesh_input_order(
+    mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"
+):
+    """
+    Write mesh to checkpoint file in original input ordering
+    """
 
-    xdofmap_var = io.DefineVariable(
-        f"{u.name}_XDofmap",
-        function_data.dofmap_offsets,
-        shape=[function_data.num_cells_global + 1],
-        start=[function_data.local_cell_range[0]],
-        count=[
-            function_data.local_cell_range[1] -
-            function_data.local_cell_range[0] + 1
-        ],
-    )
-    outfile.Put(xdofmap_var, function_data.dofmap_offsets)
-
-    val_var = io.DefineVariable(
-        f"{u.name}_values",
-        function_data.values,
-        shape=[function_data.num_dofs_global],
-        start=[function_data.dof_range[0]],
-        count=[function_data.dof_range[1] - function_data.dof_range[0]],
-    )
-    outfile.Put(val_var, function_data.values)
-
-    # Add time step to file
-    t_arr = np.array([time], dtype=np.float64)
-    time_var = io.DefineVariable(
-        f"{u.name}_time",
-        t_arr,
-        shape=[1],
-        start=[0],
-        count=[1 if mesh.comm.rank == 0 else 0],
-    )
-    outfile.Put(time_var, t_arr)
-
-    outfile.PerformPuts()
-    outfile.EndStep()
-    outfile.Close()
-    assert adios.RemoveIO("OriginalFunctionWriter")
+    mesh_data = create_original_mesh_data(mesh)
+    write_mesh(mesh.comm, mesh_data, filename, engine, io_name="OriginalMeshWriter")

@@ -4,7 +4,13 @@
 #
 # SPDX-License-Identifier:    MIT
 
-__all__ = ["compute_local_range", "index_owner", "compute_dofmap_pos", "unroll_dofmap"]
+"""
+Vectorized numpy operations used internally in adios4dolfinx
+"""
+
+
+__all__ = ["compute_local_range", "index_owner", "compute_dofmap_pos", "unroll_dofmap", "compute_insert_position",
+           "unroll_insert_position"]
 from typing import Tuple, Union
 
 from mpi4py import MPI
@@ -15,6 +21,66 @@ import numpy.typing as npt
 
 valid_function_types = Union[np.float32, np.float64, np.complex64, np.complex128]
 valid_real_types = Union[np.float32, np.float64]
+
+
+def compute_insert_position(
+    data_owner: npt.NDArray[np.int32],
+    destination_ranks: npt.NDArray[np.int32],
+    out_size: npt.NDArray[np.int32],
+) -> npt.NDArray[np.int32]:
+    """
+    Giving a list of ranks, compute the local insert position for each rank in a list sorted by destination ranks.
+    This function is used for packing data from a given process to its destination processes.
+
+    Example:
+
+        .. highlight:: python
+        .. code-block:: python
+
+            data_owner = [0, 1, 1, 0, 2, 3]
+            destination_ranks = [2,0,3,1]
+            out_size = [1, 2, 1, 2]
+            insert_position = compute_insert_position(data_owner, destination_ranks, out_size)
+
+        Insert position is then ``[1, 4, 5, 2, 0, 3]``
+    """
+    process_pos_indicator = data_owner.reshape(-1, 1) == destination_ranks
+
+    # Compute offsets for insertion based on input size
+    send_offsets = np.zeros(len(out_size) + 1, dtype=np.intc)
+    send_offsets[1:] = np.cumsum(out_size)
+    assert send_offsets[-1] == len(data_owner)
+
+    # Compute local insert index on each process
+    proc_row, proc_col = np.nonzero(process_pos_indicator)
+    cum_pos = np.cumsum(process_pos_indicator, axis=0)
+    insert_position = cum_pos[proc_row, proc_col] - 1
+
+    # Add process offset for each local index
+    insert_position += send_offsets[proc_col]
+    return insert_position
+
+
+def unroll_insert_position(
+    insert_position: npt.NDArray[np.int32], block_size: int
+) -> npt.NDArray[np.int32]:
+    """
+    Unroll insert position by a block size
+
+    Example:
+
+
+        .. highlight:: python
+        .. code-block:: python
+
+            insert_position = [1, 4, 5, 2, 0, 3]
+            unrolled_ip = unroll_insert_position(insert_position, 3)
+
+        where ``unrolled_ip = [3, 4 ,5, 12, 13, 14, 15, 16, 17, 6, 7, 8, 0, 1, 2, 9, 10, 11]``
+    """
+    unrolled_ip = np.repeat(insert_position, block_size) * block_size
+    unrolled_ip += np.tile(np.arange(block_size), len(insert_position))
+    return unrolled_ip
 
 
 def compute_local_range(comm: MPI.Intracomm, N: np.int64):
