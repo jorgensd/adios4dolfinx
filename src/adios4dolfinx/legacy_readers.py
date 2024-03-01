@@ -9,19 +9,17 @@ from typing import Optional
 
 from mpi4py import MPI
 
+import adios2
 import basix
 import dolfinx
 import numpy as np
 import numpy.typing as npt
 import ufl
 
-from .adios2_helpers import (adios_to_numpy_dtype, read_array,
-                             resolve_adios_scope)
+from .adios2_helpers import adios_to_numpy_dtype, read_array, resolve_adios_scope
 from .comm_helpers import send_dofs_and_recv_values
-from .utils import (compute_dofmap_pos, compute_local_range,
-                    index_owner)
+from .utils import compute_dofmap_pos, compute_insert_position, compute_local_range, index_owner
 
-import adios2
 adios2 = resolve_adios_scope(adios2)
 
 __all__ = [
@@ -39,7 +37,7 @@ def read_dofmap_legacy(
     engine: str,
     cells: npt.NDArray[np.int64],
     dof_pos: npt.NDArray[np.int32],
-    bs: int
+    bs: int,
 ) -> npt.NDArray[np.int64]:
     """
     Read dofmap with given communicator, split in continuous chunks based on number of
@@ -56,7 +54,8 @@ def read_dofmap_legacy(
         `input_dofmap.links(cells[i])[dof_pos[i]]`
 
     Returns:
-        The global dof index in the input data for each dof described by the (cells[i], dof_pos[i]) tuples.
+        The global dof index in the input data for each dof described by
+        the (cells[i], dof_pos[i]) tuples.
 
     .. note::
         No MPI communication is done during this call
@@ -89,7 +88,10 @@ def read_dofmap_legacy(
         )
     else:
         d_offsets.SetSelection(
-            [[local_cell_range[0], 0], [local_cell_range[1] + 1 - local_cell_range[0], shape[1]]]
+            [
+                [local_cell_range[0], 0],
+                [local_cell_range[1] + 1 - local_cell_range[0], shape[1]],
+            ]
         )
         in_offsets = np.empty(
             (local_cell_range[1] + 1 - local_cell_range[0], shape[1]),
@@ -105,13 +107,12 @@ def read_dofmap_legacy(
 
     if len(shape) == 1:
         cell_dofs.SetSelection([[in_offsets[0]], [in_offsets[-1] - in_offsets[0]]])
-        in_dofmap = np.empty(
-            in_offsets[-1] - in_offsets[0], dtype=cell_dofs.Type().strip("_t")
-        )
+        in_dofmap = np.empty(in_offsets[-1] - in_offsets[0], dtype=cell_dofs.Type().strip("_t"))
     else:
         cell_dofs.SetSelection([[in_offsets[0], 0], [in_offsets[-1] - in_offsets[0], shape[1]]])
         in_dofmap = np.empty(
-            (in_offsets[-1] - in_offsets[0], shape[1]), dtype=cell_dofs.Type().strip("_t")
+            (in_offsets[-1] - in_offsets[0], shape[1]),
+            dtype=cell_dofs.Type().strip("_t"),
         )
         assert shape[1] == 1
 
@@ -121,14 +122,17 @@ def read_dofmap_legacy(
 
     # Map xxxyyyzzz to xyzxyz
     mapped_dofmap = np.empty_like(in_dofmap)
-    for i in range(len(in_offsets)-1):
-        pos_begin, pos_end = in_offsets[i]-in_offsets[0], in_offsets[i+1]-in_offsets[0]
+    for i in range(len(in_offsets) - 1):
+        pos_begin, pos_end = (
+            in_offsets[i] - in_offsets[0],
+            in_offsets[i + 1] - in_offsets[0],
+        )
         dofs_i = in_dofmap[pos_begin:pos_end]
         assert (pos_end - pos_begin) % bs == 0
-        num_dofs_local = int((pos_end-pos_begin)//bs)
+        num_dofs_local = int((pos_end - pos_begin) // bs)
         for k in range(bs):
             for j in range(num_dofs_local):
-                mapped_dofmap[int(pos_begin + j*bs+k)] = dofs_i[int(num_dofs_local*k+j)]
+                mapped_dofmap[int(pos_begin + j * bs + k)] = dofs_i[int(num_dofs_local * k + j)]
 
     # Extract dofmap data
     global_dofs = np.zeros_like(cells, dtype=np.int64)
@@ -148,6 +152,7 @@ def send_cells_and_receive_dofmap_index(
     comm: MPI.Intracomm,
     source_ranks: npt.NDArray[np.int32],
     dest_ranks: npt.NDArray[np.int32],
+    dest_size: npt.NDArray[np.int32],
     output_owners: npt.NDArray[np.int32],
     input_cells: npt.NDArray[np.int64],
     dofmap_pos: npt.NDArray[np.int32],
@@ -155,58 +160,41 @@ def send_cells_and_receive_dofmap_index(
     dofmap_path: str,
     xdofmap_path: str,
     engine: str,
-    bs: int
+    bs: int,
 ) -> npt.NDArray[np.int64]:
     """
     Given a set of positions in input dofmap, give the global input index of this dofmap entry
     in input file.
     """
 
-    # Compute amount of data to send to each process
-    owners_transposed = output_owners.reshape(-1, 1)
-    process_pos_indicator = (owners_transposed == np.asarray(dest_ranks))
-    out_size = np.count_nonzero(process_pos_indicator, axis=0).astype(np.int32)
-
     recv_size = np.zeros(len(source_ranks), dtype=np.int32)
     mesh_to_data_comm = comm.Create_dist_graph_adjacent(
         source_ranks.tolist(), dest_ranks.tolist(), reorder=False
     )
     # Send sizes to create data structures for receiving from NeighAlltoAllv
-    mesh_to_data_comm.Neighbor_alltoall(out_size, recv_size)
+    mesh_to_data_comm.Neighbor_alltoall(dest_size, recv_size)
 
-    # Sort output for sending
-    offsets = np.zeros(len(out_size) + 1, dtype=np.intc)
-    offsets[1:] = np.cumsum(out_size)
-    out_cells = np.zeros(offsets[-1], dtype=np.int64)
-    out_pos = np.zeros(offsets[-1], dtype=np.int32)
+    # Sort output for sending and fill send data
+    out_cells = np.zeros(len(output_owners), dtype=np.int64)
+    out_pos = np.zeros(len(output_owners), dtype=np.int32)
     proc_to_dof = np.zeros_like(input_cells, dtype=np.int32)
-
-    # Fill outgoing data
-    proc_row, proc_col = np.nonzero(process_pos_indicator)
-    assert np.allclose(proc_row, np.arange(len(process_pos_indicator), dtype=np.int32))
-    cum_pos = np.cumsum(process_pos_indicator, axis=0)
-    insert_position = cum_pos[np.arange(len(proc_col), dtype=np.int32), proc_col] - 1
-    insertion_array = offsets[proc_col] + insert_position
+    insertion_array = compute_insert_position(output_owners, dest_ranks, dest_size)
     out_cells[insertion_array] = input_cells
     out_pos[insertion_array] = dofmap_pos
     proc_to_dof[insertion_array] = np.arange(len(input_cells), dtype=np.int32)
-    del cum_pos, insert_position, insertion_array
+    del insertion_array
 
     # Prepare data-structures for receiving
     total_incoming = sum(recv_size)
     inc_cells = np.zeros(total_incoming, dtype=np.int64)
     inc_pos = np.zeros(total_incoming, dtype=np.intc)
 
-    # Compute incoming offset
-    inc_offsets = np.zeros(len(recv_size) + 1, dtype=np.intc)
-    inc_offsets[1:] = np.cumsum(recv_size)
-
     # Send data
-    s_msg = [out_cells, out_size, MPI.INT64_T]
+    s_msg = [out_cells, dest_size, MPI.INT64_T]
     r_msg = [inc_cells, recv_size, MPI.INT64_T]
     mesh_to_data_comm.Neighbor_alltoallv(s_msg, r_msg)
 
-    s_msg = [out_pos, out_size, MPI.INT32_T]
+    s_msg = [out_pos, dest_size, MPI.INT32_T]
     r_msg = [inc_pos, recv_size, MPI.INT32_T]
     mesh_to_data_comm.Neighbor_alltoallv(s_msg, r_msg)
     mesh_to_data_comm.Free()
@@ -220,16 +208,16 @@ def send_cells_and_receive_dofmap_index(
         engine,
         inc_cells,
         inc_pos,
-        bs
+        bs,
     )
     # Send input dofs back to owning process
     data_to_mesh_comm = comm.Create_dist_graph_adjacent(
         dest_ranks.tolist(), source_ranks.tolist(), reorder=False
     )
 
-    incoming_global_dofs = np.zeros(sum(out_size), dtype=np.int64)
+    incoming_global_dofs = np.zeros(sum(dest_size), dtype=np.int64)
     s_msg = [input_dofs, recv_size, MPI.INT64_T]
-    r_msg = [incoming_global_dofs, out_size, MPI.INT64_T]
+    r_msg = [incoming_global_dofs, dest_size, MPI.INT64_T]
     data_to_mesh_comm.Neighbor_alltoallv(s_msg, r_msg)
 
     # Sort incoming global dofs as they were inputted
@@ -241,7 +229,6 @@ def send_cells_and_receive_dofmap_index(
 
 
 def read_mesh_geometry(io: adios2.ADIOS, infile: adios2.Engine, group: str):
-
     for geometry_key in [f"{group}/geometry", f"{group}/coordinates"]:
         if geometry_key in io.AvailableVariables().keys():
             break
@@ -251,18 +238,21 @@ def read_mesh_geometry(io: adios2.ADIOS, infile: adios2.Engine, group: str):
     geometry = io.InquireVariable(geometry_key)
     shape = geometry.Shape()
     local_range = compute_local_range(MPI.COMM_WORLD, shape[0])
-    geometry.SetSelection(
-        [[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]]
-    )
+    geometry.SetSelection([[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]])
     mesh_geometry = np.empty(
-        (local_range[1] - local_range[0], shape[1]), dtype=adios_to_numpy_dtype[geometry.Type()])
+        (local_range[1] - local_range[0], shape[1]),
+        dtype=adios_to_numpy_dtype[geometry.Type()],
+    )
 
     infile.Get(geometry, mesh_geometry, adios2.Mode.Sync)
     return mesh_geometry
 
 
 def read_mesh_from_legacy_h5(
-    comm: MPI.Intracomm, filename: pathlib.Path, group: str, cell_type: str = "tetrahedron"
+    comm: MPI.Intracomm,
+    filename: pathlib.Path,
+    group: str,
+    cell_type: str = "tetrahedron",
 ) -> dolfinx.mesh.Mesh:
     """
     Read mesh from `h5`-file generated by legacy DOLFIN `HDF5File.write` or `XDMF.write_checkpoint`.
@@ -292,9 +282,7 @@ def read_mesh_from_legacy_h5(
     topology = io.InquireVariable(f"{group}/topology")
     shape = topology.Shape()
     local_range = compute_local_range(MPI.COMM_WORLD, shape[0])
-    topology.SetSelection(
-        [[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]]
-    )
+    topology.SetSelection([[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]])
 
     mesh_topology = np.empty(
         (local_range[1] - local_range[0], shape[1]), dtype=topology.Type().strip("_t")
@@ -321,9 +309,7 @@ def read_mesh_from_legacy_h5(
         shape=(mesh_geometry.shape[1],),
     )
     domain = ufl.Mesh(element)
-    return dolfinx.mesh.create_mesh(
-        MPI.COMM_WORLD, mesh_topology, mesh_geometry, domain
-    )
+    return dolfinx.mesh.create_mesh(MPI.COMM_WORLD, mesh_topology, mesh_geometry, domain)
 
 
 def read_function_from_legacy_h5(
@@ -333,7 +319,9 @@ def read_function_from_legacy_h5(
     group: str = "mesh",
     step: Optional[int] = None,
 ):
-    """Read function from a `h5`-file generated by legacy DOLFIN `HDF5File.write` or `XDMF.write_checkpoint`.
+    """
+    Read function from a `h5`-file generated by legacy DOLFIN `HDF5File.write`
+    or `XDMF.write_checkpoint`.
 
     Args:
         comm : MPI communicator to distribute mesh over
@@ -365,7 +353,7 @@ def read_function_from_legacy_h5(
     # 1.1 Compute mesh->input communicator
     num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
     owners = index_owner(mesh.comm, input_cells, num_cells_global)
-    unique_owners = np.unique(owners)
+    unique_owners, owner_count = np.unique(owners, return_counts=True)
     # FIXME: In C++ use NBX to find neighbourhood
     _tmp_comm = mesh.comm.Create_dist_graph(
         [mesh.comm.rank], [len(unique_owners)], unique_owners, reorder=False
@@ -389,6 +377,7 @@ def read_function_from_legacy_h5(
         comm,
         np.asarray(source, dtype=np.int32),
         np.asarray(dest, dtype=np.int32),
+        owner_count.astype(np.int32),
         owners,
         input_cells,
         dof_pos,
@@ -396,7 +385,7 @@ def read_function_from_legacy_h5(
         f"/{group}/cell_dofs",
         f"/{group}/x_cell_dofs",
         "HDF5",
-        bs
+        bs,
     )
 
     # ----------------------Step 3---------------------------------
@@ -408,8 +397,9 @@ def read_function_from_legacy_h5(
 
     # Read input data
     adios = adios2.ADIOS(comm)
-    local_array, starting_pos = read_array(adios, filename, f"/{group}/{vector_group}", "HDF5",
-                                           comm, legacy=True)
+    local_array, starting_pos = read_array(
+        adios, filename, f"/{group}/{vector_group}", "HDF5", comm, legacy=True
+    )
 
     # Send global dof indices to correct input process, and receive value of given dof
     local_values = send_dofs_and_recv_values(

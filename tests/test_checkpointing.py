@@ -1,19 +1,32 @@
 import itertools
 
+from mpi4py import MPI
+
 import basix
 import basix.ufl
 import dolfinx
 import numpy as np
 import pytest
-from mpi4py import MPI
 
-from .test_utils import read_function, write_function, get_dtype, read_function_time_dep, write_function_time_dep
+from .test_utils import (
+    get_dtype,
+    read_function,
+    read_function_time_dep,
+    write_function,
+    write_function_time_dep,
+)
 
 dtypes = [np.float64, np.float32]  # Mesh geometry dtypes
 write_comm = [MPI.COMM_SELF, MPI.COMM_WORLD]  # Communicators for creating mesh
 
-two_dimensional_cell_types = [dolfinx.mesh.CellType.triangle, dolfinx.mesh.CellType.quadrilateral]
-three_dimensional_cell_types = [dolfinx.mesh.CellType.tetrahedron, dolfinx.mesh.CellType.hexahedron]
+two_dimensional_cell_types = [
+    dolfinx.mesh.CellType.triangle,
+    dolfinx.mesh.CellType.quadrilateral,
+]
+three_dimensional_cell_types = [
+    dolfinx.mesh.CellType.tetrahedron,
+    dolfinx.mesh.CellType.hexahedron,
+]
 
 two_dim_combinations = itertools.product(dtypes, two_dimensional_cell_types, write_comm)
 three_dim_combinations = itertools.product(dtypes, three_dimensional_cell_types, write_comm)
@@ -34,25 +47,30 @@ def mesh_3D(request):
     return mesh
 
 
-@pytest.mark.parametrize("complex", [True, False])
+@pytest.mark.parametrize("is_complex", [True, False])
 @pytest.mark.parametrize("family", ["Lagrange", "DG"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_read_write_P_2D(read_comm, family, degree, complex, mesh_2D):
+def test_read_write_P_2D(read_comm, family, degree, is_complex, mesh_2D):
     mesh = mesh_2D
-    f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
+    f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
 
-    el = basix.ufl.element(family,
-                           mesh.ufl_cell().cellname(),
-                           degree,
-                           basix.LagrangeVariant.gll_warped,
-                           shape=(mesh.geometry.dim, ),
-                           dtype=mesh.geometry.x.dtype)
+    el = basix.ufl.element(
+        family,
+        mesh.ufl_cell().cellname(),
+        degree,
+        basix.LagrangeVariant.gll_warped,
+        shape=(mesh.geometry.dim,),
+        dtype=mesh.geometry.x.dtype,
+    )
 
     def f(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
-        values[0] = np.full(x.shape[1], np.pi) + x[0] + x[1] * 1j
-        values[1] = x[0] + 3j * x[1]
+        values[0] = np.full(x.shape[1], np.pi) + x[0]
+        values[1] = x[0]
+        if is_complex:
+            values[0] += 1j * x[1]
+            values[1] -= 3j * x[1]
         return values
 
     hash = write_function(mesh, el, f, f_dtype)
@@ -60,24 +78,29 @@ def test_read_write_P_2D(read_comm, family, degree, complex, mesh_2D):
     read_function(read_comm, el, f, hash, f_dtype)
 
 
-@pytest.mark.parametrize("complex", [True, False])
+@pytest.mark.parametrize("is_complex", [True, False])
 @pytest.mark.parametrize("family", ["Lagrange", "DG"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_read_write_P_3D(read_comm, family, degree, complex, mesh_3D):
+def test_read_write_P_3D(read_comm, family, degree, is_complex, mesh_3D):
     mesh = mesh_3D
-    f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
-    el = basix.ufl.element(family,
-                           mesh.ufl_cell().cellname(),
-                           degree,
-                           basix.LagrangeVariant.gll_warped,
-                           shape=(mesh.geometry.dim, ))
+    f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
+    el = basix.ufl.element(
+        family,
+        mesh.ufl_cell().cellname(),
+        degree,
+        basix.LagrangeVariant.gll_warped,
+        shape=(mesh.geometry.dim,),
+    )
 
     def f(x):
         values = np.empty((3, x.shape[1]), dtype=f_dtype)
-        values[0] = np.pi + x[0] + 2j*x[2]
+        values[0] = np.pi + x[0]
         values[1] = x[1] + 2 * x[0]
-        values[2] = 1j*x[1] + np.cos(x[2])
+        values[2] = np.cos(x[2])
+        if is_complex:
+            values[0] -= 2j * x[2]
+            values[2] += 1j * x[1]
         return values
 
     hash = write_function(mesh, el, f, f_dtype)
@@ -86,31 +109,39 @@ def test_read_write_P_3D(read_comm, family, degree, complex, mesh_3D):
     read_function(read_comm, el, f, hash, f_dtype)
 
 
-@pytest.mark.parametrize("complex", [True, False])
+@pytest.mark.parametrize("is_complex", [True, False])
 @pytest.mark.parametrize("family", ["Lagrange", "DG"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_read_write_P_2D_time(read_comm, family, degree, complex, mesh_2D):
+def test_read_write_P_2D_time(read_comm, family, degree, is_complex, mesh_2D):
     mesh = mesh_2D
-    f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
+    f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
 
-    el = basix.ufl.element(family,
-                           mesh.ufl_cell().cellname(),
-                           degree,
-                           basix.LagrangeVariant.gll_warped,
-                           shape=(mesh.geometry.dim, ),
-                           dtype=mesh.geometry.x.dtype)
+    el = basix.ufl.element(
+        family,
+        mesh.ufl_cell().cellname(),
+        degree,
+        basix.LagrangeVariant.gll_warped,
+        shape=(mesh.geometry.dim,),
+        dtype=mesh.geometry.x.dtype,
+    )
 
     def f0(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
-        values[0] = np.full(x.shape[1], np.pi) + x[0] + x[1] * 1j
-        values[1] = x[0] + 3j * x[1]
+        values[0] = np.full(x.shape[1], np.pi) + x[0]
+        values[1] = x[0]
+        if is_complex:
+            values[0] += x[1] * 1j
+            values[1] -= 3j * x[1]
         return values
 
     def f1(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
-        values[0] = 2*np.full(x.shape[1], np.pi) + x[0] + x[1] * 1j
-        values[1] = -x[0] + 3j * x[1] + 2*x[1]
+        values[0] = 2 * np.full(x.shape[1], np.pi) + x[0]
+        values[1] = -x[0] + 2 * x[1]
+        if is_complex:
+            values[0] += x[1] * 1j
+            values[1] += 3j * x[1]
         return values
 
     t0 = 0.8
@@ -120,31 +151,40 @@ def test_read_write_P_2D_time(read_comm, family, degree, complex, mesh_2D):
     read_function_time_dep(read_comm, el, f0, f1, t0, t1, hash, f_dtype)
 
 
-@pytest.mark.parametrize("complex", [True, False])
+@pytest.mark.parametrize("is_complex", [True, False])
 @pytest.mark.parametrize("family", ["Lagrange", "DG"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_read_write_P_3D_time(read_comm, family, degree, complex, mesh_3D):
+def test_read_write_P_3D_time(read_comm, family, degree, is_complex, mesh_3D):
     mesh = mesh_3D
-    f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
-    el = basix.ufl.element(family,
-                           mesh.ufl_cell().cellname(),
-                           degree,
-                           basix.LagrangeVariant.gll_warped,
-                           shape=(mesh.geometry.dim, ))
+    f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
+    el = basix.ufl.element(
+        family,
+        mesh.ufl_cell().cellname(),
+        degree,
+        basix.LagrangeVariant.gll_warped,
+        shape=(mesh.geometry.dim,),
+    )
 
     def f(x):
         values = np.empty((3, x.shape[1]), dtype=f_dtype)
-        values[0] = np.pi + x[0] + 2j*x[2]
+        values[0] = np.pi + x[0]
         values[1] = x[1] + 2 * x[0]
-        values[2] = 1j*x[1] + np.cos(x[2])
+        values[2] = np.cos(x[2])
+        if is_complex:
+            values[0] += 2j * x[2]
+            values[2] += 5j * x[1]
         return values
 
     def g(x):
         values = np.empty((3, x.shape[1]), dtype=f_dtype)
-        values[0] = x[0] + np.pi * 2j*x[2]
-        values[1] = 1j*x[2] + 2 * x[0]
-        values[2] = x[0] + 1j*np.cos(x[1])
+        values[0] = x[0]
+        values[1] = 2 * x[0]
+        values[2] = x[0]
+        if is_complex:
+            values[0] += np.pi * 2j * x[2]
+            values[1] += 1j * x[2]
+            values[2] += 1j * np.cos(x[1])
         return values
 
     t0 = 0.1

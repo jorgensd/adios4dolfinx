@@ -42,9 +42,7 @@ def write_function(mesh, el, f, dtype, name="uh", append: bool = False) -> str:
 def read_function(comm, el, f, hash, dtype, name="uh"):
     filename = f"output/mesh_{hash}.bp"
     engine = "BP4"
-    mesh = adios4dolfinx.read_mesh(
-        comm, filename, engine, dolfinx.mesh.GhostMode.shared_facet
-    )
+    mesh = adios4dolfinx.read_mesh(comm, filename, engine, dolfinx.mesh.GhostMode.shared_facet)
     V = dolfinx.fem.functionspace(mesh, el)
     v = dolfinx.fem.Function(V, dtype=dtype)
     v.name = name
@@ -53,18 +51,18 @@ def read_function(comm, el, f, hash, dtype, name="uh"):
     v_ex.interpolate(f)
 
     res = np.finfo(dtype).resolution
-    assert np.allclose(v.x.array, v_ex.x.array, atol=10 * res, rtol=10 * res)
+    np.testing.assert_allclose(v.x.array, v_ex.x.array, atol=10 * res, rtol=10 * res)
 
 
-def get_dtype(in_dtype: np.dtype, complex: bool):
+def get_dtype(in_dtype: np.dtype, is_complex: bool):
     dtype: numpy.typing.DTypeLike
     if in_dtype == np.float32:
-        if complex:
+        if is_complex:
             dtype = np.complex64
         else:
             dtype = np.float32
     elif in_dtype == np.float64:
-        if complex:
+        if is_complex:
             dtype = np.complex128
         else:
             dtype = np.float64
@@ -107,9 +105,7 @@ def write_function_time_dep(mesh, el, f0, f1, t0, t1, dtype) -> str:
 def read_function_time_dep(comm, el, f0, f1, t0, t1, hash, dtype):
     filename = f"output/mesh_{hash}.bp"
     engine = "BP4"
-    mesh = adios4dolfinx.read_mesh(
-        comm, filename, engine, dolfinx.mesh.GhostMode.shared_facet
-    )
+    mesh = adios4dolfinx.read_mesh(comm, filename, engine, dolfinx.mesh.GhostMode.shared_facet)
     V = dolfinx.fem.functionspace(mesh, el)
     v = dolfinx.fem.Function(V, dtype=dtype)
 

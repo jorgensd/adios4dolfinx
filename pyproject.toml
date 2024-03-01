@@ -11,8 +11,8 @@ readme = "README.md"
 dependencies = ["fenics-dolfinx>=0.8.0.dev0"]
 
 [project.optional-dependencies]
-test = ["pytest", "coverage"]
-dev = ["pdbpp", "ipython", "mypy", "flake8"]
+test = ["pytest", "coverage", "ipyparallel"]
+dev = ["pdbpp", "ipython", "mypy", "ruff"]
 docs = ["jupyter-book"]
 all = ["adios4dolfinx[test]", "adios4dolfinx[dev]", "adios4dolfinx[docs]"]
 
@@ -27,11 +27,26 @@ exclude = ["docs/", "build/"]
 # Folder to check with mypy
 files = ["src", "tests"]
 
+[tool.ruff]
+src = ["src", "tests"]
+line-length = 100
+indent-width = 4
 
-[tool.isort]
-src_paths = ["src", "tests"]
-known_first_party = "adios4dolfinx"
-known_third_party = [
+[tool.ruff.lint]
+select = [
+    # Pyflakes
+    "F",
+    # Pycodestyle
+    "E",
+    "W",
+    # isort
+    "I001"
+]
+
+
+[tool.ruff.lint.isort]
+known-first-party = ["adios4dolfinx"]
+known-third-party = [
     "basix",
     "dolfinx",
     "ffcx",
@@ -40,12 +55,14 @@ known_third_party = [
     "numpy",
     "pytest",
 ]
-known_mpi = ["mpi4py", "petsc4py"]
-sections = [
-    "FUTURE",
-    "STDLIB",
-    "MPI",
-    "THIRDPARTY",
-    "FIRSTPARTY",
-    "LOCALFOLDER",
+section-order = [
+      "future",
+      "standard-library",
+      "mpi",
+      "third-party",
+      "first-party",
+      "local-folder",
 ]
+
+[tool.ruff.lint.isort.sections]
+"mpi" = ["mpi4py", "petsc4py"]
