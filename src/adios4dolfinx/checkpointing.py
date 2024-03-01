@@ -528,4 +528,5 @@ def write_function(
         name=u.name,
     )
     # Write to file
-    _internal_function_writer(comm, function_data, filename, engine, mode, time, "FunctionWriter")
+    fname = Path(filename)
+    _internal_function_writer(comm, function_data, fname, engine, mode, time, "FunctionWriter")
