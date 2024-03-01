@@ -49,19 +49,22 @@ def non_simplex_mesh_3D(request):
     return mesh
 
 
-@pytest.mark.parametrize("complex", [True, False])
+@pytest.mark.parametrize("is_complex", [True, False])
 @pytest.mark.parametrize("family", ["N1curl", "RT"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_read_write_2D(read_comm, family, degree, complex, simplex_mesh_2D):
+def test_read_write_2D(read_comm, family, degree, is_complex, simplex_mesh_2D):
     mesh = simplex_mesh_2D
-    f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
+    f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
     el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
 
     def f(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
-        values[0] = np.full(x.shape[1], np.pi) + x[0] + 2j * x[1]
-        values[1] = x[1] + 2j * x[0]
+        values[0] = np.full(x.shape[1], np.pi) + x[0] 
+        values[1] = x[1]
+        if is_complex:
+            values[0] += 2j * x[1]
+            values[1] += 2j * x[0]
         return values
 
     hash = write_function(mesh, el, f, f_dtype)
@@ -69,20 +72,23 @@ def test_read_write_2D(read_comm, family, degree, complex, simplex_mesh_2D):
     read_function(read_comm, el, f, hash, f_dtype)
 
 
-@pytest.mark.parametrize("complex", [True, False])
+@pytest.mark.parametrize("is_complex", [True, False])
 @pytest.mark.parametrize("family", ["N1curl", "RT"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_read_write_3D(read_comm, family, degree, complex, simplex_mesh_3D):
+def test_read_write_3D(read_comm, family, degree, is_complex, simplex_mesh_3D):
     mesh = simplex_mesh_3D
-    f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
+    f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
     el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
 
     def f(x):
         values = np.empty((3, x.shape[1]), dtype=f_dtype)
-        values[0] = np.full(x.shape[1], np.pi) + 2j * x[2]
-        values[1] = x[1] + 2 * x[0] + 2j * np.cos(x[2])
+        values[0] = np.full(x.shape[1], np.pi)
+        values[1] = x[1] + 2 * x[0]
         values[2] = np.cos(x[2])
+        if is_complex:
+            values[0] += 2j * x[2]
+            values[1] += 2j * np.cos(x[2])
         return values
 
     hash = write_function(mesh, el, f, dtype=f_dtype)
@@ -90,19 +96,22 @@ def test_read_write_3D(read_comm, family, degree, complex, simplex_mesh_3D):
     read_function(read_comm, el, f, hash, dtype=f_dtype)
 
 
-@pytest.mark.parametrize("complex", [True, False])
+@pytest.mark.parametrize("is_complex", [True, False])
 @pytest.mark.parametrize("family", ["RTCF"])
 @pytest.mark.parametrize("degree", [1, 2, 3])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_read_write_2D_quad(read_comm, family, degree, complex, non_simplex_mesh_2D):
+def test_read_write_2D_quad(read_comm, family, degree, is_complex, non_simplex_mesh_2D):
     mesh = non_simplex_mesh_2D
-    f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
+    f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
     el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
 
     def f(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
-        values[0] = np.full(x.shape[1], np.pi) + 2j * x[2]
-        values[1] = x[1] + 2 * x[0] + 2j * np.cos(x[2])
+        values[0] = np.full(x.shape[1], np.pi)
+        values[1] = x[1] + 2 * x[0]
+        if is_complex:
+            values[0] += 2j * x[2]
+            values[1] += 2j * np.cos(x[2])
         return values
 
     hash = write_function(mesh, el, f, f_dtype)
@@ -110,20 +119,23 @@ def test_read_write_2D_quad(read_comm, family, degree, complex, non_simplex_mesh
     read_function(read_comm, el, f, hash, f_dtype)
 
 
-@pytest.mark.parametrize("complex", [True, False])
+@pytest.mark.parametrize("is_complex", [True, False])
 @pytest.mark.parametrize("family", ["NCF"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_read_write_hex(read_comm, family, degree, complex, non_simplex_mesh_3D):
+def test_read_write_hex(read_comm, family, degree, is_complex, non_simplex_mesh_3D):
     mesh = non_simplex_mesh_3D
-    f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
+    f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
     el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
 
     def f(x):
         values = np.empty((3, x.shape[1]), dtype=f_dtype)
         values[0] = np.full(x.shape[1], np.pi) + x[0]
         values[1] = np.cos(x[2])
-        values[2] = 1j * x[1] + x[0]
+        values[2] = x[0]
+        if is_complex:
+            values[0] += 2j * x[2]
+            values[2] -= 1j * x[1]
         return values
 
     hash = write_function(mesh, el, f, dtype=f_dtype)
@@ -131,25 +143,31 @@ def test_read_write_hex(read_comm, family, degree, complex, non_simplex_mesh_3D)
     read_function(read_comm, el, f, hash, dtype=f_dtype)
 
 
-@pytest.mark.parametrize("complex", [True, False])
+@pytest.mark.parametrize("is_complex", [True, False])
 @pytest.mark.parametrize("family", ["RTCF"])
 @pytest.mark.parametrize("degree", [1, 2, 3])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_read_write_multiple(read_comm, family, degree, complex, non_simplex_mesh_2D):
+def test_read_write_multiple(read_comm, family, degree, is_complex, non_simplex_mesh_2D):
     mesh = non_simplex_mesh_2D
-    f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
+    f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
     el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
 
     def f(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
-        values[0] = np.full(x.shape[1], np.pi) + 2j * x[2]
-        values[1] = x[1] + 2 * x[0] + 2j * np.cos(x[2])
+        values[0] = np.full(x.shape[1], np.pi) 
+        values[1] = x[1] + 2 * x[0]
+        if is_complex: 
+            values[0] -= 2j * x[2]
+            values[1] += 2j * np.cos(x[2])
         return values
 
     def g(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
-        values[0] = (1 + 1j) * x[0]
-        values[1] = (3 - 3j) * x[1]
+        values[0] = 2 * x[1]
+        values[1] = 3 * x[0]
+        if is_complex:
+            values[0] += 3j * x[0]
+            values[1] += 2j * x[0] * x[1]
         return values
 
     hash_f = write_function(mesh, el, f, dtype=f_dtype, name="f", append=False)

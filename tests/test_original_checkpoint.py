@@ -278,15 +278,15 @@ def read_function_vector(
 
 
 @pytest.mark.skipif(MPI.COMM_WORLD.size > 1, reason="Test uses ipythonparallel for MPI")
-@pytest.mark.parametrize("complex", [True, False])
+@pytest.mark.parametrize("is_complex", [True, False])
 @pytest.mark.parametrize("family", ["Lagrange", "DG"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("write_mesh", [True, False])
-def test_read_write_P_2D(write_mesh, family, degree, complex, create_2D_mesh, cluster):
+def test_read_write_P_2D(write_mesh, family, degree, is_complex, create_2D_mesh, cluster):
     fname = create_2D_mesh
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "r") as xdmf:
         mesh = xdmf.read_mesh()
-    f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
+    f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
 
     el = basix.ufl.element(
         family,
@@ -299,8 +299,11 @@ def test_read_write_P_2D(write_mesh, family, degree, complex, create_2D_mesh, cl
 
     def f(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
-        values[0] = np.full(x.shape[1], np.pi) + x[0] + x[1] * 1j
-        values[1] = x[0] + 3j * x[1]
+        values[0] = np.full(x.shape[1], np.pi) + x[0]
+        values[1] = x[0]
+        if is_complex:
+            values[0] -= 3j * x[1]
+            values[1] += 2j * x[0]
         return values
 
     hash = write_function(write_mesh, mesh, el, f, f_dtype, "u_original")
@@ -317,15 +320,15 @@ def test_read_write_P_2D(write_mesh, family, degree, complex, create_2D_mesh, cl
 
 
 @pytest.mark.skipif(MPI.COMM_WORLD.size > 1, reason="Test uses ipythonparallel for MPI")
-@pytest.mark.parametrize("complex", [True, False])
+@pytest.mark.parametrize("is_complex", [True, False])
 @pytest.mark.parametrize("family", ["Lagrange", "DG"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("write_mesh", [True, False])
-def test_read_write_P_3D(write_mesh, family, degree, complex, create_3D_mesh, cluster):
+def test_read_write_P_3D(write_mesh, family, degree, is_complex, create_3D_mesh, cluster):
     fname = create_3D_mesh
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "r") as xdmf:
         mesh = xdmf.read_mesh()
-    f_dtype = get_dtype(mesh.geometry.x.dtype, complex)
+    f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
     el = basix.ufl.element(
         family,
         mesh.ufl_cell().cellname(),
@@ -336,9 +339,13 @@ def test_read_write_P_3D(write_mesh, family, degree, complex, create_3D_mesh, cl
 
     def f(x):
         values = np.empty((3, x.shape[1]), dtype=f_dtype)
-        values[0] = np.pi + x[0] + 2j * x[2]
+        values[0] = np.pi + x[0]
         values[1] = x[1] + 2 * x[0]
-        values[2] = 1j * x[1] + np.cos(x[2])
+        values[2] = np.cos(x[2])
+        if is_complex:
+            values[0] -= np.pi * x[1]
+            values[1] += 3j * x[2]
+            values[2] += 2j
         return values
 
     hash = write_function(write_mesh, mesh, el, f, f_dtype, "u_original")
@@ -358,20 +365,23 @@ def test_read_write_P_3D(write_mesh, family, degree, complex, create_3D_mesh, cl
 
 @pytest.mark.skipif(MPI.COMM_WORLD.size > 1, reason="Test uses ipythonparallel for MPI")
 @pytest.mark.parametrize("write_mesh", [True, False])
-@pytest.mark.parametrize("complex", [True, False])
+@pytest.mark.parametrize("is_complex", [True, False])
 @pytest.mark.parametrize("family", ["N1curl", "RT"])
 @pytest.mark.parametrize("degree", [1, 4])
 def test_read_write_2D_vector_simplex(
-    write_mesh, family, degree, complex, create_simplex_mesh_2D, cluster
+    write_mesh, family, degree, is_complex, create_simplex_mesh_2D, cluster
 ):
     fname = create_simplex_mesh_2D
 
-    f_dtype = get_dtype(np.float64, complex)
+    f_dtype = get_dtype(np.float64, is_complex)
 
     def f(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
-        values[0] = np.full(x.shape[1], np.pi) + x[0] + 2j * x[1]
-        values[1] = x[1] + 2j * x[0]
+        values[0] = np.full(x.shape[1], np.pi) + x[0]
+        values[1] = x[1]
+        if is_complex:
+            values[0] -= np.sin(x[1]) * 2j
+            values[1] += 3j
         return values
 
     query = cluster[:].apply_async(
@@ -399,21 +409,24 @@ def test_read_write_2D_vector_simplex(
 
 @pytest.mark.skipif(MPI.COMM_WORLD.size > 1, reason="Test uses ipythonparallel for MPI")
 @pytest.mark.parametrize("write_mesh", [True, False])
-@pytest.mark.parametrize("complex", [True, False])
+@pytest.mark.parametrize("is_complex", [True, False])
 @pytest.mark.parametrize("family", ["N1curl", "RT"])
 @pytest.mark.parametrize("degree", [1, 4])
 def test_read_write_3D_vector_simplex(
-    write_mesh, family, degree, complex, create_simplex_mesh_3D, cluster
+    write_mesh, family, degree, is_complex, create_simplex_mesh_3D, cluster
 ):
     fname = create_simplex_mesh_3D
 
-    f_dtype = get_dtype(np.float64, complex)
+    f_dtype = get_dtype(np.float64, is_complex)
 
     def f(x):
         values = np.empty((3, x.shape[1]), dtype=f_dtype)
-        values[0] = np.full(x.shape[1], np.pi) + 2j * x[2]
-        values[1] = x[1] + 2 * x[0] + 2j * np.cos(x[2])
+        values[0] = np.full(x.shape[1], np.pi)
+        values[1] = x[1] + 2 * x[0]
         values[2] = np.cos(x[2])
+        if is_complex:
+            values[0] += 2j * x[2]
+            values[1] += 2j * np.cos(x[2])
         return values
 
     query = cluster[:].apply_async(
@@ -441,20 +454,23 @@ def test_read_write_3D_vector_simplex(
 
 @pytest.mark.skipif(MPI.COMM_WORLD.size > 1, reason="Test uses ipythonparallel for MPI")
 @pytest.mark.parametrize("write_mesh", [True, False])
-@pytest.mark.parametrize("complex", [True, False])
+@pytest.mark.parametrize("is_complex", [True, False])
 @pytest.mark.parametrize("family", ["RTCF"])
 @pytest.mark.parametrize("degree", [1, 2, 3])
 def test_read_write_2D_vector_non_simplex(
-    write_mesh, family, degree, complex, create_non_simplex_mesh_2D, cluster
+    write_mesh, family, degree, is_complex, create_non_simplex_mesh_2D, cluster
 ):
     fname = create_non_simplex_mesh_2D
 
-    f_dtype = get_dtype(np.float64, complex)
+    f_dtype = get_dtype(np.float64, is_complex)
 
     def f(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
-        values[0] = np.full(x.shape[1], np.pi) + 2j * x[2]
-        values[1] = x[1] + 2 * x[0] + 2j * np.cos(x[2])
+        values[0] = np.full(x.shape[1], np.pi)
+        values[1] = x[1] + 2 * x[0]
+        if is_complex:
+            values[0] += 2j * x[1]
+            values[1] -= np.sin(x[0]) * 9j
         return values
 
     query = cluster[:].apply_async(
@@ -482,21 +498,23 @@ def test_read_write_2D_vector_non_simplex(
 
 @pytest.mark.skipif(MPI.COMM_WORLD.size > 1, reason="Test uses ipythonparallel for MPI")
 @pytest.mark.parametrize("write_mesh", [True, False])
-@pytest.mark.parametrize("complex", [True, False])
+@pytest.mark.parametrize("is_complex", [True, False])
 @pytest.mark.parametrize("family", ["NCF"])
 @pytest.mark.parametrize("degree", [1, 4])
 def test_read_write_3D_vector_non_simplex(
-    write_mesh, family, degree, complex, create_non_simplex_mesh_3D, cluster
+    write_mesh, family, degree, is_complex, create_non_simplex_mesh_3D, cluster
 ):
     fname = create_non_simplex_mesh_3D
 
-    f_dtype = get_dtype(np.float64, complex)
+    f_dtype = get_dtype(np.float64, is_complex)
 
     def f(x):
         values = np.empty((3, x.shape[1]), dtype=f_dtype)
         values[0] = np.full(x.shape[1], np.pi) + x[0]
         values[1] = np.cos(x[2])
-        values[2] = 1j * x[1] + x[0]
+        values[2] = x[0]
+        if is_complex:
+            values[2] += x[0]*x[1] * 3j
         return values
 
     query = cluster[:].apply_async(

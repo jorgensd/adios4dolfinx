@@ -54,15 +54,15 @@ def read_function(comm, el, f, hash, dtype, name="uh"):
     np.testing.assert_allclose(v.x.array, v_ex.x.array, atol=10 * res, rtol=10 * res)
 
 
-def get_dtype(in_dtype: np.dtype, complex: bool):
+def get_dtype(in_dtype: np.dtype, is_complex: bool):
     dtype: numpy.typing.DTypeLike
     if in_dtype == np.float32:
-        if complex:
+        if is_complex:
             dtype = np.complex64
         else:
             dtype = np.float32
     elif in_dtype == np.float64:
-        if complex:
+        if is_complex:
             dtype = np.complex128
         else:
             dtype = np.float64
