@@ -38,8 +38,8 @@ def write_checkpoint(filename, mesh, el, f):
     uh = dolfinx.fem.Function(V, dtype=np.float64)
     uh.interpolate(f)
 
-    adios4dolfinx.write_mesh(V.mesh, filename)
-    adios4dolfinx.write_function(uh, filename)
+    adios4dolfinx.write_mesh(filename, V.mesh)
+    adios4dolfinx.write_function(filename, uh)
 
 
 def verify_checkpoint(filename, el, f):
@@ -48,7 +48,7 @@ def verify_checkpoint(filename, el, f):
     )
     V = dolfinx.fem.FunctionSpace(mesh, el)
     uh = dolfinx.fem.Function(V, dtype=np.float64)
-    adios4dolfinx.read_function(uh, filename)
+    adios4dolfinx.read_function(filename, uh)
 
     u_ex = dolfinx.fem.Function(V, dtype=np.float64)
     u_ex.interpolate(f)

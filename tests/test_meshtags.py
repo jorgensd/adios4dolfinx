@@ -104,10 +104,10 @@ def test_checkpointing_meshtags_1D(mesh_1D, read_comm, read_mode):
     # If mesh communicator is more than a self communicator or serial write on all processes.
     # If serial or self communicator, only write on root rank
     if mesh.comm.size != 1:
-        adios4dolfinx.write_mesh(mesh, filename, engine="BP4")
+        adios4dolfinx.write_mesh(filename, mesh, engine="BP4")
     else:
         if MPI.COMM_WORLD.rank == root:
-            adios4dolfinx.write_mesh(mesh, filename, engine="BP4")
+            adios4dolfinx.write_mesh(filename, mesh, engine="BP4")
 
     # Create meshtags labeling each entity (of each co-dimension) with a
     # unique number (their initial global index).
@@ -137,7 +137,7 @@ def test_checkpointing_meshtags_1D(mesh_1D, read_comm, read_mode):
 
     MPI.COMM_WORLD.Barrier()
     # Read mesh on testing communicator
-    new_mesh = adios4dolfinx.read_mesh(read_comm, filename, engine="BP4", ghost_mode=read_mode)
+    new_mesh = adios4dolfinx.read_mesh(filename, read_comm, engine="BP4", ghost_mode=read_mode)
     for dim in range(new_mesh.topology.dim + 1):
         # Read meshtags on all processes if testing communicator has multiple ranks
         # else read on root 0
@@ -171,10 +171,10 @@ def test_checkpointing_meshtags_2D(mesh_2D, read_comm, read_mode):
     hash = f"{mesh.comm.size}_{mesh.topology.cell_name()}_{mesh.geometry.x.dtype}"
     filename = f"meshtags_1D_{hash}.bp"
     if mesh.comm.size != 1:
-        adios4dolfinx.write_mesh(mesh, filename, engine="BP4")
+        adios4dolfinx.write_mesh(filename, mesh, engine="BP4")
     else:
         if MPI.COMM_WORLD.rank == root:
-            adios4dolfinx.write_mesh(mesh, filename, engine="BP4")
+            adios4dolfinx.write_mesh(filename, mesh, engine="BP4")
 
     org_maps = []
     for dim in range(mesh.topology.dim + 1):
@@ -196,7 +196,7 @@ def test_checkpointing_meshtags_2D(mesh_2D, read_comm, read_mode):
         del ft
     del mesh
     MPI.COMM_WORLD.Barrier()
-    new_mesh = adios4dolfinx.read_mesh(read_comm, filename, engine="BP4", ghost_mode=read_mode)
+    new_mesh = adios4dolfinx.read_mesh(filename, read_comm, engine="BP4", ghost_mode=read_mode)
     for dim in range(new_mesh.topology.dim + 1):
         if read_comm.size != 1:
             new_ft = adios4dolfinx.read_meshtags(
@@ -225,10 +225,10 @@ def test_checkpointing_meshtags_3D(mesh_3D, read_comm, read_mode):
     hash = f"{mesh.comm.size}_{mesh.topology.cell_name()}_{mesh.geometry.x.dtype}"
     filename = f"meshtags_1D_{hash}.bp"
     if mesh.comm.size != 1:
-        adios4dolfinx.write_mesh(mesh, filename, engine="BP4")
+        adios4dolfinx.write_mesh(filename, mesh, engine="BP4")
     else:
         if MPI.COMM_WORLD.rank == root:
-            adios4dolfinx.write_mesh(mesh, filename, engine="BP4")
+            adios4dolfinx.write_mesh(filename, mesh, engine="BP4")
 
     org_maps = []
     for dim in range(mesh.topology.dim + 1):
@@ -252,7 +252,7 @@ def test_checkpointing_meshtags_3D(mesh_3D, read_comm, read_mode):
     del mesh
 
     MPI.COMM_WORLD.Barrier()
-    new_mesh = adios4dolfinx.read_mesh(read_comm, filename, engine="BP4", ghost_mode=read_mode)
+    new_mesh = adios4dolfinx.read_mesh(filename, read_comm, engine="BP4", ghost_mode=read_mode)
     for dim in range(new_mesh.topology.dim + 1):
         if read_comm.size != 1:
             new_ft = adios4dolfinx.read_meshtags(

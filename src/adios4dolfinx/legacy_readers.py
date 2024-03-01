@@ -249,8 +249,8 @@ def read_mesh_geometry(io: adios2.ADIOS, infile: adios2.Engine, group: str):
 
 
 def read_mesh_from_legacy_h5(
-    comm: MPI.Intracomm,
     filename: pathlib.Path,
+    comm: MPI.Intracomm,
     group: str,
     cell_type: str = "tetrahedron",
 ) -> dolfinx.mesh.Mesh:
@@ -313,8 +313,8 @@ def read_mesh_from_legacy_h5(
 
 
 def read_function_from_legacy_h5(
-    comm: MPI.Intracomm,
     filename: pathlib.Path,
+    comm: MPI.Intracomm,
     u: dolfinx.fem.Function,
     group: str = "mesh",
     step: Optional[int] = None,
