@@ -67,6 +67,6 @@ if __name__ == "__main__":
 
     mesh = dolfinx.mesh.create_unit_square(MPI.COMM_WORLD, 10, 10)
     el = ("N1curl", 3)
-    write_checkpoint(mesh, filename, el, f)
+    write_checkpoint(filename, mesh,  el, f)
     MPI.COMM_WORLD.Barrier()
     verify_checkpoint(filename, el, f)
