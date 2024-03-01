@@ -9,6 +9,7 @@ from typing import Optional, Union
 
 from mpi4py import MPI
 
+import adios2
 import basix
 import dolfinx
 import numpy as np
@@ -26,12 +27,10 @@ from .comm_helpers import (
     send_dofmap_and_recv_values,
     send_dofs_and_recv_values,
 )
+from .structures import FunctionData, MeshData
 from .utils import compute_dofmap_pos, compute_local_range, index_owner, unroll_dofmap
-from .structures import MeshData, FunctionData
-from .writers import write_mesh as _internal_mesh_writer
 from .writers import write_function as _internal_function_writer
-
-import adios2
+from .writers import write_mesh as _internal_mesh_writer
 
 adios2 = resolve_adios_scope(adios2)
 
@@ -55,8 +54,8 @@ def write_meshtags(
     Write meshtags associated with input mesh to file.
 
     .. note::
-        For this checkpoint to work, the mesh must be written to file using :func:`write_mesh`
-        before calling this function.
+        For this checkpoint to work, the mesh must be written to file
+        using :func:`write_mesh` before calling this function.
 
     Args:
         filename: Path to save meshtags (with file-extension)
@@ -81,9 +80,7 @@ def write_meshtags(
         mesh._cpp_object, dim, tag_entities, False
     )
 
-    indices = mesh.geometry.index_map().local_to_global(
-        entities_to_geometry.reshape(-1)
-    )
+    indices = mesh.geometry.index_map().local_to_global(entities_to_geometry.reshape(-1))
 
     adios = adios2.ADIOS(mesh.comm)
     io = adios.DeclareIO("MeshTagWriter")
@@ -172,9 +169,7 @@ def read_meshtags(
     topology.SetSelection(
         [[topology_range[0], 0], [topology_range[1] - topology_range[0], top_shape[1]]]
     )
-    mesh_entities = np.empty(
-        (topology_range[1] - topology_range[0], top_shape[1]), dtype=np.int64
-    )
+    mesh_entities = np.empty((topology_range[1] - topology_range[0], top_shape[1]), dtype=np.int64)
     infile.Get(topology, mesh_entities, adios2.Mode.Deferred)
 
     # Get mesh tags values
@@ -244,9 +239,7 @@ def read_function(
 
     # -------------------Step 2------------------------------------
     # Send and receive global cell index and cell perm
-    inc_cells, inc_perms = send_and_recv_cell_perm(
-        input_cells, cell_perm, owners, mesh.comm
-    )
+    inc_cells, inc_perms = send_and_recv_cell_perm(input_cells, cell_perm, owners, mesh.comm)
 
     # -------------------Step 3-----------------------------------
     # Read dofmap from file and compute dof owners
@@ -261,8 +254,7 @@ def read_function(
     )
     # Compute owner of dofs in dofmap
     num_dofs_global = (
-        u.function_space.dofmap.index_map.size_global
-        * u.function_space.dofmap.index_map_bs
+        u.function_space.dofmap.index_map.size_global * u.function_space.dofmap.index_map_bs
     )
     dof_owner = index_owner(comm, input_dofmap.array, num_dofs_global)
 
@@ -297,8 +289,8 @@ def read_function(
         # First invert input data to reference element then transform to current mesh
         for i, l_cell in enumerate(input_local_cell_index):
             start, end = input_dofmap.offsets[l_cell : l_cell + 2]
-            # FIXME: Tempoary cast uint32 to integer as transformations doesn't support uint32 with the switch
-            # to nanobind
+            # FIXME: Tempoary cast uint32 to integer as transformations
+            # doesn't support uint32 with the switch to nanobind
             element.pre_apply_transpose_dof_transformation(
                 recv_array[int(start) : int(end)], int(input_perms[l_cell]), bs
             )
@@ -392,12 +384,8 @@ def read_mesh(
     topology = io.InquireVariable("Topology")
     shape = topology.Shape()
     local_range = compute_local_range(comm, shape[0])
-    topology.SetSelection(
-        [[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]]
-    )
-    mesh_topology = np.empty(
-        (local_range[1] - local_range[0], shape[1]), dtype=np.int64
-    )
+    topology.SetSelection([[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]])
+    mesh_topology = np.empty((local_range[1] - local_range[0], shape[1]), dtype=np.int64)
     infile.Get(topology, mesh_topology, adios2.Mode.Deferred)
 
     infile.PerformGets()
@@ -415,9 +403,7 @@ def read_mesh(
     )
     domain = ufl.Mesh(element)
     partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)
-    return dolfinx.mesh.create_mesh(
-        comm, mesh_topology, mesh_geometry, domain, partitioner
-    )
+    return dolfinx.mesh.create_mesh(comm, mesh_topology, mesh_geometry, domain, partitioner)
 
 
 def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
@@ -542,6 +528,4 @@ def write_function(
         name=u.name,
     )
     # Write to file
-    _internal_function_writer(
-        comm, function_data, filename, engine, mode, time, "FunctionWriter"
-    )
+    _internal_function_writer(comm, function_data, filename, engine, mode, time, "FunctionWriter")

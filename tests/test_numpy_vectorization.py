@@ -19,12 +19,8 @@ two_dimensional_cell_types = [
 ]
 three_dimensional_cell_types = [dolfinx.mesh.CellType.hexahedron]
 
-two_dim_combinations = itertools.product(
-    two_dimensional_cell_types, write_comm, ghost_mode
-)
-three_dim_combinations = itertools.product(
-    three_dimensional_cell_types, write_comm, ghost_mode
-)
+two_dim_combinations = itertools.product(two_dimensional_cell_types, write_comm, ghost_mode)
+three_dim_combinations = itertools.product(three_dimensional_cell_types, write_comm, ghost_mode)
 
 
 @pytest.fixture(params=two_dim_combinations, scope="module")

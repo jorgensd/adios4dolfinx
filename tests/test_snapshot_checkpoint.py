@@ -2,15 +2,14 @@ from pathlib import Path
 
 from mpi4py import MPI
 
+import adios2
 import basix.ufl
 import dolfinx
 import numpy as np
 import pytest
 
-from adios4dolfinx.adios2_helpers import resolve_adios_scope
 from adios4dolfinx import snapshot_checkpoint
-
-import adios2
+from adios4dolfinx.adios2_helpers import resolve_adios_scope
 
 adios2 = resolve_adios_scope(adios2)
 
@@ -44,9 +43,7 @@ def test_read_write_2D(family, degree, cell_type):
     assert np.allclose(u.x.array, v.x.array)
 
 
-@pytest.mark.parametrize(
-    "cell_type, family", [(tetra, "N1curl"), (tetra, "RT"), (hex, "NCF")]
-)
+@pytest.mark.parametrize("cell_type, family", [(tetra, "N1curl"), (tetra, "RT"), (hex, "NCF")])
 @pytest.mark.parametrize("degree", [1, 4])
 def test_read_write_3D(family, degree, cell_type):
     mesh = dolfinx.mesh.create_unit_cube(MPI.COMM_WORLD, 3, 3, 3, cell_type=cell_type)
@@ -74,9 +71,7 @@ def test_read_write_3D(family, degree, cell_type):
 @pytest.mark.parametrize("degree", [1, 4])
 def test_read_write_P_2D(family, degree, cell_type):
     mesh = dolfinx.mesh.create_unit_square(MPI.COMM_WORLD, 5, 5, cell_type=cell_type)
-    el = basix.ufl.element(
-        family, mesh.ufl_cell().cellname(), degree, shape=(mesh.geometry.dim,)
-    )
+    el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree, shape=(mesh.geometry.dim,))
 
     def f(x):
         return (np.full(x.shape[1], np.pi) + x[0], x[1])
@@ -100,9 +95,7 @@ def test_read_write_P_2D(family, degree, cell_type):
 @pytest.mark.parametrize("degree", [1, 4])
 def test_read_write_P_3D(family, degree, cell_type):
     mesh = dolfinx.mesh.create_unit_cube(MPI.COMM_WORLD, 5, 5, 5, cell_type=cell_type)
-    el = basix.ufl.element(
-        family, mesh.ufl_cell().cellname(), degree, shape=(mesh.geometry.dim,)
-    )
+    el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree, shape=(mesh.geometry.dim,))
 
     def f(x):
         return (np.full(x.shape[1], np.pi) + x[0], x[1] + 2 * x[0], np.cos(x[2]))

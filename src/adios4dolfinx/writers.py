@@ -6,7 +6,9 @@
 
 
 from pathlib import Path
+
 from mpi4py import MPI
+
 import adios2
 import numpy as np
 
@@ -58,9 +60,7 @@ def write_mesh(
 
     # Write basix properties
     io.DefineAttribute("Degree", np.array([mesh.degree], dtype=np.int32))
-    io.DefineAttribute(
-        "LagrangeVariant", np.array([mesh.lagrange_variant], dtype=np.int32)
-    )
+    io.DefineAttribute("LagrangeVariant", np.array([mesh.lagrange_variant], dtype=np.int32))
 
     # Write topology
     num_dofs_per_cell = mesh.local_topology.shape[1]

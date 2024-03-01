@@ -34,9 +34,7 @@ def test_mesh_read_writer(encoder, suffix, ghost_mode):
     mesh.comm.Barrier()
 
     start = time.perf_counter()
-    mesh_adios = read_mesh(
-        MPI.COMM_WORLD, file.with_suffix(suffix), encoder, ghost_mode
-    )
+    mesh_adios = read_mesh(MPI.COMM_WORLD, file.with_suffix(suffix), encoder, ghost_mode)
     end = time.perf_counter()
     print(f"Read ADIOS2 mesh: {end-start}")
     mesh.comm.Barrier()
@@ -58,13 +56,9 @@ def test_mesh_read_writer(encoder, suffix, ghost_mode):
 
     # Check that integration over different entities are consistent
     for measure in [ufl.ds, ufl.dS, ufl.dx]:
-        c_adios = dolfinx.fem.assemble_scalar(
-            dolfinx.fem.form(1 * measure(domain=mesh_adios))
-        )
+        c_adios = dolfinx.fem.assemble_scalar(dolfinx.fem.form(1 * measure(domain=mesh_adios)))
         c_ref = dolfinx.fem.assemble_scalar(dolfinx.fem.form(1 * measure(domain=mesh)))
-        c_xdmf = dolfinx.fem.assemble_scalar(
-            dolfinx.fem.form(1 * measure(domain=mesh_xdmf))
-        )
+        c_xdmf = dolfinx.fem.assemble_scalar(dolfinx.fem.form(1 * measure(domain=mesh_xdmf)))
         assert np.isclose(
             mesh_adios.comm.allreduce(c_adios, MPI.SUM),
             mesh.comm.allreduce(c_xdmf, MPI.SUM),

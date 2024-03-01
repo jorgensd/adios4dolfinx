@@ -11,12 +11,14 @@ Functions to create checkpoints with adios4dolfinx v0.7.x
 
 import argparse
 import pathlib
-
-import numpy as np
-from mpi4py import MPI
-import adios4dolfinx
-import dolfinx
 from importlib.metadata import version
+
+from mpi4py import MPI
+
+import dolfinx
+import numpy as np
+
+import adios4dolfinx
 
 a4d_version = version("adios4dolfinx")
 assert (
@@ -55,12 +57,8 @@ def verify_checkpoint(filename, el, f):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    parser.add_argument(
-        "--output-dir", type=str, default="legacy_checkpoint", dest="dir"
-    )
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--output-dir", type=str, default="legacy_checkpoint", dest="dir")
 
     inputs = parser.parse_args()
     path = pathlib.Path(inputs.dir)

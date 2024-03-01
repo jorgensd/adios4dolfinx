@@ -19,14 +19,10 @@ __all__ = ["MeshData", "FunctionData"]
 class MeshData:
     # 2 dimensional array of node coordinates
     local_geometry: npt.NDArray[np.floating]
-    local_geometry_pos: Tuple[
-        int, int
-    ]  # Insert range on current process for geometry nodes
+    local_geometry_pos: Tuple[int, int]  # Insert range on current process for geometry nodes
     num_nodes_global: int  # Number of nodes in global geometry array
 
-    local_topology: npt.NDArray[
-        np.int64
-    ]  # 2 dimensional connecitivty array for mesh topology
+    local_topology: npt.NDArray[np.int64]  # 2 dimensional connecitivty array for mesh topology
     # Insert range on current process for topology
     local_topology_pos: Tuple[int, int]
     num_cells_global: int  # NUmber of cells in global topology

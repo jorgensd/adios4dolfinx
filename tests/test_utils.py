@@ -42,9 +42,7 @@ def write_function(mesh, el, f, dtype, name="uh", append: bool = False) -> str:
 def read_function(comm, el, f, hash, dtype, name="uh"):
     filename = f"output/mesh_{hash}.bp"
     engine = "BP4"
-    mesh = adios4dolfinx.read_mesh(
-        comm, filename, engine, dolfinx.mesh.GhostMode.shared_facet
-    )
+    mesh = adios4dolfinx.read_mesh(comm, filename, engine, dolfinx.mesh.GhostMode.shared_facet)
     V = dolfinx.fem.functionspace(mesh, el)
     v = dolfinx.fem.Function(V, dtype=dtype)
     v.name = name
@@ -107,9 +105,7 @@ def write_function_time_dep(mesh, el, f0, f1, t0, t1, dtype) -> str:
 def read_function_time_dep(comm, el, f0, f1, t0, t1, hash, dtype):
     filename = f"output/mesh_{hash}.bp"
     engine = "BP4"
-    mesh = adios4dolfinx.read_mesh(
-        comm, filename, engine, dolfinx.mesh.GhostMode.shared_facet
-    )
+    mesh = adios4dolfinx.read_mesh(comm, filename, engine, dolfinx.mesh.GhostMode.shared_facet)
     V = dolfinx.fem.functionspace(mesh, el)
     v = dolfinx.fem.Function(V, dtype=dtype)
 

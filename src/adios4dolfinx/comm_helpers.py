@@ -44,13 +44,14 @@ def send_dofmap_and_recv_values(
         comm: The MPI communicator to create the Neighbourhood-communicator from
         source_ranks: Ranks that will send dofmap indices to current process
         dest_ranks: Ranks that will receive dofmap indices from current process
-        output_owners: The owners of each dofmap entry on this process. The unique set of these entries
-            should be the same as the dest_ranks.
+        output_owners: The owners of each dofmap entry on this process. The unique set of
+            these entries should be the same as the dest_ranks.
         input_cells: A cell associated with the degree of freedom sent (global index).
-        dofmap_pos: The local position in the dofmap. I.e. `dof = dofmap.links(input_cells)[dofmap_pos]`
+        dofmap_pos: The local position in the dofmap. I.e.
+            `dof = dofmap.links(input_cells)[dofmap_pos]`
         num_cells_global: Number of global cells
-        values: Values currently held by this process. These are ordered (num_cells_local, num_dofs_per_cell),
-            flattened row-major.
+        values: Values currently held by this process. These are
+            ordered (num_cells_local, num_dofs_per_cell), flattened row-major.
         dofmap_offsets: Local dofmap offsets to access the correct `values`.
 
     Returns:
@@ -77,8 +78,8 @@ def send_dofmap_and_recv_values(
     # For a dof owned by process j, get its position in the list of dofs owned by this process
     cum_pos = np.cumsum(process_pos_indicator, axis=0)
 
-    # Get the insert position (relative to process) for each dof. Subtract 0 as first occurence is equal to 1) due
-    # to the cumsum above
+    # Get the insert position (relative to process) for each dof. Subtract 0 as first
+    # occurence is equal to 1) due to the cumsum above
     insert_position = cum_pos[proc_row, proc_col] - 1
     # Compute aboslute insert position
     insert_position += offsets[proc_col]
@@ -89,7 +90,8 @@ def send_dofmap_and_recv_values(
     out_pos = np.zeros(offsets[-1], dtype=np.int32)
     out_pos[insert_position] = dofmap_pos
 
-    # Compute map from the data index sent to each process and the local number on the current process
+    # Compute map from the data index sent to each process and the local
+    # number on the current process
     proc_to_dof = np.zeros_like(input_cells, dtype=np.int32)
     proc_to_dof[insert_position] = np.arange(len(input_cells), dtype=np.int32)
     del cum_pos, insert_position
@@ -189,8 +191,8 @@ def send_and_recv_cell_perm(
     # For a cell owned by process j, get its position in the list of cell owned by this process
     cum_pos = np.cumsum(process_pos_indicator, axis=0)
 
-    # Get the insert position (relative to process) for each dof. Subtract 0 as first occurence is equal to 1) due
-    # to the cumsum above
+    # Get the insert position (relative to process) for each dof. Subtract 0 as first
+    # occurence is equal to 1) due to the cumsum above
     insert_position = cum_pos[proc_row, proc_col] - 1
 
     # Compute aboslute insert position
@@ -275,8 +277,8 @@ def send_dofs_and_recv_values(
     # For a dof owned by process j, get its position in the list of dofs owned by this process
     cum_pos = np.cumsum(process_pos_indicator, axis=0)
 
-    # Get the insert position (relative to process) for each dof. Subtract 0 as first occurence is equal to 1) due
-    # to the cumsum above
+    # Get the insert position (relative to process) for each dof. Subtract 0 as
+    # first occurence is equal to 1) due to the cumsum above
     insert_position = cum_pos[proc_row, proc_col] - 1
     # Compute aboslute insert position
     insert_position += dofs_offsets[proc_col]
@@ -285,7 +287,8 @@ def send_dofs_and_recv_values(
     out_dofs = np.zeros(dofs_offsets[-1], dtype=np.int64)
     out_dofs[insert_position] = input_dofmap
 
-    # Compute map from the data index sent to each process and the local number on the current process
+    # Compute map from the data index sent to each process and the local number on
+    # the current process
     proc_to_local = np.zeros_like(input_dofmap, dtype=np.int32)
     proc_to_local[insert_position] = np.arange(len(input_dofmap), dtype=np.int32)
     del insert_position, cum_pos

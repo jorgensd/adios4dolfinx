@@ -84,9 +84,7 @@ def test_legacy_function():
     L = ufl.inner(f, v) * ufl.dx
 
     uh = dolfinx.fem.Function(V)
-    problem = LinearProblem(
-        a, L, [], uh, petsc_options={"ksp_type": "preonly", "pc_type": "lu"}
-    )
+    problem = LinearProblem(a, L, [], uh, petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
     problem.solve()
 
     u_in = dolfinx.fem.Function(V)
@@ -119,9 +117,7 @@ def test_read_legacy_function_from_checkpoint():
     L = ufl.inner(f, v) * ufl.dx
 
     uh = dolfinx.fem.Function(V)
-    problem = LinearProblem(
-        a, L, [], uh, petsc_options={"ksp_type": "preonly", "pc_type": "lu"}
-    )
+    problem = LinearProblem(a, L, [], uh, petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
     problem.solve()
 
     u_in = dolfinx.fem.Function(V)
@@ -148,9 +144,7 @@ def test_read_legacy_function_from_checkpoint():
 
 def test_adios4dolfinx_legacy():
     comm = MPI.COMM_WORLD
-    path = (
-        pathlib.Path("legacy_checkpoint") / "adios4dolfinx_checkpoint.bp"
-    ).absolute()
+    path = (pathlib.Path("legacy_checkpoint") / "adios4dolfinx_checkpoint.bp").absolute()
     if not path.exists():
         pytest.skip(f"{path} does not exist")
 

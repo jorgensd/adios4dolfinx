@@ -14,54 +14,38 @@ dtypes = [np.float64, np.float32]  # Mesh geometry dtypes
 write_comm = [MPI.COMM_SELF, MPI.COMM_WORLD]  # Communicators for creating mesh
 
 
-simplex_two_dim = itertools.product(
-    dtypes, [dolfinx.mesh.CellType.triangle], write_comm
-)
-simplex_three_dim = itertools.product(
-    dtypes, [dolfinx.mesh.CellType.tetrahedron], write_comm
-)
+simplex_two_dim = itertools.product(dtypes, [dolfinx.mesh.CellType.triangle], write_comm)
+simplex_three_dim = itertools.product(dtypes, [dolfinx.mesh.CellType.tetrahedron], write_comm)
 
-non_simplex_two_dim = itertools.product(
-    dtypes, [dolfinx.mesh.CellType.quadrilateral], write_comm
-)
-non_simplex_three_dim = itertools.product(
-    dtypes, [dolfinx.mesh.CellType.hexahedron], write_comm
-)
+non_simplex_two_dim = itertools.product(dtypes, [dolfinx.mesh.CellType.quadrilateral], write_comm)
+non_simplex_three_dim = itertools.product(dtypes, [dolfinx.mesh.CellType.hexahedron], write_comm)
 
 
 @pytest.fixture(params=simplex_two_dim, scope="module")
 def simplex_mesh_2D(request):
     dtype, cell_type, write_comm = request.param
-    mesh = dolfinx.mesh.create_unit_square(
-        write_comm, 10, 10, cell_type=cell_type, dtype=dtype
-    )
+    mesh = dolfinx.mesh.create_unit_square(write_comm, 10, 10, cell_type=cell_type, dtype=dtype)
     return mesh
 
 
 @pytest.fixture(params=simplex_three_dim, scope="module")
 def simplex_mesh_3D(request):
     dtype, cell_type, write_comm = request.param
-    mesh = dolfinx.mesh.create_unit_cube(
-        write_comm, 5, 5, 5, cell_type=cell_type, dtype=dtype
-    )
+    mesh = dolfinx.mesh.create_unit_cube(write_comm, 5, 5, 5, cell_type=cell_type, dtype=dtype)
     return mesh
 
 
 @pytest.fixture(params=non_simplex_two_dim, scope="module")
 def non_simplex_mesh_2D(request):
     dtype, cell_type, write_comm = request.param
-    mesh = dolfinx.mesh.create_unit_square(
-        write_comm, 10, 10, cell_type=cell_type, dtype=dtype
-    )
+    mesh = dolfinx.mesh.create_unit_square(write_comm, 10, 10, cell_type=cell_type, dtype=dtype)
     return mesh
 
 
 @pytest.fixture(params=non_simplex_three_dim, scope="module")
 def non_simplex_mesh_3D(request):
     dtype, cell_type, write_comm = request.param
-    mesh = dolfinx.mesh.create_unit_cube(
-        write_comm, 5, 5, 5, cell_type=cell_type, dtype=dtype
-    )
+    mesh = dolfinx.mesh.create_unit_cube(write_comm, 5, 5, 5, cell_type=cell_type, dtype=dtype)
     return mesh
 
 

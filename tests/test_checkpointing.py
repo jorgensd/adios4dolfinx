@@ -1,17 +1,18 @@
 import itertools
 
+from mpi4py import MPI
+
 import basix
 import basix.ufl
 import dolfinx
 import numpy as np
 import pytest
-from mpi4py import MPI
 
 from .test_utils import (
-    read_function,
-    write_function,
     get_dtype,
+    read_function,
     read_function_time_dep,
+    write_function,
     write_function_time_dep,
 )
 
@@ -28,17 +29,13 @@ three_dimensional_cell_types = [
 ]
 
 two_dim_combinations = itertools.product(dtypes, two_dimensional_cell_types, write_comm)
-three_dim_combinations = itertools.product(
-    dtypes, three_dimensional_cell_types, write_comm
-)
+three_dim_combinations = itertools.product(dtypes, three_dimensional_cell_types, write_comm)
 
 
 @pytest.fixture(params=two_dim_combinations, scope="module")
 def mesh_2D(request):
     dtype, cell_type, write_comm = request.param
-    mesh = dolfinx.mesh.create_unit_square(
-        write_comm, 10, 10, cell_type=cell_type, dtype=dtype
-    )
+    mesh = dolfinx.mesh.create_unit_square(write_comm, 10, 10, cell_type=cell_type, dtype=dtype)
     return mesh
 
 
@@ -46,9 +43,7 @@ def mesh_2D(request):
 def mesh_3D(request):
     dtype, cell_type, write_comm = request.param
     M = 5
-    mesh = dolfinx.mesh.create_unit_cube(
-        write_comm, M, M, M, cell_type=cell_type, dtype=dtype
-    )
+    mesh = dolfinx.mesh.create_unit_cube(write_comm, M, M, M, cell_type=cell_type, dtype=dtype)
     return mesh
 
 

@@ -21,8 +21,10 @@ jobs:
       - name: Install code
         run: python3 -m pip install .[dev]
 
-      - name: Flake8 code
-        run: python3 -m flake8 -v
+      - name: Check code formatting with ruff
+        run: |
+          ruff check .
+          ruff format --check .
 
       - name: Mypy check
         run: python3 -m mypy -v

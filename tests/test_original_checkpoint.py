@@ -95,9 +95,7 @@ def create_non_simplex_mesh_3D():
 @pytest.fixture(params=two_dim_combinations, scope="module")
 def create_2D_mesh(request):
     dtype, cell_type = request.param
-    mesh = dolfinx.mesh.create_unit_square(
-        MPI.COMM_WORLD, 5, 7, cell_type=cell_type, dtype=dtype
-    )
+    mesh = dolfinx.mesh.create_unit_square(MPI.COMM_WORLD, 5, 7, cell_type=cell_type, dtype=dtype)
     fname = Path("output/original_mesh_2D_{dtype}_{cell_type}.xdmf")
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "w") as xdmf:
         xdmf.write_mesh(mesh)
@@ -107,9 +105,7 @@ def create_2D_mesh(request):
 @pytest.fixture(params=three_dim_combinations, scope="module")
 def create_3D_mesh(request):
     dtype, cell_type = request.param
-    mesh = dolfinx.mesh.create_unit_cube(
-        MPI.COMM_WORLD, 5, 7, 3, cell_type=cell_type, dtype=dtype
-    )
+    mesh = dolfinx.mesh.create_unit_cube(MPI.COMM_WORLD, 5, 7, 3, cell_type=cell_type, dtype=dtype)
     fname = Path("output/original_mesh_3D_{dtype}_{cell_type}.xdmf")
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "w") as xdmf:
         xdmf.write_mesh(mesh)
@@ -169,7 +165,9 @@ def read_function(
     Convenience function for reading mesh with IPython-parallel and compare to exact solution
     """
     from mpi4py import MPI
+
     import dolfinx
+
     import adios4dolfinx
 
     assert MPI.COMM_WORLD.size > 1
@@ -212,16 +210,16 @@ def write_function_vector(
 ) -> Path:
     """Convenience function for writing function to file on the original input mesh"""
     from mpi4py import MPI
+
     import basix.ufl
     import dolfinx
+
     import adios4dolfinx
 
     assert MPI.COMM_WORLD.size > 1
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "r") as xdmf:
         mesh = xdmf.read_mesh()
-    el = basix.ufl.element(
-        family, mesh.ufl_cell().cellname(), degree, dtype=mesh.geometry.x.dtype
-    )
+    el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree, dtype=mesh.geometry.x.dtype)
     V = dolfinx.fem.functionspace(mesh, el)
     uh = dolfinx.fem.Function(V, dtype=dtype)
     uh.interpolate(f)
@@ -396,9 +394,7 @@ def test_read_write_2D_vector_simplex(
     else:
         mesh_fname = fname
 
-    read_function_vector(
-        mesh_fname, file_path, "u_original", family, degree, f, f_dtype
-    )
+    read_function_vector(mesh_fname, file_path, "u_original", family, degree, f, f_dtype)
 
 
 @pytest.mark.skipif(MPI.COMM_WORLD.size > 1, reason="Test uses ipythonparallel for MPI")
@@ -440,9 +436,7 @@ def test_read_write_3D_vector_simplex(
     else:
         mesh_fname = fname
 
-    read_function_vector(
-        mesh_fname, file_path, "u_original", family, degree, f, f_dtype
-    )
+    read_function_vector(mesh_fname, file_path, "u_original", family, degree, f, f_dtype)
 
 
 @pytest.mark.skipif(MPI.COMM_WORLD.size > 1, reason="Test uses ipythonparallel for MPI")
@@ -483,9 +477,7 @@ def test_read_write_2D_vector_non_simplex(
     else:
         mesh_fname = fname
 
-    read_function_vector(
-        mesh_fname, file_path, "u_original", family, degree, f, f_dtype
-    )
+    read_function_vector(mesh_fname, file_path, "u_original", family, degree, f, f_dtype)
 
 
 @pytest.mark.skipif(MPI.COMM_WORLD.size > 1, reason="Test uses ipythonparallel for MPI")
@@ -527,6 +519,4 @@ def test_read_write_3D_vector_non_simplex(
     else:
         mesh_fname = fname
 
-    read_function_vector(
-        mesh_fname, file_path, "u_original", family, degree, f, f_dtype
-    )
+    read_function_vector(mesh_fname, file_path, "u_original", family, degree, f, f_dtype)

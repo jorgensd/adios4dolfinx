@@ -35,8 +35,9 @@ def compute_insert_position(
     out_size: npt.NDArray[np.int32],
 ) -> npt.NDArray[np.int32]:
     """
-    Giving a list of ranks, compute the local insert position for each rank in a list sorted by destination ranks.
-    This function is used for packing data from a given process to its destination processes.
+    Giving a list of ranks, compute the local insert position for each rank in a list
+    sorted by destination ranks. This function is used for packing data from a
+    given process to its destination processes.
 
     Example:
 
@@ -139,9 +140,7 @@ def unroll_dofmap(dofs: npt.NDArray[np.int32], bs: int) -> npt.NDArray[np.int32]
     is of size `(num_cells, bs*num_dofs_per_cell)`
     """
     num_cells, num_dofs_per_cell = dofs.shape
-    unrolled_dofmap = (
-        np.repeat(dofs, bs).reshape(num_cells, num_dofs_per_cell * bs) * bs
-    )
+    unrolled_dofmap = np.repeat(dofs, bs).reshape(num_cells, num_dofs_per_cell * bs) * bs
     unrolled_dofmap += np.tile(np.arange(bs), num_dofs_per_cell)
     return unrolled_dofmap
 
@@ -166,9 +165,7 @@ def compute_dofmap_pos(
     local_cell = np.empty(
         num_owned_dofs, dtype=np.int32
     )  # Local cell index for each dof owned by process
-    dof_pos = np.empty(
-        num_owned_dofs, dtype=np.int32
-    )  # Position in dofmap for said dof
+    dof_pos = np.empty(num_owned_dofs, dtype=np.int32)  # Position in dofmap for said dof
 
     unrolled_dofmap = unroll_dofmap(dofs[:num_owned_cells, :], dofmap_bs)
     markers = unrolled_dofmap < num_owned_dofs

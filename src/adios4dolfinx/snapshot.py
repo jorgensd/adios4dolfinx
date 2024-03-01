@@ -6,11 +6,10 @@
 
 from pathlib import Path
 
+import adios2
 import dolfinx
 
 from .adios2_helpers import resolve_adios_scope
-
-import adios2
 
 adios2 = resolve_adios_scope(adios2)
 

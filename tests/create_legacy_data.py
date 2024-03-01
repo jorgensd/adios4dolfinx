@@ -33,9 +33,7 @@ def create_reference_data(
 
     f0 = ufl.conditional(ufl.gt(x[0], 0.5), x[1], 2 * x[0])
     v0 = dolfin.project(f0, V)
-    w0 = dolfin.interpolate(
-        dolfin.Expression(("x[0]", "3*x[2]", "7*x[1]"), degree=1), W
-    )
+    w0 = dolfin.interpolate(dolfin.Expression(("x[0]", "3*x[2]", "7*x[1]"), degree=1), W)
 
     v1 = dolfin.interpolate(dolfin.Expression("x[0]", degree=1), V)
     w1 = dolfin.interpolate(dolfin.Expression(("x[0]", "0", "x[1]"), degree=1), W)
@@ -47,18 +45,10 @@ def create_reference_data(
 
     with dolfin.XDMFFile(mesh.mpi_comm(), str(xdmf_file)) as xdmf:
         xdmf.write(mesh)
-        xdmf.write_checkpoint(
-            v0, function_name, 0, dolfin.XDMFFile.Encoding.HDF5, append=True
-        )
-        xdmf.write_checkpoint(
-            w0, function_name_vec, 0, dolfin.XDMFFile.Encoding.HDF5, append=True
-        )
-        xdmf.write_checkpoint(
-            v1, function_name, 1, dolfin.XDMFFile.Encoding.HDF5, append=True
-        )
-        xdmf.write_checkpoint(
-            w1, function_name_vec, 1, dolfin.XDMFFile.Encoding.HDF5, append=True
-        )
+        xdmf.write_checkpoint(v0, function_name, 0, dolfin.XDMFFile.Encoding.HDF5, append=True)
+        xdmf.write_checkpoint(w0, function_name_vec, 0, dolfin.XDMFFile.Encoding.HDF5, append=True)
+        xdmf.write_checkpoint(v1, function_name, 1, dolfin.XDMFFile.Encoding.HDF5, append=True)
+        xdmf.write_checkpoint(w1, function_name_vec, 1, dolfin.XDMFFile.Encoding.HDF5, append=True)
 
     with dolfin.XDMFFile(mesh.mpi_comm(), "test.xdmf") as xdmf:
         xdmf.write(mesh)
@@ -124,9 +114,7 @@ def verify_xdmf(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--family", type=str, default="DG")
     parser.add_argument("--degree", type=int, default=2)
     parser.add_argument("--output-dir", type=str, default="legacy", dest="dir")
