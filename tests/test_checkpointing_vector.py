@@ -60,7 +60,7 @@ def test_read_write_2D(read_comm, family, degree, is_complex, simplex_mesh_2D):
 
     def f(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
-        values[0] = np.full(x.shape[1], np.pi) + x[0] 
+        values[0] = np.full(x.shape[1], np.pi) + x[0]
         values[1] = x[1]
         if is_complex:
             values[0] += 2j * x[1]
@@ -154,9 +154,9 @@ def test_read_write_multiple(read_comm, family, degree, is_complex, non_simplex_
 
     def f(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
-        values[0] = np.full(x.shape[1], np.pi) 
+        values[0] = np.full(x.shape[1], np.pi)
         values[1] = x[1] + 2 * x[0]
-        if is_complex: 
+        if is_complex:
             values[0] -= 2j * x[2]
             values[1] += 2j * np.cos(x[2])
         return values

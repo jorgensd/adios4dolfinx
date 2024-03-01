@@ -137,8 +137,11 @@ def test_read_write_P_2D_time(read_comm, family, degree, is_complex, mesh_2D):
 
     def f1(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
-        values[0] = 2 * np.full(x.shape[1], np.pi) + x[0] + x[1] * 1j
-        values[1] = -x[0] + 3j * x[1] + 2 * x[1]
+        values[0] = 2 * np.full(x.shape[1], np.pi) + x[0]
+        values[1] = -x[0] + 2 * x[1]
+        if is_complex:
+            values[0] += x[1] * 1j
+            values[1] += 3j * x[1]
         return values
 
     t0 = 0.8
@@ -165,12 +168,12 @@ def test_read_write_P_3D_time(read_comm, family, degree, is_complex, mesh_3D):
 
     def f(x):
         values = np.empty((3, x.shape[1]), dtype=f_dtype)
-        values[0] = np.pi + x[0] + 2j * x[2]
+        values[0] = np.pi + x[0]
         values[1] = x[1] + 2 * x[0]
         values[2] = np.cos(x[2])
         if is_complex:
             values[0] += 2j * x[2]
-            values[2] += 5j*x[1]
+            values[2] += 5j * x[1]
         return values
 
     def g(x):

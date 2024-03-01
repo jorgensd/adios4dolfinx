@@ -514,7 +514,7 @@ def test_read_write_3D_vector_non_simplex(
         values[1] = np.cos(x[2])
         values[2] = x[0]
         if is_complex:
-            values[2] += x[0]*x[1] * 3j
+            values[2] += x[0] * x[1] * 3j
         return values
 
     query = cluster[:].apply_async(
