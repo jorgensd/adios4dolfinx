@@ -147,8 +147,8 @@ def write_function(
     filename = Path(f"output/mesh_{file_hash}.bp")
 
     if write_mesh:
-        adios4dolfinx.write_mesh_input_order(mesh, filename)
-    adios4dolfinx.write_function_on_input_mesh(uh, filename, time=0.0)
+        adios4dolfinx.write_mesh_input_order(filename, mesh)
+    adios4dolfinx.write_function_on_input_mesh(filename, uh, time=0.0)
     return filename
 
 
@@ -176,7 +176,7 @@ def read_function(
             mesh = xdmf.read_mesh()
     elif mesh_fname.suffix == ".bp":
         mesh = adios4dolfinx.read_mesh(
-            MPI.COMM_WORLD, mesh_fname, "BP4", dolfinx.mesh.GhostMode.shared_facet
+            mesh_fname, MPI.COMM_WORLD, "BP4", dolfinx.mesh.GhostMode.shared_facet
         )
     el = basix.ufl.element(
         family,
@@ -189,7 +189,7 @@ def read_function(
 
     V = dolfinx.fem.functionspace(mesh, el)
     u = dolfinx.fem.Function(V, name=u_name, dtype=u_dtype)
-    adios4dolfinx.read_function(u, u_fname, time=0.0)
+    adios4dolfinx.read_function(u_fname, u, time=0.0)
     MPI.COMM_WORLD.Barrier()
 
     u_ex = dolfinx.fem.Function(V, name="exact", dtype=u_dtype)
@@ -238,8 +238,8 @@ def write_function_vector(
     filename = Path(f"output/mesh_{file_hash}.bp")
 
     if write_mesh:
-        adios4dolfinx.write_mesh_input_order(mesh, filename)
-    adios4dolfinx.write_function_on_input_mesh(uh, filename, time=0.0)
+        adios4dolfinx.write_mesh_input_order(filename, mesh)
+    adios4dolfinx.write_function_on_input_mesh(filename, uh, time=0.0)
     return filename
 
 
@@ -261,13 +261,13 @@ def read_function_vector(
             mesh = xdmf.read_mesh()
     elif mesh_fname.suffix == ".bp":
         mesh = adios4dolfinx.read_mesh(
-            MPI.COMM_WORLD, mesh_fname, "BP4", dolfinx.mesh.GhostMode.shared_facet
+            mesh_fname, MPI.COMM_WORLD, "BP4", dolfinx.mesh.GhostMode.shared_facet
         )
     el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
 
     V = dolfinx.fem.functionspace(mesh, el)
     u = dolfinx.fem.Function(V, name=u_name, dtype=u_dtype)
-    adios4dolfinx.read_function(u, u_fname, time=0.0)
+    adios4dolfinx.read_function(u_fname, u, time=0.0)
     MPI.COMM_WORLD.Barrier()
 
     u_ex = dolfinx.fem.Function(V, name="exact", dtype=u_dtype)

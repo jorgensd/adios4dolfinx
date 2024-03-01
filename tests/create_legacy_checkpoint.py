@@ -38,8 +38,8 @@ def write_checkpoint(filename, mesh, el, f):
     uh = dolfinx.fem.Function(V, dtype=np.float64)
     uh.interpolate(f)
 
-    adios4dolfinx.write_mesh(filename, V.mesh)
-    adios4dolfinx.write_function(filename, uh)
+    adios4dolfinx.write_mesh(V.mesh, filename)
+    adios4dolfinx.write_function(uh, filename)
 
 
 def verify_checkpoint(filename, el, f):
@@ -48,7 +48,7 @@ def verify_checkpoint(filename, el, f):
     )
     V = dolfinx.fem.FunctionSpace(mesh, el)
     uh = dolfinx.fem.Function(V, dtype=np.float64)
-    adios4dolfinx.read_function(filename, uh)
+    adios4dolfinx.read_function(uh, filename)
 
     u_ex = dolfinx.fem.Function(V, dtype=np.float64)
     u_ex.interpolate(f)
@@ -67,6 +67,6 @@ if __name__ == "__main__":
 
     mesh = dolfinx.mesh.create_unit_square(MPI.COMM_WORLD, 10, 10)
     el = ("N1curl", 3)
-    write_checkpoint(filename, mesh, el, f)
+    write_checkpoint(mesh, filename, el, f)
     MPI.COMM_WORLD.Barrier()
     verify_checkpoint(filename, el, f)
