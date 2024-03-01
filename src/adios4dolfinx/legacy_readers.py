@@ -122,18 +122,15 @@ def read_dofmap_legacy(
     in_dofmap = in_dofmap.reshape(-1).astype(np.int64)
 
     # Map xxxyyyzzz to xyzxyz
-    mapped_dofmap = np.empty_like(in_dofmap)
-    for i in range(len(in_offsets) - 1):
-        pos_begin, pos_end = (
-            in_offsets[i] - in_offsets[0],
-            in_offsets[i + 1] - in_offsets[0],
-        )
-        dofs_i = in_dofmap[pos_begin:pos_end]
-        assert (pos_end - pos_begin) % bs == 0
-        num_dofs_local = int((pos_end - pos_begin) // bs)
-        for k in range(bs):
-            for j in range(num_dofs_local):
-                mapped_dofmap[int(pos_begin + j * bs + k)] = dofs_i[int(num_dofs_local * k + j)]
+    num_dofs = in_offsets[-1] - in_offsets[0]
+    assert num_dofs == len(in_dofmap) and (num_dofs) % bs == 0
+    num_dofs_per_cell = in_offsets[1:] - in_offsets[:-1]
+    assert np.allclose(
+        num_dofs_per_cell, num_dofs_per_cell[0]
+    ), "Non-uniform number of dofs per cell"
+    num_cells = len(in_offsets) - 1
+    nd_dofmap = in_dofmap.reshape(num_cells, bs, int(num_dofs_per_cell[0] // bs))
+    mapped_dofmap = np.swapaxes(nd_dofmap, 1, 2).reshape(-1)
 
     # Extract dofmap data
     global_dofs = np.zeros_like(cells, dtype=np.int64)
