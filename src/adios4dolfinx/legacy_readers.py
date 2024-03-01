@@ -18,7 +18,7 @@ import ufl
 
 from .adios2_helpers import adios_to_numpy_dtype, read_array, resolve_adios_scope
 from .comm_helpers import send_dofs_and_recv_values
-from .utils import compute_dofmap_pos, compute_local_range, index_owner, compute_insert_position
+from .utils import compute_dofmap_pos, compute_insert_position, compute_local_range, index_owner
 
 adios2 = resolve_adios_scope(adios2)
 
@@ -166,7 +166,6 @@ def send_cells_and_receive_dofmap_index(
     Given a set of positions in input dofmap, give the global input index of this dofmap entry
     in input file.
     """
-
 
     recv_size = np.zeros(len(source_ranks), dtype=np.int32)
     mesh_to_data_comm = comm.Create_dist_graph_adjacent(
@@ -378,8 +377,8 @@ def read_function_from_legacy_h5(
         comm,
         np.asarray(source, dtype=np.int32),
         np.asarray(dest, dtype=np.int32),
-        owners,
         owner_count.astype(np.int32),
+        owners,
         input_cells,
         dof_pos,
         num_cells_global,

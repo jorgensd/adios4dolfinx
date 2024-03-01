@@ -5,7 +5,7 @@ from mpi4py import MPI
 import numpy as np
 import numpy.typing as npt
 
-from .utils import compute_local_range, valid_function_types, compute_insert_position
+from .utils import compute_insert_position, compute_local_range, valid_function_types
 
 __all__ = [
     "send_dofmap_and_recv_values",
