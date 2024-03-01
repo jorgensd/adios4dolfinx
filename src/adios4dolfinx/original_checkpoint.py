@@ -312,7 +312,7 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
 
 def write_function_on_input_mesh(
     u: dolfinx.fem.Function,
-    filename: Path|str,
+    filename: Path | str,
     engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Append,
     time: float = 0.0,
@@ -342,7 +342,7 @@ def write_function_on_input_mesh(
     )
 
 
-def write_mesh_input_order(mesh: dolfinx.mesh.Mesh, filename: Path|str, engine: str = "BP4"):
+def write_mesh_input_order(mesh: dolfinx.mesh.Mesh, filename: Path | str, engine: str = "BP4"):
     """
     Write mesh to checkpoint file in original input ordering
     """
