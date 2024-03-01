@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import itertools
 from collections import ChainMap
-from typing import Dict, List, Tuple, Union
 
 from mpi4py import MPI
 
@@ -12,21 +13,21 @@ import pytest
 import adios4dolfinx
 
 root = 0
-dtypes: List["str"] = ["float64", "float32"]  # Mesh geometry dtypes
-write_comm: List[MPI.Intracomm] = [
+dtypes: list["str"] = ["float64", "float32"]  # Mesh geometry dtypes
+write_comm: list[MPI.Intracomm] = [
     MPI.COMM_SELF,
     MPI.COMM_WORLD,
 ]  # Communicators for creating mesh
-read_modes: List[dolfinx.mesh.GhostMode] = [
+read_modes: list[dolfinx.mesh.GhostMode] = [
     dolfinx.mesh.GhostMode.none,
     dolfinx.mesh.GhostMode.shared_facet,
 ]
 # Cell types of different dimensions
-two_dimensional_cell_types: List[dolfinx.mesh.CellType] = [
+two_dimensional_cell_types: list[dolfinx.mesh.CellType] = [
     dolfinx.mesh.CellType.triangle,
     dolfinx.mesh.CellType.quadrilateral,
 ]
-three_dimensional_cell_types: List[dolfinx.mesh.CellType] = [
+three_dimensional_cell_types: list[dolfinx.mesh.CellType] = [
     dolfinx.mesh.CellType.tetrahedron,
     dolfinx.mesh.CellType.hexahedron,
 ]
@@ -66,7 +67,7 @@ def generate_reference_map(
     meshtag: dolfinx.mesh.MeshTags,
     comm: MPI.Intracomm,
     root: int,
-) -> Union[None, Dict[str, Tuple[int, npt.NDArray]]]:
+) -> None | dict[str, tuple[int, npt.NDArray]]:
     """
     Helper function to generate map from meshtag value to its corresponding index and midpoint.
 

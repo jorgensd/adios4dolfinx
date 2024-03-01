@@ -4,8 +4,9 @@
 #
 # SPDX-License-Identifier:    MIT
 
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Optional, Union
 
 from mpi4py import MPI
 
@@ -45,10 +46,10 @@ __all__ = [
 
 
 def write_meshtags(
-    filename: Union[Path, str],
+    filename: Path | str,
     mesh: dolfinx.mesh.Mesh,
     meshtags: dolfinx.mesh.MeshTags,
-    engine: Optional[str] = "BP4",
+    engine: str = "BP4",
 ):
     """
     Write meshtags associated with input mesh to file.
@@ -115,7 +116,7 @@ def write_meshtags(
 
 
 def read_meshtags(
-    filename: Union[Path, str],
+    filename: Path | str,
     mesh: dolfinx.mesh.Mesh,
     meshtag_name: str,
     engine: str = "BP4",
@@ -206,7 +207,7 @@ def read_meshtags(
 
 
 def read_function(
-    filename: Union[Path, str],
+    filename: Path | str,
     u: dolfinx.fem.Function,
     engine: str = "BP4",
     time: float = 0.0,
@@ -329,10 +330,10 @@ def read_function(
 
 
 def read_mesh(
-    filename: Union[Path, str],
+    filename: Path | str,
     comm: MPI.Intracomm,
-    engine: str,
-    ghost_mode: dolfinx.mesh.GhostMode,
+    engine: str = "BP4",
+    ghost_mode: dolfinx.mesh.GhostMode = dolfinx.mesh.GhostMode.shared_facet,
 ) -> dolfinx.mesh.Mesh:
     """
     Read an ADIOS2 mesh into DOLFINx.
@@ -462,7 +463,7 @@ def write_mesh(filename: Path, mesh: dolfinx.mesh.Mesh, engine: str = "BP4"):
 
 
 def write_function(
-    filename: Union[Path, str],
+    filename: Path | str,
     u: dolfinx.fem.Function,
     engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Append,

@@ -4,8 +4,9 @@
 #
 # SPDX-License-Identifier:    MIT
 
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Union
 
 from mpi4py import MPI
 
@@ -314,7 +315,7 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
 
 
 def write_function_on_input_mesh(
-    filename: Union[Path, str],
+    filename: Path | str,
     u: dolfinx.fem.Function,
     engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Append,
@@ -345,9 +346,7 @@ def write_function_on_input_mesh(
     )
 
 
-def write_mesh_input_order(
-    filename: Union[Path, str], mesh: dolfinx.mesh.Mesh, engine: str = "BP4"
-):
+def write_mesh_input_order(filename: Path | str, mesh: dolfinx.mesh.Mesh, engine: str = "BP4"):
     """
     Write mesh to checkpoint file in original input ordering
     """
