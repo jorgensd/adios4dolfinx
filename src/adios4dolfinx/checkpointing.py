@@ -469,6 +469,7 @@ def write_function(
     engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Append,
     time: float = 0.0,
+    name: str | None = None,
 ):
     """
     Write function checkpoint to file.
@@ -479,6 +480,7 @@ def write_function(
         engine: ADIOS2 engine
         mode: Write or append.
         time: Time-stamp for simulation
+        name: Name of function to write. If None, the name of the function is used.
     """
     dofmap = u.function_space.dofmap
     values = u.x.array
@@ -528,7 +530,7 @@ def write_function(
         values=values[:num_dofs_local].copy(),
         dof_range=local_dof_range,
         num_dofs_global=num_dofs_global,
-        name=u.name,
+        name=name or u.name,
     )
     # Write to file
     fname = Path(filename)
