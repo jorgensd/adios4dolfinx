@@ -9,7 +9,6 @@ from mpi4py import MPI
 import basix
 import basix.ufl
 import dolfinx
-import ipyparallel as ipp
 import numpy as np
 import pytest
 
@@ -110,14 +109,6 @@ def create_3D_mesh(request):
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "w") as xdmf:
         xdmf.write_mesh(mesh)
     return fname
-
-
-@pytest.fixture(scope="module")
-def cluster():
-    cluster = ipp.Cluster(engines="mpi", n=2)
-    rc = cluster.start_and_connect_sync()
-    yield rc
-    cluster.stop_cluster_sync()
 
 
 def write_function_original(
@@ -314,6 +305,11 @@ def test_read_write_P_2D(
         mesh_fname = fname
     else:
         mesh_fname = hash
+
+    def f(x):
+        print(x)
+
+    query = cluster[:].apply_async(f, 1)
     query = cluster[:].apply_async(
         read_function_original, mesh_fname, hash, "u_original", family, degree, f, f_dtype
     )

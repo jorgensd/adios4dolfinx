@@ -3,11 +3,20 @@ import pathlib
 from mpi4py import MPI
 
 import dolfinx
+import ipyparallel as ipp
 import numpy as np
 import numpy.typing
 import pytest
 
 import adios4dolfinx
+
+
+@pytest.fixture(scope="module")
+def cluster():
+    cluster = ipp.Cluster(engines="mpi", n=2)
+    rc = cluster.start_and_connect_sync()
+    yield rc
+    cluster.stop_cluster_sync()
 
 
 @pytest.fixture(scope="function")
