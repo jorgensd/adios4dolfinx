@@ -8,6 +8,13 @@
 Vectorized numpy operations used internally in adios4dolfinx
 """
 
+from __future__ import annotations
+
+from mpi4py import MPI
+
+import dolfinx
+import numpy as np
+import numpy.typing as npt
 
 __all__ = [
     "compute_local_range",
@@ -17,16 +24,9 @@ __all__ = [
     "compute_insert_position",
     "unroll_insert_position",
 ]
-from typing import Tuple, Union
 
-from mpi4py import MPI
-
-import dolfinx
-import numpy as np
-import numpy.typing as npt
-
-valid_function_types = Union[np.float32, np.float64, np.complex64, np.complex128]
-valid_real_types = Union[np.float32, np.float64]
+valid_function_types = np.float32 | np.float64 | np.complex64 | np.complex128
+valid_real_types = np.float32 | np.float64
 
 
 def compute_insert_position(
@@ -147,7 +147,7 @@ def unroll_dofmap(dofs: npt.NDArray[np.int32], bs: int) -> npt.NDArray[np.int32]
 
 def compute_dofmap_pos(
     V: dolfinx.fem.FunctionSpace,
-) -> Tuple[npt.NDArray[np.int32], npt.NDArray[np.int32]]:
+) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.int32]]:
     """
     Compute a map from each owned dof in the dofmap to a single cell owned by the
     process, and the relative position of the dof.

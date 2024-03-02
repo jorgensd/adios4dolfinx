@@ -19,9 +19,9 @@ adios2 = resolve_adios_scope(adios2)
 
 
 def write_mesh(
+    filename: Path,
     comm: MPI.Intracomm,
     mesh: MeshData,
-    filename: Path,
     engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Write,
     io_name: str = "MeshWriter",
@@ -81,9 +81,9 @@ def write_mesh(
 
 
 def write_function(
+    filename: Path,
     comm: MPI.Intracomm,
     u: FunctionData,
-    filename: Path,
     engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Append,
     time: float = 0.0,

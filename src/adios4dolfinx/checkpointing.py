@@ -4,8 +4,9 @@
 #
 # SPDX-License-Identifier:    MIT
 
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Union
 
 from mpi4py import MPI
 
@@ -46,7 +47,7 @@ __all__ = [
 
 
 def write_meshtags(
-    filename: Union[Path, str],
+    filename: Path | str,
     mesh: dolfinx.mesh.Mesh,
     meshtags: dolfinx.mesh.MeshTags,
     engine: str = "BP4",
@@ -121,7 +122,7 @@ def write_meshtags(
 
 
 def read_meshtags(
-    filename: Union[Path, str],
+    filename: Path | str,
     mesh: dolfinx.mesh.Mesh,
     meshtag_name: str,
     engine: str = "BP4",
@@ -218,8 +219,8 @@ def read_meshtags(
 
 
 def read_function(
+    filename: Path | str,
     u: dolfinx.fem.Function,
-    filename: Union[Path, str],
     engine: str = "BP4",
     time: float = 0.0,
     legacy: bool = False,
@@ -228,8 +229,8 @@ def read_function(
     Read checkpoint from file and fill it into `u`.
 
     Args:
-        u: Function to fill
         filename: Path to checkpoint
+        u: Function to fill
         engine: ADIOS engine type used for reading
         legacy: If checkpoint is from prior to time-dependent writing set to True
     """
@@ -341,17 +342,17 @@ def read_function(
 
 
 def read_mesh(
+    filename: Path | str,
     comm: MPI.Intracomm,
-    filename: Union[Path, str],
-    engine: str,
-    ghost_mode: dolfinx.mesh.GhostMode,
+    engine: str = "BP4",
+    ghost_mode: dolfinx.mesh.GhostMode = dolfinx.mesh.GhostMode.shared_facet,
 ) -> dolfinx.mesh.Mesh:
     """
     Read an ADIOS2 mesh into DOLFINx.
 
     Args:
-        comm: The MPI communciator to distribute the mesh over
         filename: Path to input file
+        comm: The MPI communciator to distribute the mesh over
         engine: ADIOS engine to use for reading (BP4, BP5 or HDF5)
         ghost_mode: Ghost mode to use for mesh
     Returns:
@@ -426,15 +427,15 @@ def read_mesh(
     return dolfinx.mesh.create_mesh(comm, mesh_topology, mesh_geometry, domain, partitioner)
 
 
-def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
+def write_mesh(filename: Path, mesh: dolfinx.mesh.Mesh, engine: str = "BP4"):
     """
     Write a mesh to specified ADIOS2 format, see:
     https://adios2.readthedocs.io/en/stable/engines/engines.html
     for possible formats.
 
     Args:
-        mesh: The mesh to write to file
         filename: Path to save mesh (without file-extension)
+        mesh: The mesh to write to file
         engine: Adios2 Engine
     """
     num_xdofs_local = mesh.geometry.index_map().size_local
@@ -471,9 +472,9 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
 
     # NOTE: Mode will become input again once we have variable geometry
     _internal_mesh_writer(
+        filename,
         mesh.comm,
         mesh_data,
-        filename,
         engine,
         mode=adios2.Mode.Write,
         io_name="MeshWriter",
@@ -481,8 +482,8 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
 
 
 def write_function(
+    filename: Path | str,
     u: dolfinx.fem.Function,
-    filename: Union[Path, str],
     engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Append,
     time: float = 0.0,
@@ -549,4 +550,4 @@ def write_function(
     )
     # Write to file
     fname = Path(filename)
-    _internal_function_writer(comm, function_data, fname, engine, mode, time, "FunctionWriter")
+    _internal_function_writer(fname, comm, function_data, engine, mode, time, "FunctionWriter")

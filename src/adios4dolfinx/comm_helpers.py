@@ -1,4 +1,4 @@
-from typing import Tuple
+from __future__ import annotations
 
 from mpi4py import MPI
 
@@ -130,7 +130,7 @@ def send_and_recv_cell_perm(
     perms: npt.NDArray[np.uint32],
     cell_owners: npt.NDArray[np.int32],
     comm: MPI.Intracomm,
-) -> Tuple[npt.NDArray[np.int64], npt.NDArray[np.uint32]]:
+) -> tuple[npt.NDArray[np.int64], npt.NDArray[np.uint32]]:
     """
     Send global cell index and permutation to corresponding entry in `dest_ranks`.
 
