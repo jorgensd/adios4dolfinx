@@ -306,10 +306,6 @@ def test_read_write_P_2D(
     else:
         mesh_fname = hash
 
-    def f(x):
-        print(x)
-
-    query = cluster[:].apply_async(f, 1)
     query = cluster[:].apply_async(
         read_function_original, mesh_fname, hash, "u_original", family, degree, f, f_dtype
     )
