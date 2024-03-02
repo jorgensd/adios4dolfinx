@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Tuple, Union
 
 from mpi4py import MPI
 
@@ -36,7 +37,7 @@ adios_to_numpy_dtype = {
 def read_cell_perms(
     adios: adios2.ADIOS,
     comm: MPI.Intracomm,
-    filename: Union[Path, str],
+    filename: Path | str,
     variable: str,
     num_cells_global: np.int64,
     engine: str,
@@ -98,7 +99,7 @@ def read_cell_perms(
 def read_dofmap(
     adios: adios2.ADIOS,
     comm: MPI.Intracomm,
-    filename: Union[Path, str],
+    filename: Path | str,
     dofmap: str,
     dofmap_offsets: str,
     num_cells_global: np.int64,
@@ -174,14 +175,14 @@ def read_dofmap(
 
 def read_array(
     adios: adios2.ADIOS,
-    filename: Union[Path, str],
+    filename: Path | str,
     array_name: str,
     engine: str,
     comm: MPI.Intracomm,
     time: float = 0.0,
     time_name: str = "",
     legacy: bool = False,
-) -> Tuple[npt.NDArray[valid_function_types], int]:
+) -> tuple[npt.NDArray[valid_function_types], int]:
     """
     Read an array from file, return the global starting position of the local array
 

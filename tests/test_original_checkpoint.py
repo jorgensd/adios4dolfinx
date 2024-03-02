@@ -1,19 +1,18 @@
+from __future__ import annotations
+
 import itertools
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from mpi4py import MPI
 
 import basix
 import basix.ufl
 import dolfinx
-import ipyparallel as ipp
 import numpy as np
 import pytest
 
 import adios4dolfinx
-
-from .test_utils import get_dtype
 
 dtypes = [np.float64, np.float32]  # Mesh geometry dtypes
 
@@ -112,15 +111,7 @@ def create_3D_mesh(request):
     return fname
 
 
-@pytest.fixture(scope="module")
-def cluster():
-    cluster = ipp.Cluster(engines="mpi", n=2)
-    rc = cluster.start_and_connect_sync()
-    yield rc
-    cluster.stop_cluster_sync()
-
-
-def write_function(
+def write_function_original(
     write_mesh: bool,
     mesh: dolfinx.mesh.Mesh,
     el: basix.ufl._ElementBase,
@@ -147,12 +138,12 @@ def write_function(
     filename = Path(f"output/mesh_{file_hash}.bp")
 
     if write_mesh:
-        adios4dolfinx.write_mesh_input_order(mesh, filename)
-    adios4dolfinx.write_function_on_input_mesh(uh, filename, time=0.0)
+        adios4dolfinx.write_mesh_input_order(filename, mesh)
+    adios4dolfinx.write_function_on_input_mesh(filename, uh, time=0.0)
     return filename
 
 
-def read_function(
+def read_function_original(
     mesh_fname: Path,
     u_fname: Path,
     u_name: str,
@@ -176,7 +167,7 @@ def read_function(
             mesh = xdmf.read_mesh()
     elif mesh_fname.suffix == ".bp":
         mesh = adios4dolfinx.read_mesh(
-            MPI.COMM_WORLD, mesh_fname, "BP4", dolfinx.mesh.GhostMode.shared_facet
+            mesh_fname, MPI.COMM_WORLD, "BP4", dolfinx.mesh.GhostMode.shared_facet
         )
     el = basix.ufl.element(
         family,
@@ -189,7 +180,7 @@ def read_function(
 
     V = dolfinx.fem.functionspace(mesh, el)
     u = dolfinx.fem.Function(V, name=u_name, dtype=u_dtype)
-    adios4dolfinx.read_function(u, u_fname, time=0.0)
+    adios4dolfinx.read_function(u_fname, u, time=0.0)
     MPI.COMM_WORLD.Barrier()
 
     u_ex = dolfinx.fem.Function(V, name="exact", dtype=u_dtype)
@@ -238,8 +229,8 @@ def write_function_vector(
     filename = Path(f"output/mesh_{file_hash}.bp")
 
     if write_mesh:
-        adios4dolfinx.write_mesh_input_order(mesh, filename)
-    adios4dolfinx.write_function_on_input_mesh(uh, filename, time=0.0)
+        adios4dolfinx.write_mesh_input_order(filename, mesh)
+    adios4dolfinx.write_function_on_input_mesh(filename, uh, time=0.0)
     return filename
 
 
@@ -261,13 +252,13 @@ def read_function_vector(
             mesh = xdmf.read_mesh()
     elif mesh_fname.suffix == ".bp":
         mesh = adios4dolfinx.read_mesh(
-            MPI.COMM_WORLD, mesh_fname, "BP4", dolfinx.mesh.GhostMode.shared_facet
+            mesh_fname, MPI.COMM_WORLD, "BP4", dolfinx.mesh.GhostMode.shared_facet
         )
     el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
 
     V = dolfinx.fem.functionspace(mesh, el)
     u = dolfinx.fem.Function(V, name=u_name, dtype=u_dtype)
-    adios4dolfinx.read_function(u, u_fname, time=0.0)
+    adios4dolfinx.read_function(u_fname, u, time=0.0)
     MPI.COMM_WORLD.Barrier()
 
     u_ex = dolfinx.fem.Function(V, name="exact", dtype=u_dtype)
@@ -282,7 +273,9 @@ def read_function_vector(
 @pytest.mark.parametrize("family", ["Lagrange", "DG"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("write_mesh", [True, False])
-def test_read_write_P_2D(write_mesh, family, degree, is_complex, create_2D_mesh, cluster):
+def test_read_write_P_2D(
+    write_mesh, family, degree, is_complex, create_2D_mesh, cluster, get_dtype
+):
     fname = create_2D_mesh
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "r") as xdmf:
         mesh = xdmf.read_mesh()
@@ -306,14 +299,15 @@ def test_read_write_P_2D(write_mesh, family, degree, is_complex, create_2D_mesh,
             values[1] += 2j * x[0]
         return values
 
-    hash = write_function(write_mesh, mesh, el, f, f_dtype, "u_original")
+    hash = write_function_original(write_mesh, mesh, el, f, f_dtype, "u_original")
 
     if write_mesh:
         mesh_fname = fname
     else:
         mesh_fname = hash
+
     query = cluster[:].apply_async(
-        read_function, mesh_fname, hash, "u_original", family, degree, f, f_dtype
+        read_function_original, mesh_fname, hash, "u_original", family, degree, f, f_dtype
     )
     query.wait()
     assert query.successful(), query.error
@@ -324,7 +318,9 @@ def test_read_write_P_2D(write_mesh, family, degree, is_complex, create_2D_mesh,
 @pytest.mark.parametrize("family", ["Lagrange", "DG"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("write_mesh", [True, False])
-def test_read_write_P_3D(write_mesh, family, degree, is_complex, create_3D_mesh, cluster):
+def test_read_write_P_3D(
+    write_mesh, family, degree, is_complex, create_3D_mesh, cluster, get_dtype
+):
     fname = create_3D_mesh
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "r") as xdmf:
         mesh = xdmf.read_mesh()
@@ -348,7 +344,7 @@ def test_read_write_P_3D(write_mesh, family, degree, is_complex, create_3D_mesh,
             values[2] += 2j
         return values
 
-    hash = write_function(write_mesh, mesh, el, f, f_dtype, "u_original")
+    hash = write_function_original(write_mesh, mesh, el, f, f_dtype, "u_original")
     MPI.COMM_WORLD.Barrier()
 
     if write_mesh:
@@ -357,7 +353,7 @@ def test_read_write_P_3D(write_mesh, family, degree, is_complex, create_3D_mesh,
         mesh_fname = hash
 
     query = cluster[:].apply_async(
-        read_function, mesh_fname, hash, "u_original", family, degree, f, f_dtype
+        read_function_original, mesh_fname, hash, "u_original", family, degree, f, f_dtype
     )
     query.wait()
     assert query.successful(), query.error
@@ -369,7 +365,7 @@ def test_read_write_P_3D(write_mesh, family, degree, is_complex, create_3D_mesh,
 @pytest.mark.parametrize("family", ["N1curl", "RT"])
 @pytest.mark.parametrize("degree", [1, 4])
 def test_read_write_2D_vector_simplex(
-    write_mesh, family, degree, is_complex, create_simplex_mesh_2D, cluster
+    write_mesh, family, degree, is_complex, create_simplex_mesh_2D, cluster, get_dtype
 ):
     fname = create_simplex_mesh_2D
 
@@ -413,7 +409,7 @@ def test_read_write_2D_vector_simplex(
 @pytest.mark.parametrize("family", ["N1curl", "RT"])
 @pytest.mark.parametrize("degree", [1, 4])
 def test_read_write_3D_vector_simplex(
-    write_mesh, family, degree, is_complex, create_simplex_mesh_3D, cluster
+    write_mesh, family, degree, is_complex, create_simplex_mesh_3D, cluster, get_dtype
 ):
     fname = create_simplex_mesh_3D
 
@@ -458,7 +454,7 @@ def test_read_write_3D_vector_simplex(
 @pytest.mark.parametrize("family", ["RTCF"])
 @pytest.mark.parametrize("degree", [1, 2, 3])
 def test_read_write_2D_vector_non_simplex(
-    write_mesh, family, degree, is_complex, create_non_simplex_mesh_2D, cluster
+    write_mesh, family, degree, is_complex, create_non_simplex_mesh_2D, cluster, get_dtype
 ):
     fname = create_non_simplex_mesh_2D
 
@@ -502,7 +498,7 @@ def test_read_write_2D_vector_non_simplex(
 @pytest.mark.parametrize("family", ["NCF"])
 @pytest.mark.parametrize("degree", [1, 4])
 def test_read_write_3D_vector_non_simplex(
-    write_mesh, family, degree, is_complex, create_non_simplex_mesh_3D, cluster
+    write_mesh, family, degree, is_complex, create_non_simplex_mesh_3D, cluster, get_dtype
 ):
     fname = create_non_simplex_mesh_3D
 
