@@ -224,6 +224,7 @@ def read_function(
     engine: str = "BP4",
     time: float = 0.0,
     legacy: bool = False,
+    name: str | None = None,
 ):
     """
     Read checkpoint from file and fill it into `u`.
@@ -232,12 +233,15 @@ def read_function(
         filename: Path to checkpoint
         u: Function to fill
         engine: ADIOS engine type used for reading
+        time: Time-stamp associated with checkpoint
         legacy: If checkpoint is from prior to time-dependent writing set to True
+        name: If not provided, `u.name` is used to search through the input file for the function
     """
     mesh = u.function_space.mesh
     comm = mesh.comm
     adios = adios2.ADIOS(comm)
-    name = u.name
+    if name is None:
+        name = u.name
     # ----------------------Step 1---------------------------------
     # Compute index of input cells and get cell permutation
     num_owned_cells = mesh.topology.index_map(mesh.topology.dim).size_local
@@ -487,6 +491,7 @@ def write_function(
     engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Append,
     time: float = 0.0,
+    name: str | None = None,
 ):
     """
     Write function checkpoint to file.
@@ -497,6 +502,7 @@ def write_function(
         engine: ADIOS2 engine
         mode: Write or append.
         time: Time-stamp for simulation
+        name: Name of function to write. If None, the name of the function is used.
     """
     dofmap = u.function_space.dofmap
     values = u.x.array
@@ -546,7 +552,7 @@ def write_function(
         values=values[:num_dofs_local].copy(),
         dof_range=local_dof_range,
         num_dofs_global=num_dofs_global,
-        name=u.name,
+        name=name or u.name,
     )
     # Write to file
     fname = Path(filename)
