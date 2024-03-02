@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import itertools
 from collections import ChainMap
-from typing import Dict, List, Tuple, Union
 
 from mpi4py import MPI
 
@@ -12,21 +13,21 @@ import pytest
 import adios4dolfinx
 
 root = 0
-dtypes: List["str"] = ["float64", "float32"]  # Mesh geometry dtypes
-write_comm: List[MPI.Intracomm] = [
+dtypes: list["str"] = ["float64", "float32"]  # Mesh geometry dtypes
+write_comm: list[MPI.Intracomm] = [
     MPI.COMM_SELF,
     MPI.COMM_WORLD,
 ]  # Communicators for creating mesh
-read_modes: List[dolfinx.mesh.GhostMode] = [
+read_modes: list[dolfinx.mesh.GhostMode] = [
     dolfinx.mesh.GhostMode.none,
     dolfinx.mesh.GhostMode.shared_facet,
 ]
 # Cell types of different dimensions
-two_dimensional_cell_types: List[dolfinx.mesh.CellType] = [
+two_dimensional_cell_types: list[dolfinx.mesh.CellType] = [
     dolfinx.mesh.CellType.triangle,
     dolfinx.mesh.CellType.quadrilateral,
 ]
-three_dimensional_cell_types: List[dolfinx.mesh.CellType] = [
+three_dimensional_cell_types: list[dolfinx.mesh.CellType] = [
     dolfinx.mesh.CellType.tetrahedron,
     dolfinx.mesh.CellType.hexahedron,
 ]
@@ -66,7 +67,7 @@ def generate_reference_map(
     meshtag: dolfinx.mesh.MeshTags,
     comm: MPI.Intracomm,
     root: int,
-) -> Union[None, Dict[str, Tuple[int, npt.NDArray]]]:
+) -> None | dict[str, tuple[int, npt.NDArray]]:
     """
     Helper function to generate map from meshtag value to its corresponding index and midpoint.
 
@@ -104,10 +105,10 @@ def test_checkpointing_meshtags_1D(mesh_1D, read_comm, read_mode):
     # If mesh communicator is more than a self communicator or serial write on all processes.
     # If serial or self communicator, only write on root rank
     if mesh.comm.size != 1:
-        adios4dolfinx.write_mesh(mesh, filename, engine="BP4")
+        adios4dolfinx.write_mesh(filename, mesh, engine="BP4")
     else:
         if MPI.COMM_WORLD.rank == root:
-            adios4dolfinx.write_mesh(mesh, filename, engine="BP4")
+            adios4dolfinx.write_mesh(filename, mesh, engine="BP4")
 
     # Create meshtags labeling each entity (of each co-dimension) with a
     # unique number (their initial global index).
@@ -137,7 +138,7 @@ def test_checkpointing_meshtags_1D(mesh_1D, read_comm, read_mode):
 
     MPI.COMM_WORLD.Barrier()
     # Read mesh on testing communicator
-    new_mesh = adios4dolfinx.read_mesh(read_comm, filename, engine="BP4", ghost_mode=read_mode)
+    new_mesh = adios4dolfinx.read_mesh(filename, read_comm, engine="BP4", ghost_mode=read_mode)
     for dim in range(new_mesh.topology.dim + 1):
         # Read meshtags on all processes if testing communicator has multiple ranks
         # else read on root 0
@@ -171,10 +172,10 @@ def test_checkpointing_meshtags_2D(mesh_2D, read_comm, read_mode):
     hash = f"{mesh.comm.size}_{mesh.topology.cell_name()}_{mesh.geometry.x.dtype}"
     filename = f"meshtags_1D_{hash}.bp"
     if mesh.comm.size != 1:
-        adios4dolfinx.write_mesh(mesh, filename, engine="BP4")
+        adios4dolfinx.write_mesh(filename, mesh, engine="BP4")
     else:
         if MPI.COMM_WORLD.rank == root:
-            adios4dolfinx.write_mesh(mesh, filename, engine="BP4")
+            adios4dolfinx.write_mesh(filename, mesh, engine="BP4")
 
     org_maps = []
     for dim in range(mesh.topology.dim + 1):
@@ -196,7 +197,7 @@ def test_checkpointing_meshtags_2D(mesh_2D, read_comm, read_mode):
         del ft
     del mesh
     MPI.COMM_WORLD.Barrier()
-    new_mesh = adios4dolfinx.read_mesh(read_comm, filename, engine="BP4", ghost_mode=read_mode)
+    new_mesh = adios4dolfinx.read_mesh(filename, read_comm, engine="BP4", ghost_mode=read_mode)
     for dim in range(new_mesh.topology.dim + 1):
         if read_comm.size != 1:
             new_ft = adios4dolfinx.read_meshtags(
@@ -225,10 +226,10 @@ def test_checkpointing_meshtags_3D(mesh_3D, read_comm, read_mode):
     hash = f"{mesh.comm.size}_{mesh.topology.cell_name()}_{mesh.geometry.x.dtype}"
     filename = f"meshtags_1D_{hash}.bp"
     if mesh.comm.size != 1:
-        adios4dolfinx.write_mesh(mesh, filename, engine="BP4")
+        adios4dolfinx.write_mesh(filename, mesh, engine="BP4")
     else:
         if MPI.COMM_WORLD.rank == root:
-            adios4dolfinx.write_mesh(mesh, filename, engine="BP4")
+            adios4dolfinx.write_mesh(filename, mesh, engine="BP4")
 
     org_maps = []
     for dim in range(mesh.topology.dim + 1):
@@ -252,7 +253,7 @@ def test_checkpointing_meshtags_3D(mesh_3D, read_comm, read_mode):
     del mesh
 
     MPI.COMM_WORLD.Barrier()
-    new_mesh = adios4dolfinx.read_mesh(read_comm, filename, engine="BP4", ghost_mode=read_mode)
+    new_mesh = adios4dolfinx.read_mesh(filename, read_comm, engine="BP4", ghost_mode=read_mode)
     for dim in range(new_mesh.topology.dim + 1):
         if read_comm.size != 1:
             new_ft = adios4dolfinx.read_meshtags(

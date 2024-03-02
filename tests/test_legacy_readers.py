@@ -28,7 +28,7 @@ def test_legacy_mesh():
     path = (pathlib.Path("legacy") / "mesh.h5").absolute()
     if not path.exists():
         pytest.skip(f"{path} does not exist")
-    mesh = read_mesh_from_legacy_h5(comm=comm, filename=path, group="/mesh")
+    mesh = read_mesh_from_legacy_h5(filename=path, comm=comm, group="/mesh")
     assert mesh.topology.dim == 3
     volume = mesh.comm.allreduce(
         dolfinx.fem.assemble_scalar(dolfinx.fem.form(1 * ufl.dx(domain=mesh))),
@@ -51,7 +51,7 @@ def test_read_legacy_mesh_from_checkpoint():
     filename = (pathlib.Path("legacy") / "mesh_checkpoint.h5").absolute()
     if not filename.exists():
         pytest.skip(f"{filename} does not exist")
-    mesh = read_mesh_from_legacy_h5(comm=comm, filename=filename, group="/Mesh/mesh")
+    mesh = read_mesh_from_legacy_h5(filename=filename, comm=comm, group="/Mesh/mesh")
     assert mesh.topology.dim == 3
     volume = mesh.comm.allreduce(
         dolfinx.fem.assemble_scalar(dolfinx.fem.form(1 * ufl.dx(domain=mesh))),
@@ -74,7 +74,7 @@ def test_legacy_function():
     path = (pathlib.Path("legacy") / "mesh.h5").absolute()
     if not path.exists():
         pytest.skip(f"{path} does not exist")
-    mesh = read_mesh_from_legacy_h5(comm, path, "/mesh")
+    mesh = read_mesh_from_legacy_h5(path, comm, "/mesh")
     V = dolfinx.fem.functionspace(mesh, ("DG", 2))
     u = ufl.TrialFunction(V)
     v = ufl.TestFunction(V)
@@ -88,7 +88,7 @@ def test_legacy_function():
     problem.solve()
 
     u_in = dolfinx.fem.Function(V)
-    read_function_from_legacy_h5(mesh.comm, path, u_in, group="v")
+    read_function_from_legacy_h5(path, mesh.comm, u_in, group="v")
     np.testing.assert_allclose(uh.x.array, u_in.x.array, atol=1e-14)
 
     W = dolfinx.fem.functionspace(mesh, ("DG", 2, (mesh.geometry.dim,)))
@@ -96,7 +96,7 @@ def test_legacy_function():
     wh.interpolate(lambda x: (x[0], 3 * x[2], 7 * x[1]))
     w_in = dolfinx.fem.Function(W)
 
-    read_function_from_legacy_h5(mesh.comm, path, w_in, group="w")
+    read_function_from_legacy_h5(path, mesh.comm, w_in, group="w")
 
     np.testing.assert_allclose(wh.x.array, w_in.x.array, atol=1e-14)
 
@@ -106,7 +106,7 @@ def test_read_legacy_function_from_checkpoint():
     path = (pathlib.Path("legacy") / "mesh_checkpoint.h5").absolute()
     if not path.exists():
         pytest.skip(f"{path} does not exist")
-    mesh = read_mesh_from_legacy_h5(comm, path, "/Mesh/mesh")
+    mesh = read_mesh_from_legacy_h5(path, comm, "/Mesh/mesh")
 
     V = dolfinx.fem.functionspace(mesh, ("DG", 2))
     u = ufl.TrialFunction(V)
@@ -121,12 +121,12 @@ def test_read_legacy_function_from_checkpoint():
     problem.solve()
 
     u_in = dolfinx.fem.Function(V)
-    read_function_from_legacy_h5(mesh.comm, path, u_in, group="v", step=0)
+    read_function_from_legacy_h5(path, mesh.comm, u_in, group="v", step=0)
     assert np.allclose(uh.x.array, u_in.x.array)
 
     # Check second step
     uh.interpolate(lambda x: x[0])
-    read_function_from_legacy_h5(mesh.comm, path, u_in, group="v", step=1)
+    read_function_from_legacy_h5(path, mesh.comm, u_in, group="v", step=1)
     assert np.allclose(uh.x.array, u_in.x.array)
 
     W = dolfinx.fem.functionspace(mesh, ("DG", 2, (mesh.geometry.dim,)))
@@ -134,11 +134,11 @@ def test_read_legacy_function_from_checkpoint():
     wh.interpolate(lambda x: (x[0], 3 * x[2], 7 * x[1]))
     w_in = dolfinx.fem.Function(W)
 
-    read_function_from_legacy_h5(mesh.comm, path, w_in, group="w", step=0)
+    read_function_from_legacy_h5(path, mesh.comm, w_in, group="w", step=0)
     np.testing.assert_allclose(wh.x.array, w_in.x.array, atol=1e-14)
 
     wh.interpolate(lambda x: np.vstack((x[0], 0 * x[0], x[1])))
-    read_function_from_legacy_h5(mesh.comm, path, w_in, group="w", step=1)
+    read_function_from_legacy_h5(path, mesh.comm, w_in, group="w", step=1)
     np.testing.assert_allclose(wh.x.array, w_in.x.array, atol=1e-14)
 
 
@@ -149,7 +149,7 @@ def test_adios4dolfinx_legacy():
         pytest.skip(f"{path} does not exist")
 
     el = ("N1curl", 3)
-    mesh = read_mesh(comm, path, "BP4", dolfinx.mesh.GhostMode.shared_facet)
+    mesh = read_mesh(path, comm, "BP4", dolfinx.mesh.GhostMode.shared_facet)
 
     def f(x):
         values = np.zeros((2, x.shape[1]), dtype=np.float64)
@@ -159,7 +159,7 @@ def test_adios4dolfinx_legacy():
 
     V = dolfinx.fem.functionspace(mesh, el)
     u = dolfinx.fem.Function(V)
-    read_function(u, path, engine="BP4", legacy=True)
+    read_function(path, u, engine="BP4", legacy=True)
 
     u_ex = dolfinx.fem.Function(V)
     u_ex.interpolate(f)

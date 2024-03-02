@@ -8,14 +8,6 @@ import dolfinx
 import numpy as np
 import pytest
 
-from .test_utils import (
-    get_dtype,
-    read_function,
-    read_function_time_dep,
-    write_function,
-    write_function_time_dep,
-)
-
 dtypes = [np.float64, np.float32]  # Mesh geometry dtypes
 write_comm = [MPI.COMM_SELF, MPI.COMM_WORLD]  # Communicators for creating mesh
 
@@ -51,7 +43,9 @@ def mesh_3D(request):
 @pytest.mark.parametrize("family", ["Lagrange", "DG"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_read_write_P_2D(read_comm, family, degree, is_complex, mesh_2D):
+def test_read_write_P_2D(
+    read_comm, family, degree, is_complex, mesh_2D, get_dtype, write_function, read_function
+):
     mesh = mesh_2D
     f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
 
@@ -82,7 +76,9 @@ def test_read_write_P_2D(read_comm, family, degree, is_complex, mesh_2D):
 @pytest.mark.parametrize("family", ["Lagrange", "DG"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_read_write_P_3D(read_comm, family, degree, is_complex, mesh_3D):
+def test_read_write_P_3D(
+    read_comm, family, degree, is_complex, mesh_3D, get_dtype, write_function, read_function
+):
     mesh = mesh_3D
     f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
     el = basix.ufl.element(
@@ -113,7 +109,16 @@ def test_read_write_P_3D(read_comm, family, degree, is_complex, mesh_3D):
 @pytest.mark.parametrize("family", ["Lagrange", "DG"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_read_write_P_2D_time(read_comm, family, degree, is_complex, mesh_2D):
+def test_read_write_P_2D_time(
+    read_comm,
+    family,
+    degree,
+    is_complex,
+    mesh_2D,
+    get_dtype,
+    write_function_time_dep,
+    read_function_time_dep,
+):
     mesh = mesh_2D
     f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
 
@@ -155,7 +160,16 @@ def test_read_write_P_2D_time(read_comm, family, degree, is_complex, mesh_2D):
 @pytest.mark.parametrize("family", ["Lagrange", "DG"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_read_write_P_3D_time(read_comm, family, degree, is_complex, mesh_3D):
+def test_read_write_P_3D_time(
+    read_comm,
+    family,
+    degree,
+    is_complex,
+    mesh_3D,
+    get_dtype,
+    write_function_time_dep,
+    read_function_time_dep,
+):
     mesh = mesh_3D
     f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
     el = basix.ufl.element(

@@ -8,8 +8,6 @@ import dolfinx
 import numpy as np
 import pytest
 
-from .test_utils import get_dtype, read_function, write_function
-
 dtypes = [np.float64, np.float32]  # Mesh geometry dtypes
 write_comm = [MPI.COMM_SELF, MPI.COMM_WORLD]  # Communicators for creating mesh
 
@@ -53,7 +51,9 @@ def non_simplex_mesh_3D(request):
 @pytest.mark.parametrize("family", ["N1curl", "RT"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_read_write_2D(read_comm, family, degree, is_complex, simplex_mesh_2D):
+def test_read_write_2D(
+    read_comm, family, degree, is_complex, simplex_mesh_2D, get_dtype, write_function, read_function
+):
     mesh = simplex_mesh_2D
     f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
     el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
@@ -76,7 +76,9 @@ def test_read_write_2D(read_comm, family, degree, is_complex, simplex_mesh_2D):
 @pytest.mark.parametrize("family", ["N1curl", "RT"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_read_write_3D(read_comm, family, degree, is_complex, simplex_mesh_3D):
+def test_read_write_3D(
+    read_comm, family, degree, is_complex, simplex_mesh_3D, get_dtype, write_function, read_function
+):
     mesh = simplex_mesh_3D
     f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
     el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
@@ -100,7 +102,16 @@ def test_read_write_3D(read_comm, family, degree, is_complex, simplex_mesh_3D):
 @pytest.mark.parametrize("family", ["RTCF"])
 @pytest.mark.parametrize("degree", [1, 2, 3])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_read_write_2D_quad(read_comm, family, degree, is_complex, non_simplex_mesh_2D):
+def test_read_write_2D_quad(
+    read_comm,
+    family,
+    degree,
+    is_complex,
+    non_simplex_mesh_2D,
+    get_dtype,
+    write_function,
+    read_function,
+):
     mesh = non_simplex_mesh_2D
     f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
     el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
@@ -123,7 +134,16 @@ def test_read_write_2D_quad(read_comm, family, degree, is_complex, non_simplex_m
 @pytest.mark.parametrize("family", ["NCF"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_read_write_hex(read_comm, family, degree, is_complex, non_simplex_mesh_3D):
+def test_read_write_hex(
+    read_comm,
+    family,
+    degree,
+    is_complex,
+    non_simplex_mesh_3D,
+    get_dtype,
+    write_function,
+    read_function,
+):
     mesh = non_simplex_mesh_3D
     f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
     el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
@@ -147,7 +167,16 @@ def test_read_write_hex(read_comm, family, degree, is_complex, non_simplex_mesh_
 @pytest.mark.parametrize("family", ["RTCF"])
 @pytest.mark.parametrize("degree", [1, 2, 3])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_read_write_multiple(read_comm, family, degree, is_complex, non_simplex_mesh_2D):
+def test_read_write_multiple(
+    read_comm,
+    family,
+    degree,
+    is_complex,
+    non_simplex_mesh_2D,
+    get_dtype,
+    write_function,
+    read_function,
+):
     mesh = non_simplex_mesh_2D
     f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
     el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
