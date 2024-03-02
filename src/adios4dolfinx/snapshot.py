@@ -9,7 +9,7 @@ from pathlib import Path
 import adios2
 import dolfinx
 
-from .adios2_helpers import Adios, resolve_adios_scope
+from .adios2_helpers import ADIOSFile, resolve_adios_scope
 
 adios2 = resolve_adios_scope(adios2)
 
@@ -32,7 +32,7 @@ def snapshot_checkpoint(uh: dolfinx.fem.Function, file: Path, mode: adios2.Mode)
         raise ValueError("Got invalid mode {mode}")
     # Create ADIOS IO
     adios = adios2.ADIOS(uh.function_space.mesh.comm)
-    with Adios(
+    with ADIOSFile(
         adios=adios,
         filename=file,
         mode=mode,

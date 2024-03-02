@@ -20,7 +20,7 @@ def resolve_adios_scope(adios2):
 adios2 = resolve_adios_scope(adios2)
 
 """
-Helpers reading/writing data with ADIOS2
+Helpers reading/writing data with ADIOSFile2
 """
 
 __all__ = ["read_array", "read_dofmap", "read_cell_perms", "adios_to_numpy_dtype"]
@@ -40,7 +40,7 @@ class AdiosFile(NamedTuple):
 
 
 @contextmanager
-def Adios(
+def ADIOSFile(
     adios: adios2.ADIOS,
     filename: Path | str,
     engine: str,
@@ -87,7 +87,7 @@ def read_cell_perms(
     # Open ADIOS engine
     io_name = f"{variable=}_reader"
 
-    with Adios(
+    with ADIOSFile(
         adios=adios,
         engine=engine,
         filename=filename,
@@ -154,7 +154,7 @@ def read_dofmap(
     # Open ADIOS engine
     io_name = f"{dofmap=}_reader"
 
-    with Adios(
+    with ADIOSFile(
         adios=adios,
         engine=engine,
         filename=filename,
@@ -228,7 +228,7 @@ def read_array(
         Local part of array and its global starting position
     """
 
-    with Adios(
+    with ADIOSFile(
         adios=adios,
         engine=engine,
         filename=filename,

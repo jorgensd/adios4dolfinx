@@ -12,7 +12,7 @@ from mpi4py import MPI
 import adios2
 import numpy as np
 
-from .adios2_helpers import Adios, resolve_adios_scope
+from .adios2_helpers import ADIOSFile, resolve_adios_scope
 from .structures import FunctionData, MeshData
 
 adios2 = resolve_adios_scope(adios2)
@@ -40,7 +40,7 @@ def write_mesh(
 
     gdim = mesh.local_geometry.shape[1]
     adios = adios2.ADIOS(comm)
-    with Adios(
+    with ADIOSFile(
         adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name
     ) as adios_file:
         # Write geometry
@@ -103,7 +103,7 @@ def write_function(
     """
     adios = adios2.ADIOS(comm)
 
-    with Adios(
+    with ADIOSFile(
         adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name
     ) as adios_file:
         # Add mesh permutations

@@ -16,7 +16,12 @@ import numpy as np
 import numpy.typing as npt
 import ufl
 
-from .adios2_helpers import Adios, adios_to_numpy_dtype, read_array, resolve_adios_scope
+from .adios2_helpers import (
+    ADIOSFile,
+    adios_to_numpy_dtype,
+    read_array,
+    resolve_adios_scope,
+)
 from .comm_helpers import send_dofs_and_recv_values
 from .utils import (
     compute_dofmap_pos,
@@ -69,7 +74,7 @@ def read_dofmap_legacy(
 
     # Open ADIOS engine
     adios = adios2.ADIOS(comm)
-    with Adios(
+    with ADIOSFile(
         adios=adios,
         filename=filename,
         mode=adios2.Mode.Read,
@@ -272,7 +277,7 @@ def read_mesh_from_legacy_h5(
     """
     # Create ADIOS2 reader
     adios = adios2.ADIOS(comm)
-    with Adios(
+    with ADIOSFile(
         adios=adios,
         filename=filename,
         mode=adios2.Mode.Read,
