@@ -233,7 +233,9 @@ def read_function(
         filename: Path to checkpoint
         u: Function to fill
         engine: ADIOS engine type used for reading
+        time: Time-stamp associated with checkpoint
         legacy: If checkpoint is from prior to time-dependent writing set to True
+        name: If not provided, `u.name` is used to search through the input file for the function
     """
     mesh = u.function_space.mesh
     comm = mesh.comm
@@ -303,14 +305,14 @@ def read_function(
 
         # First invert input data to reference element then transform to current mesh
         for i, l_cell in enumerate(input_local_cell_index):
-            start, end = input_dofmap.offsets[l_cell : l_cell + 2]
+            start, end = input_dofmap.offsets[l_cell: l_cell + 2]
             # FIXME: Tempoary cast uint32 to integer as transformations
             # doesn't support uint32 with the switch to nanobind
             element.pre_apply_transpose_dof_transformation(
-                recv_array[int(start) : int(end)], int(input_perms[l_cell]), bs
+                recv_array[int(start): int(end)], int(input_perms[l_cell]), bs
             )
             element.pre_apply_inverse_transpose_dof_transformation(
-                recv_array[int(start) : int(end)], int(inc_perms[i]), bs
+                recv_array[int(start): int(end)], int(inc_perms[i]), bs
             )
     # ------------------Step 6----------------------------------------
     # For each dof owned by a process, find the local position in the dofmap.
