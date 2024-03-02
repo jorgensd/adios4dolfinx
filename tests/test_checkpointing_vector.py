@@ -67,9 +67,9 @@ def test_read_write_2D(
             values[1] += 2j * x[0]
         return values
 
-    hash = write_function(mesh, el, f, f_dtype)
+    fname = write_function(mesh, el, f, f_dtype)
     MPI.COMM_WORLD.Barrier()
-    read_function(read_comm, el, f, hash, f_dtype)
+    read_function(read_comm, el, f, fname, f_dtype)
 
 
 @pytest.mark.parametrize("is_complex", [True, False])
@@ -93,9 +93,9 @@ def test_read_write_3D(
             values[1] += 2j * np.cos(x[2])
         return values
 
-    hash = write_function(mesh, el, f, dtype=f_dtype)
+    fname = write_function(mesh, el, f, dtype=f_dtype)
     MPI.COMM_WORLD.Barrier()
-    read_function(read_comm, el, f, hash, dtype=f_dtype)
+    read_function(read_comm, el, f, fname, dtype=f_dtype)
 
 
 @pytest.mark.parametrize("is_complex", [True, False])

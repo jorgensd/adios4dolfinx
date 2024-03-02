@@ -15,8 +15,10 @@ from adios4dolfinx import read_mesh, write_mesh
 @pytest.mark.parametrize("ghost_mode", [dolfinx.mesh.GhostMode.shared_facet])
 def test_mesh_read_writer(encoder, suffix, ghost_mode, tmp_path):
     N = 25
-    file = tmp_path / f"adios_mesh_{encoder}"
-    xdmf_file = tmp_path / "xdmf_mesh"
+    # Consistent tmp dir across processes
+    fname = MPI.COMM_WORLD.bcast(tmp_path, root=0)
+    file = fname / f"adios_mesh_{encoder}"
+    xdmf_file = fname / "xdmf_mesh"
     mesh = dolfinx.mesh.create_unit_cube(MPI.COMM_WORLD, N, N, N, ghost_mode=ghost_mode)
 
     start = time.perf_counter()
