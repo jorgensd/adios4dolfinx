@@ -20,7 +20,7 @@ def resolve_adios_scope(adios2):
 adios2 = resolve_adios_scope(adios2)
 
 """
-Helpers reading/writing data with ADIOSFile2
+Helpers reading/writing data with ADIOS2
 """
 
 __all__ = ["read_array", "read_dofmap", "read_cell_perms", "adios_to_numpy_dtype"]
