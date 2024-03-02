@@ -1,5 +1,3 @@
-import pathlib
-
 from mpi4py import MPI
 
 import dolfinx
@@ -20,7 +18,7 @@ def cluster():
 
 
 @pytest.fixture(scope="function")
-def write_function():
+def write_function(tmp_path):
     def _write_function(mesh, el, f, dtype, name="uh", append: bool = False) -> str:
         V = dolfinx.fem.functionspace(mesh, el)
         uh = dolfinx.fem.Function(V, dtype=dtype)
@@ -37,7 +35,7 @@ def write_function():
         )
 
         file_hash = f"{el_hash}_{np.dtype(dtype).name}"
-        filename = pathlib.Path(f"output/mesh_{file_hash}.bp")
+        filename = tmp_path / f"mesh_{file_hash}.bp"
         if mesh.comm.size != 1:
             if not append:
                 adios4dolfinx.write_mesh(filename, mesh)
@@ -54,9 +52,9 @@ def write_function():
 
 
 @pytest.fixture(scope="function")
-def read_function():
+def read_function(tmp_path):
     def _read_function(comm, el, f, hash, dtype, name="uh"):
-        filename = f"output/mesh_{hash}.bp"
+        filename = tmp_path / f"mesh_{hash}.bp"
         engine = "BP4"
         mesh = adios4dolfinx.read_mesh(filename, comm, engine, dolfinx.mesh.GhostMode.shared_facet)
         V = dolfinx.fem.functionspace(mesh, el)
@@ -94,7 +92,7 @@ def get_dtype():
 
 
 @pytest.fixture(scope="function")
-def write_function_time_dep():
+def write_function_time_dep(tmp_path):
     def _write_function_time_dep(mesh, el, f0, f1, t0, t1, dtype) -> str:
         V = dolfinx.fem.functionspace(mesh, el)
         uh = dolfinx.fem.Function(V, dtype=dtype)
@@ -109,7 +107,7 @@ def write_function_time_dep():
             .replace("]", "")
         )
         file_hash = f"{el_hash}_{np.dtype(dtype).name}"
-        filename = pathlib.Path(f"output/mesh_{file_hash}.bp")
+        filename = tmp_path / f"mesh_{file_hash}.bp"
         if mesh.comm.size != 1:
             adios4dolfinx.write_mesh(filename, mesh)
             adios4dolfinx.write_function(filename, uh, time=t0)
@@ -129,9 +127,9 @@ def write_function_time_dep():
 
 
 @pytest.fixture(scope="function")
-def read_function_time_dep():
+def read_function_time_dep(tmp_path):
     def _read_function_time_dep(comm, el, f0, f1, t0, t1, hash, dtype):
-        filename = f"output/mesh_{hash}.bp"
+        filename = tmp_path / f"mesh_{hash}.bp"
         engine = "BP4"
         mesh = adios4dolfinx.read_mesh(filename, comm, engine, dolfinx.mesh.GhostMode.shared_facet)
         V = dolfinx.fem.functionspace(mesh, el)

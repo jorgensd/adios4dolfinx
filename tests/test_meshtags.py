@@ -95,12 +95,12 @@ def generate_reference_map(
 
 @pytest.mark.parametrize("read_mode", read_modes)
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_checkpointing_meshtags_1D(mesh_1D, read_comm, read_mode):
+def test_checkpointing_meshtags_1D(mesh_1D, read_comm, read_mode, tmp_path):
     mesh = mesh_1D
 
     # Write unique mesh file for each combination of MPI communicator and dtype
     hash = f"{mesh.comm.size}_{mesh.geometry.x.dtype}"
-    filename = f"meshtags_1D_{hash}.bp"
+    filename = tmp_path / f"meshtags_1D_{hash}.bp"
 
     # If mesh communicator is more than a self communicator or serial write on all processes.
     # If serial or self communicator, only write on root rank
@@ -167,10 +167,10 @@ def test_checkpointing_meshtags_1D(mesh_1D, read_comm, read_mode):
 
 @pytest.mark.parametrize("read_mode", read_modes)
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_checkpointing_meshtags_2D(mesh_2D, read_comm, read_mode):
+def test_checkpointing_meshtags_2D(mesh_2D, read_comm, read_mode, tmp_path):
     mesh = mesh_2D
     hash = f"{mesh.comm.size}_{mesh.topology.cell_name()}_{mesh.geometry.x.dtype}"
-    filename = f"meshtags_1D_{hash}.bp"
+    filename = tmp_path / f"meshtags_1D_{hash}.bp"
     if mesh.comm.size != 1:
         adios4dolfinx.write_mesh(filename, mesh, engine="BP4")
     else:
@@ -221,10 +221,10 @@ def test_checkpointing_meshtags_2D(mesh_2D, read_comm, read_mode):
 
 @pytest.mark.parametrize("read_mode", read_modes)
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_checkpointing_meshtags_3D(mesh_3D, read_comm, read_mode):
+def test_checkpointing_meshtags_3D(mesh_3D, read_comm, read_mode, tmp_path):
     mesh = mesh_3D
     hash = f"{mesh.comm.size}_{mesh.topology.cell_name()}_{mesh.geometry.x.dtype}"
-    filename = f"meshtags_1D_{hash}.bp"
+    filename = tmp_path / f"meshtags_1D_{hash}.bp"
     if mesh.comm.size != 1:
         adios4dolfinx.write_mesh(filename, mesh, engine="BP4")
     else:

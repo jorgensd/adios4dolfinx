@@ -1,4 +1,3 @@
-import pathlib
 import time
 
 from mpi4py import MPI
@@ -14,10 +13,10 @@ from adios4dolfinx import read_mesh, write_mesh
 @pytest.mark.parametrize("encoder, suffix", [("BP4", ".bp"), ("HDF5", ".h5")])
 # , ("BP5", ".bp")]) # Deactivated, see: https://github.com/jorgensd/adios4dolfinx/issues/7
 @pytest.mark.parametrize("ghost_mode", [dolfinx.mesh.GhostMode.shared_facet])
-def test_mesh_read_writer(encoder, suffix, ghost_mode):
+def test_mesh_read_writer(encoder, suffix, ghost_mode, tmp_path):
     N = 25
-    file = pathlib.Path(f"output/adios_mesh_{encoder}")
-    xdmf_file = pathlib.Path("output/xdmf_mesh")
+    file = tmp_path / f"adios_mesh_{encoder}"
+    xdmf_file = tmp_path / "xdmf_mesh"
     mesh = dolfinx.mesh.create_unit_cube(MPI.COMM_WORLD, N, N, N, ghost_mode=ghost_mode)
 
     start = time.perf_counter()
