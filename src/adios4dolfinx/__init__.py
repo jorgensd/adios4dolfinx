@@ -8,9 +8,11 @@
 from importlib.metadata import metadata
 
 from .checkpointing import (
+    read_attributes,
     read_function,
     read_mesh,
     read_meshtags,
+    write_attributes,
     write_function,
     write_mesh,
     write_meshtags,
@@ -38,4 +40,6 @@ __all__ = [
     "snapshot_checkpoint",
     "write_function_on_input_mesh",
     "write_mesh_input_order",
+    "write_attributes",
+    "read_attributes",
 ]

@@ -43,7 +43,76 @@ __all__ = [
     "write_mesh",
     "read_meshtags",
     "write_meshtags",
+    "write_attributes",
 ]
+
+
+def write_attributes(
+    filename: Path | str,
+    comm: MPI.Intracomm,
+    name: str,
+    attributes: dict[str, np.ndarray],
+    engine: str = "BP4",
+):
+    """Write attributes to file using ADIOS2.
+
+    Args:
+        filename: Path to file to write to
+        comm: MPI communicator used in storage
+        name: Name of the attributes
+        attributes: Dictionary of attributes to write to file
+        engine: ADIOS2 engine to use
+    """
+    adios = adios2.ADIOS(comm)
+    with ADIOSFile(
+        adios=adios,
+        filename=filename,
+        mode=adios2.Mode.Append,
+        engine=engine,
+        io_name="AttributesWriter",
+    ) as adios_file:
+        adios_file.file.BeginStep()
+
+        for k, v in attributes.items():
+            adios_file.io.DefineAttribute(f"{name}_{k}", v)
+
+        adios_file.file.PerformPuts()
+        adios_file.file.EndStep()
+
+
+def read_attributes(
+    filename: Path | str,
+    comm: MPI.Intracomm,
+    name: str,
+    engine: str = "BP4",
+) -> dict[str, np.ndarray]:
+    """Read attributes from file using ADIOS2.
+
+    Args:
+        filename: Path to file to read from
+        comm: MPI communicator used in storage
+        name: Name of the attributes
+        engine: ADIOS2 engine to use
+    Returns:
+        The attributes
+    """
+
+    adios = adios2.ADIOS(comm)
+    with ADIOSFile(
+        adios=adios,
+        filename=filename,
+        mode=adios2.Mode.Read,
+        engine=engine,
+        io_name="AttributesReader",
+    ) as adios_file:
+        adios_file.file.BeginStep()
+        attributes = {}
+        for k in adios_file.io.AvailableAttributes().keys():
+            if k.startswith(f"{name}_"):
+                a = adios_file.io.InquireAttribute(k)
+                attributes[k[len(name) + 1 :]] = a.Data()
+        adios_file.file.EndStep()
+    return attributes
 
 
 def write_meshtags(
