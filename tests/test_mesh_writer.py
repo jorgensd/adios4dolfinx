@@ -21,7 +21,7 @@ def test_mesh_read_writer(encoder, suffix, ghost_mode):
     mesh = dolfinx.mesh.create_unit_cube(MPI.COMM_WORLD, N, N, N, ghost_mode=ghost_mode)
 
     start = time.perf_counter()
-    write_mesh(mesh, file.with_suffix(suffix), encoder)
+    write_mesh(file.with_suffix(suffix), mesh, encoder)
     end = time.perf_counter()
     print(f"Write ADIOS2 mesh: {end-start}")
 
@@ -34,7 +34,7 @@ def test_mesh_read_writer(encoder, suffix, ghost_mode):
     mesh.comm.Barrier()
 
     start = time.perf_counter()
-    mesh_adios = read_mesh(MPI.COMM_WORLD, file.with_suffix(suffix), encoder, ghost_mode)
+    mesh_adios = read_mesh(file.with_suffix(suffix), MPI.COMM_WORLD, encoder, ghost_mode)
     end = time.perf_counter()
     print(f"Read ADIOS2 mesh: {end-start}")
     mesh.comm.Barrier()

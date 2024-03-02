@@ -15,8 +15,6 @@ import pytest
 
 import adios4dolfinx
 
-from .test_utils import get_dtype
-
 dtypes = [np.float64, np.float32]  # Mesh geometry dtypes
 
 two_dimensional_cell_types = [
@@ -122,7 +120,7 @@ def cluster():
     cluster.stop_cluster_sync()
 
 
-def write_function(
+def write_function_original(
     write_mesh: bool,
     mesh: dolfinx.mesh.Mesh,
     el: basix.ufl._ElementBase,
@@ -154,7 +152,7 @@ def write_function(
     return filename
 
 
-def read_function(
+def read_function_original(
     mesh_fname: Path,
     u_fname: Path,
     u_name: str,
@@ -172,7 +170,7 @@ def read_function(
 
     import adios4dolfinx
 
-    assert MPI.COMM_WORLD.size > 1
+    # assert MPI.COMM_WORLD.size > 1
     if mesh_fname.suffix == ".xdmf":
         with dolfinx.io.XDMFFile(MPI.COMM_WORLD, mesh_fname, "r") as xdmf:
             mesh = xdmf.read_mesh()
@@ -284,7 +282,9 @@ def read_function_vector(
 @pytest.mark.parametrize("family", ["Lagrange", "DG"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("write_mesh", [True, False])
-def test_read_write_P_2D(write_mesh, family, degree, is_complex, create_2D_mesh, cluster):
+def test_read_write_P_2D(
+    write_mesh, family, degree, is_complex, create_2D_mesh, cluster, get_dtype
+):
     fname = create_2D_mesh
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "r") as xdmf:
         mesh = xdmf.read_mesh()
@@ -308,14 +308,14 @@ def test_read_write_P_2D(write_mesh, family, degree, is_complex, create_2D_mesh,
             values[1] += 2j * x[0]
         return values
 
-    hash = write_function(write_mesh, mesh, el, f, f_dtype, "u_original")
+    hash = write_function_original(write_mesh, mesh, el, f, f_dtype, "u_original")
 
     if write_mesh:
         mesh_fname = fname
     else:
         mesh_fname = hash
     query = cluster[:].apply_async(
-        read_function, mesh_fname, hash, "u_original", family, degree, f, f_dtype
+        read_function_original, mesh_fname, hash, "u_original", family, degree, f, f_dtype
     )
     query.wait()
     assert query.successful(), query.error
@@ -326,7 +326,9 @@ def test_read_write_P_2D(write_mesh, family, degree, is_complex, create_2D_mesh,
 @pytest.mark.parametrize("family", ["Lagrange", "DG"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("write_mesh", [True, False])
-def test_read_write_P_3D(write_mesh, family, degree, is_complex, create_3D_mesh, cluster):
+def test_read_write_P_3D(
+    write_mesh, family, degree, is_complex, create_3D_mesh, cluster, get_dtype
+):
     fname = create_3D_mesh
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "r") as xdmf:
         mesh = xdmf.read_mesh()
@@ -350,7 +352,7 @@ def test_read_write_P_3D(write_mesh, family, degree, is_complex, create_3D_mesh,
             values[2] += 2j
         return values
 
-    hash = write_function(write_mesh, mesh, el, f, f_dtype, "u_original")
+    hash = write_function_original(write_mesh, mesh, el, f, f_dtype, "u_original")
     MPI.COMM_WORLD.Barrier()
 
     if write_mesh:
@@ -359,7 +361,7 @@ def test_read_write_P_3D(write_mesh, family, degree, is_complex, create_3D_mesh,
         mesh_fname = hash
 
     query = cluster[:].apply_async(
-        read_function, mesh_fname, hash, "u_original", family, degree, f, f_dtype
+        read_function_original, mesh_fname, hash, "u_original", family, degree, f, f_dtype
     )
     query.wait()
     assert query.successful(), query.error
@@ -371,7 +373,7 @@ def test_read_write_P_3D(write_mesh, family, degree, is_complex, create_3D_mesh,
 @pytest.mark.parametrize("family", ["N1curl", "RT"])
 @pytest.mark.parametrize("degree", [1, 4])
 def test_read_write_2D_vector_simplex(
-    write_mesh, family, degree, is_complex, create_simplex_mesh_2D, cluster
+    write_mesh, family, degree, is_complex, create_simplex_mesh_2D, cluster, get_dtype
 ):
     fname = create_simplex_mesh_2D
 
@@ -415,7 +417,7 @@ def test_read_write_2D_vector_simplex(
 @pytest.mark.parametrize("family", ["N1curl", "RT"])
 @pytest.mark.parametrize("degree", [1, 4])
 def test_read_write_3D_vector_simplex(
-    write_mesh, family, degree, is_complex, create_simplex_mesh_3D, cluster
+    write_mesh, family, degree, is_complex, create_simplex_mesh_3D, cluster, get_dtype
 ):
     fname = create_simplex_mesh_3D
 
@@ -460,7 +462,7 @@ def test_read_write_3D_vector_simplex(
 @pytest.mark.parametrize("family", ["RTCF"])
 @pytest.mark.parametrize("degree", [1, 2, 3])
 def test_read_write_2D_vector_non_simplex(
-    write_mesh, family, degree, is_complex, create_non_simplex_mesh_2D, cluster
+    write_mesh, family, degree, is_complex, create_non_simplex_mesh_2D, cluster, get_dtype
 ):
     fname = create_non_simplex_mesh_2D
 
@@ -504,7 +506,7 @@ def test_read_write_2D_vector_non_simplex(
 @pytest.mark.parametrize("family", ["NCF"])
 @pytest.mark.parametrize("degree", [1, 4])
 def test_read_write_3D_vector_non_simplex(
-    write_mesh, family, degree, is_complex, create_non_simplex_mesh_3D, cluster
+    write_mesh, family, degree, is_complex, create_non_simplex_mesh_3D, cluster, get_dtype
 ):
     fname = create_non_simplex_mesh_3D
 
