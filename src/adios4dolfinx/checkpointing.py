@@ -43,6 +43,7 @@ __all__ = [
     "write_mesh",
     "read_meshtags",
     "write_meshtags",
+    "read_attributes",
     "write_attributes",
 ]
 
