@@ -51,6 +51,7 @@ def write_meshtags(
     mesh: dolfinx.mesh.Mesh,
     meshtags: dolfinx.mesh.MeshTags,
     engine: str = "BP4",
+    meshtag_name: str | None = None,
 ):
     """
     Write meshtags associated with input mesh to file.
@@ -64,6 +65,7 @@ def write_meshtags(
         mesh: The mesh associated with the meshtags
         meshtags: The meshtags to write to file
         engine: Adios2 Engine
+        meshtag_name: Name of the meshtag. If None, the meshtag name is used.
     """
     tag_entities = meshtags.indices
     dim = meshtags.dim
@@ -84,6 +86,8 @@ def write_meshtags(
 
     indices = mesh.geometry.index_map().local_to_global(entities_to_geometry.reshape(-1))
 
+    name = meshtag_name or meshtags.name
+
     adios = adios2.ADIOS(mesh.comm)
     with ADIOSFile(
         adios=adios,
@@ -94,7 +98,7 @@ def write_meshtags(
     ) as adios_file:
         # Write meshtag topology
         topology_var = adios_file.io.DefineVariable(
-            meshtags.name + "_topology",
+            name + "_topology",
             indices,
             shape=[global_num_tag_entities, num_dofs_per_entity],
             start=[local_start, 0],
@@ -104,7 +108,7 @@ def write_meshtags(
 
         # Write meshtag topology
         values_var = adios_file.io.DefineVariable(
-            meshtags.name + "_values",
+            name + "_values",
             local_values,
             shape=[global_num_tag_entities],
             start=[local_start],
@@ -113,9 +117,7 @@ def write_meshtags(
         adios_file.file.Put(values_var, local_values, adios2.Mode.Sync)
 
         # Write meshtag dim
-        adios_file.io.DefineAttribute(
-            meshtags.name + "_dim", np.array([meshtags.dim], dtype=np.uint8)
-        )
+        adios_file.io.DefineAttribute(name + "_dim", np.array([meshtags.dim], dtype=np.uint8))
 
         adios_file.file.PerformPuts()
         adios_file.file.EndStep()
