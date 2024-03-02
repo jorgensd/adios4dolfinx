@@ -161,7 +161,7 @@ def read_function_original(
 
     import adios4dolfinx
 
-    # assert MPI.COMM_WORLD.size > 1
+    assert MPI.COMM_WORLD.size > 1
     if mesh_fname.suffix == ".xdmf":
         with dolfinx.io.XDMFFile(MPI.COMM_WORLD, mesh_fname, "r") as xdmf:
             mesh = xdmf.read_mesh()
