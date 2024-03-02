@@ -39,6 +39,7 @@ def create_simplex_mesh_2D(tmp_path_factory):
         dtype=np.float64,
     )
     fname = tmp_path_factory.mktemp("output") / "original_mesh_2D_simplex.xdmf"
+    fname = MPI.COMM_WORLD.bcast(fname, root=0)
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "w") as xdmf:
         xdmf.write_mesh(mesh)
     return fname
