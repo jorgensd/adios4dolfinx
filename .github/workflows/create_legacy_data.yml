@@ -15,7 +15,7 @@ jobs:
       data_dir: "legacy"
   
     runs-on: "ubuntu-22.04"
-    container: ghcr.io/scientificcomputing/fenics:2023-11-15
+    container: ghcr.io/scientificcomputing/fenics:2024-02-19
     steps:
     - uses: actions/checkout@v4
 
