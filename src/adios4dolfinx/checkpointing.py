@@ -4,8 +4,9 @@
 #
 # SPDX-License-Identifier:    MIT
 
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Optional, Union
 
 from mpi4py import MPI
 
@@ -16,6 +17,7 @@ import numpy as np
 import ufl
 
 from .adios2_helpers import (
+    ADIOSFile,
     adios_to_numpy_dtype,
     read_array,
     read_cell_perms,
@@ -45,10 +47,10 @@ __all__ = [
 
 
 def write_meshtags(
-    filename: Union[Path, str],
+    filename: Path | str,
     mesh: dolfinx.mesh.Mesh,
     meshtags: dolfinx.mesh.MeshTags,
-    engine: Optional[str] = "BP4",
+    engine: str = "BP4",
 ):
     """
     Write meshtags associated with input mesh to file.
@@ -83,39 +85,44 @@ def write_meshtags(
     indices = mesh.geometry.index_map().local_to_global(entities_to_geometry.reshape(-1))
 
     adios = adios2.ADIOS(mesh.comm)
-    io = adios.DeclareIO("MeshTagWriter")
-    io.SetEngine(engine)
-    outfile = io.Open(str(filename), adios2.Mode.Append)
-    # Write meshtag topology
-    topology_var = io.DefineVariable(
-        meshtags.name + "_topology",
-        indices,
-        shape=[global_num_tag_entities, num_dofs_per_entity],
-        start=[local_start, 0],
-        count=[num_saved_tag_entities, num_dofs_per_entity],
-    )
-    outfile.Put(topology_var, indices, adios2.Mode.Sync)
+    with ADIOSFile(
+        adios=adios,
+        filename=filename,
+        mode=adios2.Mode.Append,
+        engine=engine,
+        io_name="MeshTagWriter",
+    ) as adios_file:
+        # Write meshtag topology
+        topology_var = adios_file.io.DefineVariable(
+            meshtags.name + "_topology",
+            indices,
+            shape=[global_num_tag_entities, num_dofs_per_entity],
+            start=[local_start, 0],
+            count=[num_saved_tag_entities, num_dofs_per_entity],
+        )
+        adios_file.file.Put(topology_var, indices, adios2.Mode.Sync)
 
-    # Write meshtag topology
-    values_var = io.DefineVariable(
-        meshtags.name + "_values",
-        local_values,
-        shape=[global_num_tag_entities],
-        start=[local_start],
-        count=[num_saved_tag_entities],
-    )
-    outfile.Put(values_var, local_values, adios2.Mode.Sync)
+        # Write meshtag topology
+        values_var = adios_file.io.DefineVariable(
+            meshtags.name + "_values",
+            local_values,
+            shape=[global_num_tag_entities],
+            start=[local_start],
+            count=[num_saved_tag_entities],
+        )
+        adios_file.file.Put(values_var, local_values, adios2.Mode.Sync)
 
-    # Write meshtag dim
-    io.DefineAttribute(meshtags.name + "_dim", np.array([meshtags.dim], dtype=np.uint8))
+        # Write meshtag dim
+        adios_file.io.DefineAttribute(
+            meshtags.name + "_dim", np.array([meshtags.dim], dtype=np.uint8)
+        )
 
-    outfile.PerformPuts()
-    outfile.EndStep()
-    outfile.Close()
+        adios_file.file.PerformPuts()
+        adios_file.file.EndStep()
 
 
 def read_meshtags(
-    filename: Union[Path, str],
+    filename: Path | str,
     mesh: dolfinx.mesh.Mesh,
     meshtag_name: str,
     engine: str = "BP4",
@@ -132,62 +139,68 @@ def read_meshtags(
         The meshtags
     """
     adios = adios2.ADIOS(mesh.comm)
-    io = adios.DeclareIO("MeshTagsReader")
-    io.SetEngine(engine)
-    infile = io.Open(str(filename), adios2.Mode.Read)
+    with ADIOSFile(
+        adios=adios,
+        filename=filename,
+        mode=adios2.Mode.Read,
+        engine=engine,
+        io_name="MeshTagsReader",
+    ) as adios_file:
+        # Get mesh cell type
+        dim_attr_name = f"{meshtag_name}_dim"
+        step = 0
+        for i in range(adios_file.file.Steps()):
+            adios_file.file.BeginStep()
+            if dim_attr_name in adios_file.io.AvailableAttributes().keys():
+                step = i
+                break
+            adios_file.file.EndStep()
+        if dim_attr_name not in adios_file.io.AvailableAttributes().keys():
+            raise KeyError(f"{dim_attr_name} not found in {filename}")
 
-    # Get mesh cell type
-    dim_attr_name = f"{meshtag_name}_dim"
-    step = 0
-    for i in range(infile.Steps()):
-        infile.BeginStep()
-        if dim_attr_name in io.AvailableAttributes().keys():
-            step = i
-            break
-        infile.EndStep()
-    if dim_attr_name not in io.AvailableAttributes().keys():
-        raise KeyError(f"{dim_attr_name} not found in {filename}")
+        m_dim = adios_file.io.InquireAttribute(dim_attr_name)
+        dim = int(m_dim.Data()[0])
 
-    m_dim = io.InquireAttribute(dim_attr_name)
-    dim = int(m_dim.Data()[0])
+        # Get mesh tags entites
+        topology_name = f"{meshtag_name}_topology"
+        for i in range(step, adios_file.file.Steps()):
+            if i > step:
+                adios_file.file.BeginStep()
+            if topology_name in adios_file.io.AvailableVariables().keys():
+                break
+            adios_file.file.EndStep()
+        if topology_name not in adios_file.io.AvailableVariables().keys():
+            raise KeyError(f"{topology_name} not found in {filename}")
 
-    # Get mesh tags entites
-    topology_name = f"{meshtag_name}_topology"
-    for i in range(step, infile.Steps()):
-        if i > step:
-            infile.BeginStep()
-        if topology_name in io.AvailableVariables().keys():
-            break
-        infile.EndStep()
-    if topology_name not in io.AvailableVariables().keys():
-        raise KeyError(f"{topology_name} not found in {filename}")
+        topology = adios_file.io.InquireVariable(topology_name)
+        top_shape = topology.Shape()
+        topology_range = compute_local_range(mesh.comm, top_shape[0])
 
-    topology = io.InquireVariable(topology_name)
-    top_shape = topology.Shape()
-    topology_range = compute_local_range(mesh.comm, top_shape[0])
+        topology.SetSelection(
+            [
+                [topology_range[0], 0],
+                [topology_range[1] - topology_range[0], top_shape[1]],
+            ]
+        )
+        mesh_entities = np.empty(
+            (topology_range[1] - topology_range[0], top_shape[1]), dtype=np.int64
+        )
+        adios_file.file.Get(topology, mesh_entities, adios2.Mode.Deferred)
 
-    topology.SetSelection(
-        [[topology_range[0], 0], [topology_range[1] - topology_range[0], top_shape[1]]]
-    )
-    mesh_entities = np.empty((topology_range[1] - topology_range[0], top_shape[1]), dtype=np.int64)
-    infile.Get(topology, mesh_entities, adios2.Mode.Deferred)
+        # Get mesh tags values
+        values_name = f"{meshtag_name}_values"
+        if values_name not in adios_file.io.AvailableVariables().keys():
+            raise KeyError(f"{values_name} not found")
 
-    # Get mesh tags values
-    values_name = f"{meshtag_name}_values"
-    if values_name not in io.AvailableVariables().keys():
-        raise KeyError(f"{values_name} not found")
+        values = adios_file.io.InquireVariable(values_name)
+        val_shape = values.Shape()
+        assert val_shape[0] == top_shape[0]
+        values.SetSelection([[topology_range[0]], [topology_range[1] - topology_range[0]]])
+        tag_values = np.empty((topology_range[1] - topology_range[0]), dtype=np.int32)
+        adios_file.file.Get(values, tag_values, adios2.Mode.Deferred)
 
-    values = io.InquireVariable(values_name)
-    val_shape = values.Shape()
-    assert val_shape[0] == top_shape[0]
-    values.SetSelection([[topology_range[0]], [topology_range[1] - topology_range[0]]])
-    tag_values = np.empty((topology_range[1] - topology_range[0]), dtype=np.int32)
-    infile.Get(values, tag_values, adios2.Mode.Deferred)
-
-    infile.PerformGets()
-    infile.EndStep()
-    infile.Close()
-    assert adios.RemoveIO("MeshTagsReader")
+        adios_file.file.PerformGets()
+        adios_file.file.EndStep()
 
     local_entities, local_values = dolfinx.cpp.io.distribute_entity_data(
         mesh._cpp_object, int(dim), mesh_entities, tag_values
@@ -206,8 +219,8 @@ def read_meshtags(
 
 
 def read_function(
+    filename: Path | str,
     u: dolfinx.fem.Function,
-    filename: Union[Path, str],
     engine: str = "BP4",
     time: float = 0.0,
     legacy: bool = False,
@@ -217,8 +230,8 @@ def read_function(
     Read checkpoint from file and fill it into `u`.
 
     Args:
-        u: Function to fill
         filename: Path to checkpoint
+        u: Function to fill
         engine: ADIOS engine type used for reading
         legacy: If checkpoint is from prior to time-dependent writing set to True
     """
@@ -331,69 +344,76 @@ def read_function(
 
 
 def read_mesh(
+    filename: Path | str,
     comm: MPI.Intracomm,
-    filename: Union[Path, str],
-    engine: str,
-    ghost_mode: dolfinx.mesh.GhostMode,
+    engine: str = "BP4",
+    ghost_mode: dolfinx.mesh.GhostMode = dolfinx.mesh.GhostMode.shared_facet,
 ) -> dolfinx.mesh.Mesh:
     """
     Read an ADIOS2 mesh into DOLFINx.
 
     Args:
-        comm: The MPI communciator to distribute the mesh over
         filename: Path to input file
+        comm: The MPI communciator to distribute the mesh over
         engine: ADIOS engine to use for reading (BP4, BP5 or HDF5)
         ghost_mode: Ghost mode to use for mesh
     Returns:
         The distributed mesh
     """
     adios = adios2.ADIOS(comm)
-    io = adios.DeclareIO("MeshReader")
-    io.SetEngine(engine)
-    infile = io.Open(str(filename), adios2.Mode.Read)
-    infile.BeginStep()
 
-    # Get mesh cell type
-    if "CellType" not in io.AvailableAttributes().keys():
-        raise KeyError(f"Mesh cell type not found at CellType in {filename}")
-    celltype = io.InquireAttribute("CellType")
-    cell_type = celltype.DataString()[0]
+    with ADIOSFile(
+        adios=adios,
+        filename=filename,
+        mode=adios2.Mode.Read,
+        engine=engine,
+        io_name="MeshReader",
+    ) as adios_file:
+        adios_file.file.BeginStep()
 
-    # Get basix info
-    if "LagrangeVariant" not in io.AvailableAttributes().keys():
-        raise KeyError(f"Mesh LagrangeVariant not found in {filename}")
-    lvar = io.InquireAttribute("LagrangeVariant").Data()[0]
-    if "Degree" not in io.AvailableAttributes().keys():
-        raise KeyError(f"Mesh degree not found in {filename}")
-    degree = io.InquireAttribute("Degree").Data()[0]
+        # Get mesh cell type
+        if "CellType" not in adios_file.io.AvailableAttributes().keys():
+            raise KeyError(f"Mesh cell type not found at CellType in {filename}")
+        celltype = adios_file.io.InquireAttribute("CellType")
+        cell_type = celltype.DataString()[0]
 
-    # Get mesh geometry
-    if "Points" not in io.AvailableVariables().keys():
-        raise KeyError(f"Mesh coordinates not found at Points in {filename}")
-    geometry = io.InquireVariable("Points")
-    x_shape = geometry.Shape()
-    geometry_range = compute_local_range(comm, x_shape[0])
-    geometry.SetSelection(
-        [[geometry_range[0], 0], [geometry_range[1] - geometry_range[0], x_shape[1]]]
-    )
-    mesh_geometry = np.empty(
-        (geometry_range[1] - geometry_range[0], x_shape[1]),
-        dtype=adios_to_numpy_dtype[geometry.Type()],
-    )
-    infile.Get(geometry, mesh_geometry, adios2.Mode.Deferred)
-    # Get mesh topology (distributed)
-    if "Topology" not in io.AvailableVariables().keys():
-        raise KeyError(f"Mesh topology not found at Topology in {filename}")
-    topology = io.InquireVariable("Topology")
-    shape = topology.Shape()
-    local_range = compute_local_range(comm, shape[0])
-    topology.SetSelection([[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]])
-    mesh_topology = np.empty((local_range[1] - local_range[0], shape[1]), dtype=np.int64)
-    infile.Get(topology, mesh_topology, adios2.Mode.Deferred)
+        # Get basix info
+        if "LagrangeVariant" not in adios_file.io.AvailableAttributes().keys():
+            raise KeyError(f"Mesh LagrangeVariant not found in {filename}")
+        lvar = adios_file.io.InquireAttribute("LagrangeVariant").Data()[0]
+        if "Degree" not in adios_file.io.AvailableAttributes().keys():
+            raise KeyError(f"Mesh degree not found in {filename}")
+        degree = adios_file.io.InquireAttribute("Degree").Data()[0]
 
-    infile.PerformGets()
-    infile.EndStep()
-    assert adios.RemoveIO("MeshReader")
+        # Get mesh geometry
+        if "Points" not in adios_file.io.AvailableVariables().keys():
+            raise KeyError(f"Mesh coordinates not found at Points in {filename}")
+        geometry = adios_file.io.InquireVariable("Points")
+        x_shape = geometry.Shape()
+        geometry_range = compute_local_range(comm, x_shape[0])
+        geometry.SetSelection(
+            [
+                [geometry_range[0], 0],
+                [geometry_range[1] - geometry_range[0], x_shape[1]],
+            ]
+        )
+        mesh_geometry = np.empty(
+            (geometry_range[1] - geometry_range[0], x_shape[1]),
+            dtype=adios_to_numpy_dtype[geometry.Type()],
+        )
+        adios_file.file.Get(geometry, mesh_geometry, adios2.Mode.Deferred)
+        # Get mesh topology (distributed)
+        if "Topology" not in adios_file.io.AvailableVariables().keys():
+            raise KeyError(f"Mesh topology not found at Topology in {filename}")
+        topology = adios_file.io.InquireVariable("Topology")
+        shape = topology.Shape()
+        local_range = compute_local_range(comm, shape[0])
+        topology.SetSelection([[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]])
+        mesh_topology = np.empty((local_range[1] - local_range[0], shape[1]), dtype=np.int64)
+        adios_file.file.Get(topology, mesh_topology, adios2.Mode.Deferred)
+
+        adios_file.file.PerformGets()
+        adios_file.file.EndStep()
 
     # Create DOLFINx mesh
     element = basix.ufl.element(
@@ -409,15 +429,15 @@ def read_mesh(
     return dolfinx.mesh.create_mesh(comm, mesh_topology, mesh_geometry, domain, partitioner)
 
 
-def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
+def write_mesh(filename: Path, mesh: dolfinx.mesh.Mesh, engine: str = "BP4"):
     """
     Write a mesh to specified ADIOS2 format, see:
     https://adios2.readthedocs.io/en/stable/engines/engines.html
     for possible formats.
 
     Args:
-        mesh: The mesh to write to file
         filename: Path to save mesh (without file-extension)
+        mesh: The mesh to write to file
         engine: Adios2 Engine
     """
     num_xdofs_local = mesh.geometry.index_map().size_local
@@ -454,9 +474,9 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
 
     # NOTE: Mode will become input again once we have variable geometry
     _internal_mesh_writer(
+        filename,
         mesh.comm,
         mesh_data,
-        filename,
         engine,
         mode=adios2.Mode.Write,
         io_name="MeshWriter",
@@ -464,8 +484,8 @@ def write_mesh(mesh: dolfinx.mesh.Mesh, filename: Path, engine: str = "BP4"):
 
 
 def write_function(
+    filename: Path | str,
     u: dolfinx.fem.Function,
-    filename: Union[Path, str],
     engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Append,
     time: float = 0.0,
@@ -534,4 +554,4 @@ def write_function(
     )
     # Write to file
     fname = Path(filename)
-    _internal_function_writer(comm, function_data, fname, engine, mode, time, "FunctionWriter")
+    _internal_function_writer(fname, comm, function_data, engine, mode, time, "FunctionWriter")
