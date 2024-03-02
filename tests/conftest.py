@@ -1,5 +1,3 @@
-import pathlib
-
 from mpi4py import MPI
 
 import dolfinx
@@ -20,7 +18,7 @@ def cluster():
 
 
 @pytest.fixture(scope="function")
-def write_function():
+def write_function(tmp_path):
     def _write_function(mesh, el, f, dtype, name="uh", append: bool = False) -> str:
         V = dolfinx.fem.functionspace(mesh, el)
         uh = dolfinx.fem.Function(V, dtype=dtype)
@@ -35,9 +33,10 @@ def write_function():
             .replace("[", "")
             .replace("]", "")
         )
-
+        # Consistent tmp dir across processes
+        f_path = MPI.COMM_WORLD.bcast(tmp_path, root=0)
         file_hash = f"{el_hash}_{np.dtype(dtype).name}"
-        filename = pathlib.Path(f"output/mesh_{file_hash}.bp")
+        filename = f_path / f"mesh_{file_hash}.bp"
         if mesh.comm.size != 1:
             if not append:
                 adios4dolfinx.write_mesh(filename, mesh)
@@ -48,21 +47,20 @@ def write_function():
                     adios4dolfinx.write_mesh(filename, mesh)
                 adios4dolfinx.write_function(filename, uh, time=0.0)
 
-        return file_hash
+        return filename
 
     return _write_function
 
 
 @pytest.fixture(scope="function")
 def read_function():
-    def _read_function(comm, el, f, hash, dtype, name="uh"):
-        filename = f"output/mesh_{hash}.bp"
+    def _read_function(comm, el, f, path, dtype, name="uh"):
         engine = "BP4"
-        mesh = adios4dolfinx.read_mesh(filename, comm, engine, dolfinx.mesh.GhostMode.shared_facet)
+        mesh = adios4dolfinx.read_mesh(path, comm, engine, dolfinx.mesh.GhostMode.shared_facet)
         V = dolfinx.fem.functionspace(mesh, el)
         v = dolfinx.fem.Function(V, dtype=dtype)
         v.name = name
-        adios4dolfinx.read_function(filename, v, engine)
+        adios4dolfinx.read_function(path, v, engine)
         v_ex = dolfinx.fem.Function(V, dtype=dtype)
         v_ex.interpolate(f)
 
@@ -94,7 +92,7 @@ def get_dtype():
 
 
 @pytest.fixture(scope="function")
-def write_function_time_dep():
+def write_function_time_dep(tmp_path):
     def _write_function_time_dep(mesh, el, f0, f1, t0, t1, dtype) -> str:
         V = dolfinx.fem.functionspace(mesh, el)
         uh = dolfinx.fem.Function(V, dtype=dtype)
@@ -109,7 +107,9 @@ def write_function_time_dep():
             .replace("]", "")
         )
         file_hash = f"{el_hash}_{np.dtype(dtype).name}"
-        filename = pathlib.Path(f"output/mesh_{file_hash}.bp")
+        # Consistent tmp dir across processes
+        f_path = MPI.COMM_WORLD.bcast(tmp_path, root=0)
+        filename = f_path / f"mesh_{file_hash}.bp"
         if mesh.comm.size != 1:
             adios4dolfinx.write_mesh(filename, mesh)
             adios4dolfinx.write_function(filename, uh, time=t0)
@@ -123,28 +123,27 @@ def write_function_time_dep():
                 uh.interpolate(f1)
                 adios4dolfinx.write_function(filename, uh, time=t1)
 
-        return file_hash
+        return filename
 
     return _write_function_time_dep
 
 
 @pytest.fixture(scope="function")
 def read_function_time_dep():
-    def _read_function_time_dep(comm, el, f0, f1, t0, t1, hash, dtype):
-        filename = f"output/mesh_{hash}.bp"
+    def _read_function_time_dep(comm, el, f0, f1, t0, t1, path, dtype):
         engine = "BP4"
-        mesh = adios4dolfinx.read_mesh(filename, comm, engine, dolfinx.mesh.GhostMode.shared_facet)
+        mesh = adios4dolfinx.read_mesh(path, comm, engine, dolfinx.mesh.GhostMode.shared_facet)
         V = dolfinx.fem.functionspace(mesh, el)
         v = dolfinx.fem.Function(V, dtype=dtype)
 
-        adios4dolfinx.read_function(filename, v, engine, time=t1)
+        adios4dolfinx.read_function(path, v, engine, time=t1)
         v_ex = dolfinx.fem.Function(V, dtype=dtype)
         v_ex.interpolate(f1)
 
         res = np.finfo(dtype).resolution
         assert np.allclose(v.x.array, v_ex.x.array, atol=10 * res, rtol=10 * res)
 
-        adios4dolfinx.read_function(filename, v, engine, time=t0)
+        adios4dolfinx.read_function(path, v, engine, time=t0)
         v_ex = dolfinx.fem.Function(V, dtype=dtype)
         v_ex.interpolate(f0)
 
