@@ -431,7 +431,8 @@ def read_mesh(
         filename: Path to input file
         comm: The MPI communciator to distribute the mesh over
         engine: ADIOS engine to use for reading (BP4, BP5 or HDF5)
-        ghost_mode: Ghost mode to use for mesh
+        ghost_mode: Ghost mode to use for mesh. If `read_from_partition`
+            is set to `True` this option is ignored.
         read_from_partition: Read mesh with partition from file
     Returns:
         The distributed mesh
