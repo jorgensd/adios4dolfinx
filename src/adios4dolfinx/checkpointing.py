@@ -19,9 +19,9 @@ import ufl
 from .adios2_helpers import (
     ADIOSFile,
     adios_to_numpy_dtype,
+    read_adjacency_list,
     read_array,
     read_cell_perms,
-    read_dofmap,
     resolve_adios_scope,
 )
 from .comm_helpers import (
@@ -338,7 +338,7 @@ def read_function(
     else:
         dofmap_path = f"{name}_dofmap"
         xdofmap_path = f"{name}_XDofmap"
-    input_dofmap = read_dofmap(
+    input_dofmap = read_adjacency_list(
         adios, comm, filename, dofmap_path, xdofmap_path, num_cells_global, engine
     )
     # Compute owner of dofs in dofmap
@@ -512,7 +512,7 @@ def read_mesh(
     domain = ufl.Mesh(element)
 
     if read_from_partition:
-        partition_graph = read_dofmap(
+        partition_graph = read_adjacency_list(
             adios, comm, filename, "PartitioningData", "PartitioningOffset", shape[0], engine
         )
 

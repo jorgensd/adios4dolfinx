@@ -25,7 +25,7 @@ adios2 = resolve_adios_scope(adios2)
 Helpers reading/writing data with ADIOS2
 """
 
-__all__ = ["read_array", "read_dofmap", "read_cell_perms", "adios_to_numpy_dtype"]
+__all__ = ["read_array", "read_adjacency_list", "read_cell_perms", "adios_to_numpy_dtype"]
 
 adios_to_numpy_dtype = {
     "float": np.float32,
@@ -123,7 +123,7 @@ def read_cell_perms(
     return in_perm
 
 
-def read_dofmap(
+def read_adjacency_list(
     adios: adios2.ADIOS,
     comm: MPI.Intracomm,
     filename: Path | str,
@@ -133,8 +133,8 @@ def read_dofmap(
     engine: str,
 ) -> dolfinx.cpp.graph.AdjacencyList_int64 | dolfinx.cpp.graph.AdjacencyList_int32:
     """
-    Read dofmap with given communicator,
-    split in continuous chunks based on number of cells in the mesh (global).
+    Read an adjacency-list from an ADIOS file with given communicator.
+    The adjancency list is split in to a flat array (data) and its corresponding offset.
 
     Args:
         adios: The ADIOS instance
