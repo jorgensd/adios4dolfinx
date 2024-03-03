@@ -149,7 +149,7 @@ def test_adios4dolfinx_legacy():
         pytest.skip(f"{path} does not exist")
 
     el = ("N1curl", 3)
-    mesh = read_mesh(path, comm, "BP4", dolfinx.mesh.GhostMode.shared_facet)
+    mesh = read_mesh(path, comm, "BP4", dolfinx.mesh.GhostMode.shared_facet, legacy=True)
 
     def f(x):
         values = np.zeros((2, x.shape[1]), dtype=np.float64)
