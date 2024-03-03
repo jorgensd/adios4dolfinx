@@ -493,7 +493,7 @@ def read_mesh(
         # Check validity of partitioning information
         if read_from_partition:
             if "PartitionProcesses" not in adios_file.io.AvailableAttributes().keys():
-                raise KeyError(f"Partitioning informatuon not found in {filename}")
+                raise KeyError(f"Partitioning information not found in {filename}")
             par_num_procs = adios_file.io.InquireAttribute("PartitionProcesses")
             num_procs = par_num_procs.Data()[0]
             if num_procs != comm.size:
