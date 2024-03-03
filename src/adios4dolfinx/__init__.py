@@ -5,6 +5,7 @@
 # SPDX-License-Identifier:    MIT
 
 """Top-level package for ADIOS2Wrappers."""
+
 from importlib.metadata import metadata
 
 from .checkpointing import (
