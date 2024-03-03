@@ -1,4 +1,3 @@
-
 from mpi4py import MPI
 
 import dolfinx
@@ -72,7 +71,7 @@ def test_timedep_mesh(encoder, suffix, ghost_mode, tmp_path):
     def u(x):
         return np.asarray([x[0] + 0.1 * np.sin(x[1]), 0.2 * np.cos(x[1]), x[2]])
 
-    write_mesh(file.with_suffix(suffix), mesh, encoder)
+    write_mesh(file.with_suffix(suffix), mesh, encoder, mode=adios2.Mode.Write, time=0.0)
     delta_x = u(mesh.geometry.x.T).T
     mesh.geometry.x[:] += delta_x
     write_mesh(file.with_suffix(suffix), mesh, encoder, mode=adios2.Mode.Append, time=3.0)

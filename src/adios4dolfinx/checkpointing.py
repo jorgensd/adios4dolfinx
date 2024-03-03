@@ -449,10 +449,37 @@ def read_mesh(
         engine=engine,
         io_name="MeshReader",
     ) as adios_file:
+        # Get time independent mesh variables (mesh topology and cell type info) first
+        adios_file.file.BeginStep()
+        # Get mesh topology (distributed)
+        if "Topology" not in adios_file.io.AvailableVariables().keys():
+            raise KeyError(f"Mesh topology not found at Topology in {filename}")
+        topology = adios_file.io.InquireVariable("Topology")
+        shape = topology.Shape()
+        local_range = compute_local_range(comm, shape[0])
+        topology.SetSelection([[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]])
+        mesh_topology = np.empty((local_range[1] - local_range[0], shape[1]), dtype=np.int64)
+        adios_file.file.Get(topology, mesh_topology, adios2.Mode.Deferred)
+
+        # Get mesh cell type
+        if "CellType" not in adios_file.io.AvailableAttributes().keys():
+            raise KeyError(f"Mesh cell type not found at CellType in {filename}")
+        celltype = adios_file.io.InquireAttribute("CellType")
+        cell_type = celltype.DataString()[0]
+
+        # Get basix info
+        if "LagrangeVariant" not in adios_file.io.AvailableAttributes().keys():
+            raise KeyError(f"Mesh LagrangeVariant not found in {filename}")
+        lvar = adios_file.io.InquireAttribute("LagrangeVariant").Data()[0]
+        if "Degree" not in adios_file.io.AvailableAttributes().keys():
+            raise KeyError(f"Mesh degree not found in {filename}")
+        degree = adios_file.io.InquireAttribute("Degree").Data()[0]
+
         if not legacy:
             time_name = "MeshTime"
             for i in range(adios_file.file.Steps()):
-                adios_file.file.BeginStep()
+                if i > 0:
+                    adios_file.file.BeginStep()
                 if time_name in adios_file.io.AvailableVariables().keys():
                     arr = adios_file.io.InquireVariable(time_name)
                     time_shape = arr.Shape()
@@ -471,20 +498,6 @@ def read_mesh(
             if time_name not in adios_file.io.AvailableVariables().keys():
                 raise KeyError(f"No data associated with {time_name}={time} found in {filename}")
 
-        # Get mesh cell type
-        if "CellType" not in adios_file.io.AvailableAttributes().keys():
-            raise KeyError(f"Mesh cell type not found at CellType in {filename}")
-        celltype = adios_file.io.InquireAttribute("CellType")
-        cell_type = celltype.DataString()[0]
-
-        # Get basix info
-        if "LagrangeVariant" not in adios_file.io.AvailableAttributes().keys():
-            raise KeyError(f"Mesh LagrangeVariant not found in {filename}")
-        lvar = adios_file.io.InquireAttribute("LagrangeVariant").Data()[0]
-        if "Degree" not in adios_file.io.AvailableAttributes().keys():
-            raise KeyError(f"Mesh degree not found in {filename}")
-        degree = adios_file.io.InquireAttribute("Degree").Data()[0]
-
         # Get mesh geometry
         if "Points" not in adios_file.io.AvailableVariables().keys():
             raise KeyError(f"Mesh coordinates not found at Points in {filename}")
@@ -502,15 +515,6 @@ def read_mesh(
             dtype=adios_to_numpy_dtype[geometry.Type()],
         )
         adios_file.file.Get(geometry, mesh_geometry, adios2.Mode.Deferred)
-        # Get mesh topology (distributed)
-        if "Topology" not in adios_file.io.AvailableVariables().keys():
-            raise KeyError(f"Mesh topology not found at Topology in {filename}")
-        topology = adios_file.io.InquireVariable("Topology")
-        shape = topology.Shape()
-        local_range = compute_local_range(comm, shape[0])
-        topology.SetSelection([[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]])
-        mesh_topology = np.empty((local_range[1] - local_range[0], shape[1]), dtype=np.int64)
-        adios_file.file.Get(topology, mesh_topology, adios2.Mode.Deferred)
 
         adios_file.file.PerformGets()
         adios_file.file.EndStep()

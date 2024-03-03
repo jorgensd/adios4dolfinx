@@ -55,29 +55,25 @@ def write_mesh(
         )
         adios_file.file.Put(pointvar, mesh.local_geometry, adios2.Mode.Sync)
 
-        # Write celltype
-        adios_file.io.DefineAttribute("CellType", mesh.cell_type)
-
-        # Write basix properties
-        adios_file.io.DefineAttribute("Degree", np.array([mesh.degree], dtype=np.int32))
-        adios_file.io.DefineAttribute(
-            "LagrangeVariant", np.array([mesh.lagrange_variant], dtype=np.int32)
-        )
-
-        # Write topology
-        num_dofs_per_cell = mesh.local_topology.shape[1]
-        dvar = adios_file.io.DefineVariable(
-            "Topology",
-            mesh.local_topology,
-            shape=[mesh.num_cells_global, num_dofs_per_cell],
-            start=[mesh.local_topology_pos[0], 0],
-            count=[
-                mesh.local_topology_pos[1] - mesh.local_topology_pos[0],
-                num_dofs_per_cell,
-            ],
-        )
-
-        adios_file.file.Put(dvar, mesh.local_topology)
+        if mode == adios2.Mode.Write:
+            adios_file.io.DefineAttribute("CellType", mesh.cell_type)
+            adios_file.io.DefineAttribute("Degree", np.array([mesh.degree], dtype=np.int32))
+            adios_file.io.DefineAttribute(
+                "LagrangeVariant", np.array([mesh.lagrange_variant], dtype=np.int32)
+            )
+            # Write topology (on;y on first write as topology is constant)
+            num_dofs_per_cell = mesh.local_topology.shape[1]
+            dvar = adios_file.io.DefineVariable(
+                "Topology",
+                mesh.local_topology,
+                shape=[mesh.num_cells_global, num_dofs_per_cell],
+                start=[mesh.local_topology_pos[0], 0],
+                count=[
+                    mesh.local_topology_pos[1] - mesh.local_topology_pos[0],
+                    num_dofs_per_cell,
+                ],
+            )
+            adios_file.file.Put(dvar, mesh.local_topology)
 
         # Add time step to file
         t_arr = np.array([time], dtype=np.float64)
