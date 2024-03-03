@@ -166,6 +166,8 @@ def write_meshtags(
         engine=engine,
         io_name="MeshTagWriter",
     ) as adios_file:
+        adios_file.file.BeginStep()
+
         # Write meshtag topology
         topology_var = adios_file.io.DefineVariable(
             name + "_topology",
@@ -422,6 +424,8 @@ def read_mesh(
     comm: MPI.Intracomm,
     engine: str = "BP4",
     ghost_mode: dolfinx.mesh.GhostMode = dolfinx.mesh.GhostMode.shared_facet,
+    time: float = 0.0,
+    legacy: bool = False,
 ) -> dolfinx.mesh.Mesh:
     """
     Read an ADIOS2 mesh into DOLFINx.
@@ -431,6 +435,8 @@ def read_mesh(
         comm: The MPI communciator to distribute the mesh over
         engine: ADIOS engine to use for reading (BP4, BP5 or HDF5)
         ghost_mode: Ghost mode to use for mesh
+        time: Time stamp associated with mesh
+        legacy: If checkpoint was made prior to time-dependent mesh-writer set to True
     Returns:
         The distributed mesh
     """
@@ -443,7 +449,27 @@ def read_mesh(
         engine=engine,
         io_name="MeshReader",
     ) as adios_file:
-        adios_file.file.BeginStep()
+        if not legacy:
+            time_name = "MeshTime"
+            for i in range(adios_file.file.Steps()):
+                adios_file.file.BeginStep()
+                if time_name in adios_file.io.AvailableVariables().keys():
+                    arr = adios_file.io.InquireVariable(time_name)
+                    time_shape = arr.Shape()
+                    arr.SetSelection([[0], [time_shape[0]]])
+                    times = np.empty(time_shape[0], dtype=adios_to_numpy_dtype[arr.Type()])
+                    adios_file.file.Get(arr, times, adios2.Mode.Sync)
+                    if times[0] == time:
+                        break
+                if i == adios_file.file.Steps() - 1:
+                    raise KeyError(
+                        f"No data associated with {time_name}={time} found in {filename}"
+                    )
+
+                adios_file.file.EndStep()
+
+            if time_name not in adios_file.io.AvailableVariables().keys():
+                raise KeyError(f"No data associated with {time_name}={time} found in {filename}")
 
         # Get mesh cell type
         if "CellType" not in adios_file.io.AvailableAttributes().keys():
@@ -503,7 +529,13 @@ def read_mesh(
     return dolfinx.mesh.create_mesh(comm, mesh_topology, mesh_geometry, domain, partitioner)
 
 
-def write_mesh(filename: Path, mesh: dolfinx.mesh.Mesh, engine: str = "BP4"):
+def write_mesh(
+    filename: Path,
+    mesh: dolfinx.mesh.Mesh,
+    engine: str = "BP4",
+    mode: adios2.Mode = adios2.Mode.Write,
+    time: float = 0.0,
+):
     """
     Write a mesh to specified ADIOS2 format, see:
     https://adios2.readthedocs.io/en/stable/engines/engines.html
@@ -546,13 +578,13 @@ def write_mesh(filename: Path, mesh: dolfinx.mesh.Mesh, engine: str = "BP4"):
         lagrange_variant=mesh.geometry.cmap.variant,
     )
 
-    # NOTE: Mode will become input again once we have variable geometry
     _internal_mesh_writer(
         filename,
         mesh.comm,
         mesh_data,
         engine,
-        mode=adios2.Mode.Write,
+        mode=mode,
+        time=time,
         io_name="MeshWriter",
     )
 

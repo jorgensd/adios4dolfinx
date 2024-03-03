@@ -24,6 +24,7 @@ def write_mesh(
     mesh: MeshData,
     engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Write,
+    time: float = 0.0,
     io_name: str = "MeshWriter",
 ):
     """
@@ -43,6 +44,7 @@ def write_mesh(
     with ADIOSFile(
         adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name
     ) as adios_file:
+        adios_file.file.BeginStep()
         # Write geometry
         pointvar = adios_file.io.DefineVariable(
             "Points",
@@ -76,6 +78,18 @@ def write_mesh(
         )
 
         adios_file.file.Put(dvar, mesh.local_topology)
+
+        # Add time step to file
+        t_arr = np.array([time], dtype=np.float64)
+        time_var = adios_file.io.DefineVariable(
+            "MeshTime",
+            t_arr,
+            shape=[1],
+            start=[0],
+            count=[1 if comm.rank == 0 else 0],
+        )
+        adios_file.file.Put(time_var, t_arr)
+
         adios_file.file.PerformPuts()
         adios_file.file.EndStep()
 
@@ -106,6 +120,7 @@ def write_function(
     with ADIOSFile(
         adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name
     ) as adios_file:
+        adios_file.file.BeginStep()
         # Add mesh permutations
         pvar = adios_file.io.DefineVariable(
             "CellPermutations",
