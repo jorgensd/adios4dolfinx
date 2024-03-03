@@ -10,11 +10,13 @@ import ufl
 from adios4dolfinx import read_mesh, write_mesh
 
 
-@pytest.mark.parametrize("encoder, suffix", [("BP4", ".bp"), ("HDF5", ".h5")])
-# , ("BP5", ".bp")]) # Deactivated, see: https://github.com/jorgensd/adios4dolfinx/issues/7
-@pytest.mark.parametrize("ghost_mode", [dolfinx.mesh.GhostMode.shared_facet])
-def test_mesh_read_writer(encoder, suffix, ghost_mode, tmp_path):
-    N = 25
+@pytest.mark.parametrize("encoder, suffix", [("BP4", ".bp"), ("HDF5", ".h5"), ("BP5", ".bp")])
+@pytest.mark.parametrize(
+    "ghost_mode", [dolfinx.mesh.GhostMode.shared_facet, dolfinx.mesh.GhostMode.none]
+)
+@pytest.mark.parametrize("store_partition", [True, False])
+def test_mesh_read_writer(encoder, suffix, ghost_mode, tmp_path, store_partition):
+    N = 3
     # Consistent tmp dir across processes
     fname = MPI.COMM_WORLD.bcast(tmp_path, root=0)
     file = fname / f"adios_mesh_{encoder}"
@@ -22,7 +24,7 @@ def test_mesh_read_writer(encoder, suffix, ghost_mode, tmp_path):
     mesh = dolfinx.mesh.create_unit_cube(MPI.COMM_WORLD, N, N, N, ghost_mode=ghost_mode)
 
     start = time.perf_counter()
-    write_mesh(file.with_suffix(suffix), mesh, encoder)
+    write_mesh(file.with_suffix(suffix), mesh, encoder, store_partition_info=store_partition)
     end = time.perf_counter()
     print(f"Write ADIOS2 mesh: {end-start}")
 
@@ -35,7 +37,45 @@ def test_mesh_read_writer(encoder, suffix, ghost_mode, tmp_path):
     mesh.comm.Barrier()
 
     start = time.perf_counter()
-    mesh_adios = read_mesh(file.with_suffix(suffix), MPI.COMM_WORLD, encoder, ghost_mode)
+    mesh_adios = read_mesh(
+        file.with_suffix(suffix), MPI.COMM_WORLD, encoder, ghost_mode, store_partition
+    )
+
+    if store_partition:
+
+        def compute_distance_matrix(points_A, points_B, tol=1e-12):
+            points_A_e = np.expand_dims(points_A, 1)
+            points_B_e = np.expand_dims(points_B, 0)
+            distances = np.sum(np.square(points_A_e - points_B_e), axis=2)
+            return distances < tol
+
+        cell_map = mesh.topology.index_map(mesh.topology.dim)
+        new_cell_map = mesh_adios.topology.index_map(mesh_adios.topology.dim)
+        assert cell_map.size_local == new_cell_map.size_local
+        assert cell_map.num_ghosts == new_cell_map.num_ghosts
+        midpoints = dolfinx.mesh.compute_midpoints(
+            mesh,
+            mesh.topology.dim,
+            np.arange(cell_map.size_local + cell_map.num_ghosts, dtype=np.int32),
+        )
+        new_midpoints = dolfinx.mesh.compute_midpoints(
+            mesh_adios,
+            mesh_adios.topology.dim,
+            np.arange(new_cell_map.size_local + new_cell_map.num_ghosts, dtype=np.int32),
+        )
+        # Check that all points in owned by initial mesh is owned by the new mesh
+        # (might be locally reordered)
+        owned_distances = compute_distance_matrix(
+            midpoints[: cell_map.size_local], new_midpoints[: new_cell_map.size_local]
+        )
+        np.testing.assert_allclose(np.sum(owned_distances, axis=1), 1)
+        # Check that all points that are ghosted in original mesh is ghosted on the
+        # same process in the new mesh
+        ghost_distances = compute_distance_matrix(
+            midpoints[cell_map.size_local :], new_midpoints[new_cell_map.size_local :]
+        )
+        np.testing.assert_allclose(np.sum(ghost_distances, axis=1), 1)
+
     end = time.perf_counter()
     print(f"Read ADIOS2 mesh: {end-start}")
     mesh.comm.Barrier()
@@ -56,7 +96,10 @@ def test_mesh_read_writer(encoder, suffix, ghost_mode, tmp_path):
         )
 
     # Check that integration over different entities are consistent
-    for measure in [ufl.ds, ufl.dS, ufl.dx]:
+    measures = (
+        [ufl.ds, ufl.dx] if ghost_mode is dolfinx.mesh.GhostMode.none else [ufl.ds, ufl.dS, ufl.dx]
+    )
+    for measure in measures:
         c_adios = dolfinx.fem.assemble_scalar(dolfinx.fem.form(1 * measure(domain=mesh_adios)))
         c_ref = dolfinx.fem.assemble_scalar(dolfinx.fem.form(1 * measure(domain=mesh)))
         c_xdmf = dolfinx.fem.assemble_scalar(dolfinx.fem.form(1 * measure(domain=mesh_xdmf)))

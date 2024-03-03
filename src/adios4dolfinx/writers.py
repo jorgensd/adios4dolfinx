@@ -76,6 +76,33 @@ def write_mesh(
         )
 
         adios_file.file.Put(dvar, mesh.local_topology)
+
+        # Add partitioning data
+        if mesh.store_partition:
+            par_data = adios_file.io.DefineVariable(
+                "PartitioningData",
+                mesh.ownership_array,
+                shape=[mesh.partition_global],
+                start=[mesh.partition_range[0]],
+                count=[
+                    mesh.partition_range[1] - mesh.partition_range[0],
+                ],
+            )
+            adios_file.file.Put(par_data, mesh.ownership_array)
+
+            par_offset = adios_file.io.DefineVariable(
+                "PartitioningOffset",
+                mesh.ownership_offset,
+                shape=[mesh.num_cells_global + 1],
+                start=[mesh.local_topology_pos[0]],
+                count=[mesh.local_topology_pos[1] - mesh.local_topology_pos[0] + 1],
+            )
+            adios_file.file.Put(par_offset, mesh.ownership_offset)
+
+            adios_file.io.DefineAttribute(
+                "PartitionProcesses", np.array([mesh.partition_processes], dtype=np.int32)
+            )
+
         adios_file.file.PerformPuts()
         adios_file.file.EndStep()
 

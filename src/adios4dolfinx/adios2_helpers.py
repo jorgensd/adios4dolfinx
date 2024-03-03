@@ -131,7 +131,7 @@ def read_dofmap(
     dofmap_offsets: str,
     num_cells_global: np.int64,
     engine: str,
-) -> dolfinx.cpp.graph.AdjacencyList_int64:
+) -> dolfinx.cpp.graph.AdjacencyList_int64 | dolfinx.cpp.graph.AdjacencyList_int32:
     """
     Read dofmap with given communicator,
     split in continuous chunks based on number of cells in the mesh (global).
@@ -195,8 +195,6 @@ def read_dofmap(
         cell_dofs.SetSelection([[in_offsets[0]], [in_offsets[-1] - in_offsets[0]]])
         in_dofmap = np.empty(in_offsets[-1] - in_offsets[0], dtype=cell_dofs.Type().strip("_t"))
         adios_file.file.Get(cell_dofs, in_dofmap, adios2.Mode.Sync)
-
-        in_dofmap = in_dofmap.astype(np.int64)
         in_offsets -= in_offsets[0]
 
         adios_file.file.EndStep()
