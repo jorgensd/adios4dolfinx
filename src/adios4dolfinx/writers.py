@@ -79,6 +79,7 @@ def write_mesh(
 
         # Add partitioning data
         if mesh.store_partition:
+            assert mesh.partition_range is not None
             par_data = adios_file.io.DefineVariable(
                 "PartitioningData",
                 mesh.ownership_array,
@@ -89,7 +90,7 @@ def write_mesh(
                 ],
             )
             adios_file.file.Put(par_data, mesh.ownership_array)
-
+            assert mesh.ownership_offset is not None
             par_offset = adios_file.io.DefineVariable(
                 "PartitioningOffset",
                 mesh.ownership_offset,
@@ -98,7 +99,7 @@ def write_mesh(
                 count=[mesh.local_topology_pos[1] - mesh.local_topology_pos[0] + 1],
             )
             adios_file.file.Put(par_offset, mesh.ownership_offset)
-
+            assert mesh.partition_processes is not None
             adios_file.io.DefineAttribute(
                 "PartitionProcesses", np.array([mesh.partition_processes], dtype=np.int32)
             )
