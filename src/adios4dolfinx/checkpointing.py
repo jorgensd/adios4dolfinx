@@ -545,6 +545,7 @@ def read_mesh(
         partition_graph = read_adjacency_list(
             adios, comm, filename, "PartitioningData", "PartitioningOffset", shape[0], engine
         )
+
         def partitioner(comm: MPI.Intracomm, n, m, topo):
             assert len(partition_graph.offsets) - 1 == topo.num_nodes
             return partition_graph
@@ -603,7 +604,7 @@ def write_mesh(
         if cell_offsets[-1] == 0:
             cell_array = np.empty(0, dtype=np.int32)
         else:
-            cell_array = cell_map.array[:cell_offsets[-1]]
+            cell_array = cell_map.array[: cell_offsets[-1]]
 
         # Compute adjacency with current process as first entry
         ownership_array = np.full(num_cells_local + cell_offsets[-1], -1, dtype=np.int32)
