@@ -31,6 +31,14 @@ class MeshData:
     degree: int
     lagrange_variant: int
 
+    # Partitioning_information
+    store_partition: bool
+    partition_processes: int | None  # Number of processes in partition
+    ownership_array: npt.NDArray[np.int32] | None  # Ownership array for cells
+    ownership_offset: npt.NDArray[np.int32] | None  # Ownership offset for cells
+    partition_range: tuple[int, int] | None  # Local insert position for partitioning information
+    partition_global: int | None
+
 
 @dataclass
 class FunctionData:
