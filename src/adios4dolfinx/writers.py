@@ -5,13 +5,13 @@
 # SPDX-License-Identifier:    MIT
 
 
+import warnings
 from pathlib import Path
 
 from mpi4py import MPI
 
 import adios2
 import numpy as np
-import warnings
 
 from .adios2_helpers import ADIOSFile, resolve_adios_scope
 from .structures import FunctionData, MeshData

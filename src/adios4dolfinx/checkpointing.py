@@ -562,7 +562,7 @@ def write_mesh(
     engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Write,
     time: float = 0.0,
-    store_partition_info: bool = False
+    store_partition_info: bool = False,
 ):
     """
     Write a mesh to specified ADIOS2 format, see:

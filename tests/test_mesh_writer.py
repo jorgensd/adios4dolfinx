@@ -28,10 +28,13 @@ def test_mesh_read_writer(encoder, suffix, ghost_mode, tmp_path, store_partition
         xdmf.write_mesh(mesh)
     mesh.comm.Barrier()
 
-
-    mesh_adios = read_mesh(file.with_suffix(suffix), MPI.COMM_WORLD, engine=encoder,
-                           ghost_mode=ghost_mode,
-                           read_from_partition=store_partition)
+    mesh_adios = read_mesh(
+        file.with_suffix(suffix),
+        MPI.COMM_WORLD,
+        engine=encoder,
+        ghost_mode=ghost_mode,
+        read_from_partition=store_partition,
+    )
     mesh_adios.comm.Barrier()
     if store_partition:
 
@@ -116,13 +119,27 @@ def test_timedep_mesh(encoder, suffix, ghost_mode, tmp_path, store_partition):
     def u(x):
         return np.asarray([x[0] + 0.1 * np.sin(x[1]), 0.2 * np.cos(x[1]), x[2]])
 
-    write_mesh(file.with_suffix(suffix), mesh, encoder, mode=adios2.Mode.Write, time=0.0, store_partition_info=store_partition)
+    write_mesh(
+        file.with_suffix(suffix),
+        mesh,
+        encoder,
+        mode=adios2.Mode.Write,
+        time=0.0,
+        store_partition_info=store_partition,
+    )
     delta_x = u(mesh.geometry.x.T).T
     mesh.geometry.x[:] += delta_x
     write_mesh(file.with_suffix(suffix), mesh, encoder, mode=adios2.Mode.Append, time=3.0)
     mesh.geometry.x[:] -= delta_x
 
-    mesh_first = read_mesh(file.with_suffix(suffix), MPI.COMM_WORLD, encoder, ghost_mode, time=0.0, read_from_partition=store_partition)
+    mesh_first = read_mesh(
+        file.with_suffix(suffix),
+        MPI.COMM_WORLD,
+        encoder,
+        ghost_mode,
+        time=0.0,
+        read_from_partition=store_partition,
+    )
     mesh_first.comm.Barrier()
 
     # Check that integration over different entities are consistent
@@ -138,7 +155,14 @@ def test_timedep_mesh(encoder, suffix, ghost_mode, tmp_path, store_partition):
         )
 
     mesh.geometry.x[:] += delta_x
-    mesh_second = read_mesh(file.with_suffix(suffix), MPI.COMM_WORLD, encoder, ghost_mode, time=3.0, read_from_partition=store_partition)
+    mesh_second = read_mesh(
+        file.with_suffix(suffix),
+        MPI.COMM_WORLD,
+        encoder,
+        ghost_mode,
+        time=3.0,
+        read_from_partition=store_partition,
+    )
     mesh_second.comm.Barrier()
     measures = [ufl.ds, ufl.dx]
     if ghost_mode == dolfinx.mesh.GhostMode.shared_facet:
