@@ -19,9 +19,9 @@ import ufl
 from .adios2_helpers import (
     ADIOSFile,
     adios_to_numpy_dtype,
+    read_adjacency_list,
     read_array,
     read_cell_perms,
-    read_dofmap,
     resolve_adios_scope,
 )
 from .comm_helpers import (
@@ -340,7 +340,7 @@ def read_function(
     else:
         dofmap_path = f"{name}_dofmap"
         xdofmap_path = f"{name}_XDofmap"
-    input_dofmap = read_dofmap(
+    input_dofmap = read_adjacency_list(
         adios, comm, filename, dofmap_path, xdofmap_path, num_cells_global, engine
     )
     # Compute owner of dofs in dofmap
@@ -426,6 +426,7 @@ def read_mesh(
     ghost_mode: dolfinx.mesh.GhostMode = dolfinx.mesh.GhostMode.shared_facet,
     time: float = 0.0,
     legacy: bool = False,
+    read_from_partition: int = False,
 ) -> dolfinx.mesh.Mesh:
     """
     Read an ADIOS2 mesh into DOLFINx.
@@ -434,9 +435,11 @@ def read_mesh(
         filename: Path to input file
         comm: The MPI communciator to distribute the mesh over
         engine: ADIOS engine to use for reading (BP4, BP5 or HDF5)
-        ghost_mode: Ghost mode to use for mesh
+        ghost_mode: Ghost mode to use for mesh. If `read_from_partition`
+            is set to `True` this option is ignored.
         time: Time stamp associated with mesh
         legacy: If checkpoint was made prior to time-dependent mesh-writer set to True
+        read_from_partition: Read mesh with partition from file
     Returns:
         The distributed mesh
     """
@@ -517,6 +520,15 @@ def read_mesh(
         adios_file.file.Get(geometry, mesh_geometry, adios2.Mode.Deferred)
 
         adios_file.file.PerformGets()
+
+        # Check validity of partitioning information
+        if read_from_partition:
+            if "PartitionProcesses" not in adios_file.io.AvailableAttributes().keys():
+                raise KeyError(f"Partitioning information not found in {filename}")
+            par_num_procs = adios_file.io.InquireAttribute("PartitionProcesses")
+            num_procs = par_num_procs.Data()[0]
+            if num_procs != comm.size:
+                raise ValueError(f"Number of processes in file ({num_procs})!=({comm.size=})")
         adios_file.file.EndStep()
 
     # Create DOLFINx mesh
@@ -529,7 +541,18 @@ def read_mesh(
         dtype=mesh_geometry.dtype,
     )
     domain = ufl.Mesh(element)
-    partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)
+
+    if read_from_partition:
+        partition_graph = read_adjacency_list(
+            adios, comm, filename, "PartitioningData", "PartitioningOffset", shape[0], engine
+        )
+
+        def partitioner(comm: MPI.Intracomm, n, m, topo):
+            assert len(partition_graph.offsets) - 1 == topo.num_nodes
+            return partition_graph
+    else:
+        partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)
+
     return dolfinx.mesh.create_mesh(comm, mesh_topology, mesh_geometry, domain, partitioner)
 
 
@@ -539,6 +562,7 @@ def write_mesh(
     engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Write,
     time: float = 0.0,
+    store_partition_info: bool = False
 ):
     """
     Write a mesh to specified ADIOS2 format, see:
@@ -549,6 +573,7 @@ def write_mesh(
         filename: Path to save mesh (without file-extension)
         mesh: The mesh to write to file
         engine: Adios2 Engine
+        store_partition_info: Store mesh partitioning (including ghosting) to file
     """
     num_xdofs_local = mesh.geometry.index_map().size_local
     num_xdofs_global = mesh.geometry.index_map().size_global
@@ -570,6 +595,36 @@ def write_mesh(
         g_imap.local_to_global(g_dmap[:num_cells_local, :].reshape(-1))
     ).reshape(dofs_out.shape)
 
+    if store_partition_info:
+        partition_processes = mesh.comm.size
+
+        # Get partitioning
+        cell_map = mesh.topology.index_map(mesh.topology.dim).index_to_dest_ranks()
+        num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
+        cell_offsets = cell_map.offsets[: num_cells_local + 1]
+        if cell_offsets[-1] == 0:
+            cell_array = np.empty(0, dtype=np.int32)
+        else:
+            cell_array = cell_map.array[cell_offsets[-1]]
+
+        # Compute adjacency with current process as first entry
+        ownership_array = np.full(num_cells_local + cell_offsets[-1], -1, dtype=np.int32)
+        ownership_offset = cell_offsets + np.arange(len(cell_offsets), dtype=np.int32)
+        ownership_array[ownership_offset[:-1]] = mesh.comm.rank
+        insert_position = np.flatnonzero(ownership_array == -1)
+        ownership_array[insert_position] = cell_array
+
+        partition_map = dolfinx.common.IndexMap(mesh.comm, ownership_array.size)
+        ownership_offset += partition_map.local_range[0]
+        partition_range = partition_map.local_range
+        partition_global = partition_map.size_global
+    else:
+        partition_processes = None
+        ownership_array = None
+        ownership_offset = None
+        partition_range = None
+        partition_global = None
+
     mesh_data = MeshData(
         local_geometry=mesh.geometry.x[:num_xdofs_local, :gdim].copy(),
         local_geometry_pos=geometry_range,
@@ -580,6 +635,12 @@ def write_mesh(
         cell_type=mesh.topology.cell_name(),
         degree=mesh.geometry.cmap.degree,
         lagrange_variant=mesh.geometry.cmap.variant,
+        store_partition=store_partition_info,
+        partition_processes=partition_processes,
+        ownership_array=ownership_array,
+        ownership_offset=ownership_offset,
+        partition_range=partition_range,
+        partition_global=partition_global,
     )
 
     _internal_mesh_writer(

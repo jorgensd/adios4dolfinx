@@ -176,6 +176,9 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     geometry = geometry[:, :gdim].copy()
     assert local_node_range[1] - local_node_range[0] == geometry.shape[0]
     cmap = mesh.geometry.cmap
+
+    # NOTE: Could in theory store partitioning information, but would not work nicely
+    # as one would need to read this data rather than the xdmffile.
     return MeshData(
         local_geometry=geometry,
         local_geometry_pos=local_node_range,
@@ -186,6 +189,12 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
         cell_type=mesh.topology.cell_name(),
         degree=cmap.degree,
         lagrange_variant=cmap.variant,
+        store_partition=False,
+        partition_processes=None,
+        ownership_array=None,
+        ownership_offset=None,
+        partition_range=None,
+        partition_global=None,
     )
 
 
