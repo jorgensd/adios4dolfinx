@@ -426,7 +426,7 @@ def read_mesh(
     ghost_mode: dolfinx.mesh.GhostMode = dolfinx.mesh.GhostMode.shared_facet,
     time: float = 0.0,
     legacy: bool = False,
-    read_from_partition: int = False,
+    read_from_partition: bool = False,
 ) -> dolfinx.mesh.Mesh:
     """
     Read an ADIOS2 mesh into DOLFINx.
@@ -463,6 +463,15 @@ def read_mesh(
         topology.SetSelection([[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]])
         mesh_topology = np.empty((local_range[1] - local_range[0], shape[1]), dtype=np.int64)
         adios_file.file.Get(topology, mesh_topology, adios2.Mode.Deferred)
+
+        # Check validity of partitioning information
+        if read_from_partition:
+            if "PartitionProcesses" not in adios_file.io.AvailableAttributes().keys():
+                raise KeyError(f"Partitioning information not found in {filename}")
+            par_num_procs = adios_file.io.InquireAttribute("PartitionProcesses")
+            num_procs = par_num_procs.Data()[0]
+            if num_procs != comm.size:
+                raise ValueError(f"Number of processes in file ({num_procs})!=({comm.size=})")
 
         # Get mesh cell type
         if "CellType" not in adios_file.io.AvailableAttributes().keys():
@@ -518,17 +527,7 @@ def read_mesh(
             dtype=adios_to_numpy_dtype[geometry.Type()],
         )
         adios_file.file.Get(geometry, mesh_geometry, adios2.Mode.Deferred)
-
         adios_file.file.PerformGets()
-
-        # Check validity of partitioning information
-        if read_from_partition:
-            if "PartitionProcesses" not in adios_file.io.AvailableAttributes().keys():
-                raise KeyError(f"Partitioning information not found in {filename}")
-            par_num_procs = adios_file.io.InquireAttribute("PartitionProcesses")
-            num_procs = par_num_procs.Data()[0]
-            if num_procs != comm.size:
-                raise ValueError(f"Number of processes in file ({num_procs})!=({comm.size=})")
         adios_file.file.EndStep()
 
     # Create DOLFINx mesh
@@ -546,7 +545,6 @@ def read_mesh(
         partition_graph = read_adjacency_list(
             adios, comm, filename, "PartitioningData", "PartitioningOffset", shape[0], engine
         )
-
         def partitioner(comm: MPI.Intracomm, n, m, topo):
             assert len(partition_graph.offsets) - 1 == topo.num_nodes
             return partition_graph
@@ -605,7 +603,7 @@ def write_mesh(
         if cell_offsets[-1] == 0:
             cell_array = np.empty(0, dtype=np.int32)
         else:
-            cell_array = cell_map.array[cell_offsets[-1]]
+            cell_array = cell_map.array[:cell_offsets[-1]]
 
         # Compute adjacency with current process as first entry
         ownership_array = np.full(num_cells_local + cell_offsets[-1], -1, dtype=np.int32)

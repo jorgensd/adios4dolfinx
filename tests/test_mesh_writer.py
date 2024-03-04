@@ -15,11 +15,11 @@ from adios4dolfinx.adios2_helpers import adios2
 )
 @pytest.mark.parametrize("store_partition", [True, False])
 def test_mesh_read_writer(encoder, suffix, ghost_mode, tmp_path, store_partition):
-    N = 5
+    N = 7
     # Consistent tmp dir across processes
     fname = MPI.COMM_WORLD.bcast(tmp_path, root=0)
-    file = fname / f"adios_mesh_{encoder}"
-    xdmf_file = fname / "xdmf_mesh"
+    file = fname / f"adios_mesh_{encoder}_{store_partition}"
+    xdmf_file = fname / "xdmf_mesh_{encode}_{ghost_mode}_{store_partition}"
     mesh = dolfinx.mesh.create_unit_cube(MPI.COMM_WORLD, N, N, N, ghost_mode=ghost_mode)
 
     write_mesh(file.with_suffix(suffix), mesh, encoder, store_partition_info=store_partition)
