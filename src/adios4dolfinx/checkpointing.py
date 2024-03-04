@@ -166,6 +166,8 @@ def write_meshtags(
         engine=engine,
         io_name="MeshTagWriter",
     ) as adios_file:
+        adios_file.file.BeginStep()
+
         # Write meshtag topology
         topology_var = adios_file.io.DefineVariable(
             name + "_topology",
@@ -422,7 +424,9 @@ def read_mesh(
     comm: MPI.Intracomm,
     engine: str = "BP4",
     ghost_mode: dolfinx.mesh.GhostMode = dolfinx.mesh.GhostMode.shared_facet,
-    read_from_partition: int = False,
+    time: float = 0.0,
+    legacy: bool = False,
+    read_from_partition: bool = False,
 ) -> dolfinx.mesh.Mesh:
     """
     Read an ADIOS2 mesh into DOLFINx.
@@ -433,6 +437,8 @@ def read_mesh(
         engine: ADIOS engine to use for reading (BP4, BP5 or HDF5)
         ghost_mode: Ghost mode to use for mesh. If `read_from_partition`
             is set to `True` this option is ignored.
+        time: Time stamp associated with mesh
+        legacy: If checkpoint was made prior to time-dependent mesh-writer set to True
         read_from_partition: Read mesh with partition from file
     Returns:
         The distributed mesh
@@ -446,7 +452,26 @@ def read_mesh(
         engine=engine,
         io_name="MeshReader",
     ) as adios_file:
+        # Get time independent mesh variables (mesh topology and cell type info) first
         adios_file.file.BeginStep()
+        # Get mesh topology (distributed)
+        if "Topology" not in adios_file.io.AvailableVariables().keys():
+            raise KeyError(f"Mesh topology not found at Topology in {filename}")
+        topology = adios_file.io.InquireVariable("Topology")
+        shape = topology.Shape()
+        local_range = compute_local_range(comm, shape[0])
+        topology.SetSelection([[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]])
+        mesh_topology = np.empty((local_range[1] - local_range[0], shape[1]), dtype=np.int64)
+        adios_file.file.Get(topology, mesh_topology, adios2.Mode.Deferred)
+
+        # Check validity of partitioning information
+        if read_from_partition:
+            if "PartitionProcesses" not in adios_file.io.AvailableAttributes().keys():
+                raise KeyError(f"Partitioning information not found in {filename}")
+            par_num_procs = adios_file.io.InquireAttribute("PartitionProcesses")
+            num_procs = par_num_procs.Data()[0]
+            if num_procs != comm.size:
+                raise ValueError(f"Number of processes in file ({num_procs})!=({comm.size=})")
 
         # Get mesh cell type
         if "CellType" not in adios_file.io.AvailableAttributes().keys():
@@ -461,6 +486,29 @@ def read_mesh(
         if "Degree" not in adios_file.io.AvailableAttributes().keys():
             raise KeyError(f"Mesh degree not found in {filename}")
         degree = adios_file.io.InquireAttribute("Degree").Data()[0]
+
+        if not legacy:
+            time_name = "MeshTime"
+            for i in range(adios_file.file.Steps()):
+                if i > 0:
+                    adios_file.file.BeginStep()
+                if time_name in adios_file.io.AvailableVariables().keys():
+                    arr = adios_file.io.InquireVariable(time_name)
+                    time_shape = arr.Shape()
+                    arr.SetSelection([[0], [time_shape[0]]])
+                    times = np.empty(time_shape[0], dtype=adios_to_numpy_dtype[arr.Type()])
+                    adios_file.file.Get(arr, times, adios2.Mode.Sync)
+                    if times[0] == time:
+                        break
+                if i == adios_file.file.Steps() - 1:
+                    raise KeyError(
+                        f"No data associated with {time_name}={time} found in {filename}"
+                    )
+
+                adios_file.file.EndStep()
+
+            if time_name not in adios_file.io.AvailableVariables().keys():
+                raise KeyError(f"No data associated with {time_name}={time} found in {filename}")
 
         # Get mesh geometry
         if "Points" not in adios_file.io.AvailableVariables().keys():
@@ -479,26 +527,7 @@ def read_mesh(
             dtype=adios_to_numpy_dtype[geometry.Type()],
         )
         adios_file.file.Get(geometry, mesh_geometry, adios2.Mode.Deferred)
-        # Get mesh topology (distributed)
-        if "Topology" not in adios_file.io.AvailableVariables().keys():
-            raise KeyError(f"Mesh topology not found at Topology in {filename}")
-        topology = adios_file.io.InquireVariable("Topology")
-        shape = topology.Shape()
-        local_range = compute_local_range(comm, shape[0])
-        topology.SetSelection([[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]])
-        mesh_topology = np.empty((local_range[1] - local_range[0], shape[1]), dtype=np.int64)
-        adios_file.file.Get(topology, mesh_topology, adios2.Mode.Deferred)
-
         adios_file.file.PerformGets()
-
-        # Check validity of partitioning information
-        if read_from_partition:
-            if "PartitionProcesses" not in adios_file.io.AvailableAttributes().keys():
-                raise KeyError(f"Partitioning information not found in {filename}")
-            par_num_procs = adios_file.io.InquireAttribute("PartitionProcesses")
-            num_procs = par_num_procs.Data()[0]
-            if num_procs != comm.size:
-                raise ValueError(f"Number of processes in file ({num_procs})!=({comm.size=})")
         adios_file.file.EndStep()
 
     # Create DOLFINx mesh
@@ -527,7 +556,12 @@ def read_mesh(
 
 
 def write_mesh(
-    filename: Path, mesh: dolfinx.mesh.Mesh, engine: str = "BP4", store_partition_info: bool = False
+    filename: Path,
+    mesh: dolfinx.mesh.Mesh,
+    engine: str = "BP4",
+    mode: adios2.Mode = adios2.Mode.Write,
+    time: float = 0.0,
+    store_partition_info: bool = False,
 ):
     """
     Write a mesh to specified ADIOS2 format, see:
@@ -570,7 +604,7 @@ def write_mesh(
         if cell_offsets[-1] == 0:
             cell_array = np.empty(0, dtype=np.int32)
         else:
-            cell_array = cell_map.array[cell_offsets[-1]]
+            cell_array = cell_map.array[: cell_offsets[-1]]
 
         # Compute adjacency with current process as first entry
         ownership_array = np.full(num_cells_local + cell_offsets[-1], -1, dtype=np.int32)
@@ -608,13 +642,13 @@ def write_mesh(
         partition_global=partition_global,
     )
 
-    # NOTE: Mode will become input again once we have variable geometry
     _internal_mesh_writer(
         filename,
         mesh.comm,
         mesh_data,
         engine,
-        mode=adios2.Mode.Write,
+        mode=mode,
+        time=time,
         io_name="MeshWriter",
     )
 
