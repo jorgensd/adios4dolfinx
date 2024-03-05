@@ -35,5 +35,9 @@ sphinx:
 
   config:
     html_last_updated_fmt: "%b %d, %Y"
+    nb_custom_formats:
+      .py:
+        - jupytext.reads
+        - fmt: py
 
 exclude_patterns: [".pytest_cache/*"]
