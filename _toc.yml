@@ -10,7 +10,7 @@ parts:
     - file: "docs/writing_mesh_checkpoint"
     - file: "docs/partitioned_mesh"
     - file: "docs/time_dependent_mesh"
-    # - file: "docs/meshtags"
+    - file: "docs/meshtags"
 
   # - caption: Writing and reading functions
   #   chapters:
