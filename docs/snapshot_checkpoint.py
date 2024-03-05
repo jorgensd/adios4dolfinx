@@ -60,7 +60,7 @@ def read_write_snapshot(filename: Path):
 mesh_file = Path("snapshot.bp")
 
 with ipp.Cluster(engines="mpi", n=3, log_level=logging.ERROR) as cluster:
-    cluster[:].push({"f":f})
+    cluster[:].push({"f": f})
     query = cluster[:].apply_async(
         read_write_snapshot,
         mesh_file,

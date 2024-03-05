@@ -4,13 +4,14 @@
 #
 # We start by creating a simple unit-square mesh.
 
+import logging
 from pathlib import Path
 
 from mpi4py import MPI
-import logging
+
 import dolfinx
 import ipyparallel as ipp
-import logging
+
 mesh = dolfinx.mesh.create_unit_square(MPI.COMM_WORLD, 10, 10)
 
 # Note that when a mesh is created in DOLFINx, we send in an MPI communicator.

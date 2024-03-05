@@ -6,11 +6,12 @@
 # (on a fixed number of processes), one can store the partitioning of the mesh
 # in the checkpoint.
 
+import logging
 from pathlib import Path
 
 import ipyparallel as ipp
 
-import logging
+
 def write_partitioned_mesh(filename: Path):
     import subprocess
 

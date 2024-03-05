@@ -7,6 +7,7 @@
 
 # As an example we will use a unit-cube, where each entity has been tagged with a unique index.
 
+import logging
 from pathlib import Path
 
 from mpi4py import MPI
@@ -14,7 +15,7 @@ from mpi4py import MPI
 import dolfinx
 import ipyparallel as ipp
 import numpy as np
-import logging
+
 import adios4dolfinx
 
 assert MPI.COMM_WORLD.size == 1, "This example should only be run with 1 MPI process"

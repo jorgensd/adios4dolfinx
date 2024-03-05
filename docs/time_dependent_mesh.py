@@ -8,6 +8,7 @@
 
 # First, we create a simple function to compute the volume of a mesh
 
+import logging
 from pathlib import Path
 
 from mpi4py import MPI
@@ -16,7 +17,7 @@ import ipyparallel as ipp
 
 import adios4dolfinx
 
-import logging
+
 def compute_volume(mesh, time_stamp):
     from mpi4py import MPI
 
