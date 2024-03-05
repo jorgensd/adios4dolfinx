@@ -13,7 +13,7 @@ dependencies = ["fenics-dolfinx>=0.8.0.dev0"]
 [project.optional-dependencies]
 test = ["pytest", "coverage", "ipyparallel"]
 dev = ["pdbpp", "ipython", "mypy", "ruff"]
-docs = ["jupyter-book", "ipyparallel"]
+docs = ["jupyter-book", "ipyparallel", "ipywidgets"]
 all = ["adios4dolfinx[test,dev,docs]"]
 
 [tool.pytest.ini_options]
