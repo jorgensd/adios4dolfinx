@@ -51,6 +51,7 @@ with ipp.Cluster(engines="mpi", n=4, log_level=logging.ERROR) as cluster:
 
 # Next, we will create a function on the mesh and write it to a checkpoint.
 
+
 def f(x):
     return (x[0] + x[1]) * (x[0] < 0.5), x[1], x[2] - x[1]
 
@@ -81,6 +82,7 @@ def write_function(
         f"{mesh.comm.rank+1}/{mesh.comm.size} Function written to ",
         f"{function_filename.with_suffix('.bp')}",
     )
+
 
 # Read in mesh and write function to file
 
