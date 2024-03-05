@@ -11,7 +11,7 @@
 # ordering as the mesh. The write operation will be more expensive, as it requires data
 # communication to ensure contiguous data being written to the checkpoint.
 # The method is exposed as `adios4dolfinx.write_function_on_input_mesh`.
-# Below we will demostrate this method.
+# Below we will demonstrate this method.
 
 import logging
 from pathlib import Path
@@ -50,6 +50,7 @@ with ipp.Cluster(engines="mpi", n=4, log_level=logging.ERROR) as cluster:
 
 
 # Next, we will create a function on the mesh and write it to a checkpoint.
+
 def f(x):
     return (x[0] + x[1]) * (x[0] < 0.5), x[1], x[2] - x[1]
 
@@ -81,11 +82,11 @@ def write_function(
         f"{function_filename.with_suffix('.bp')}",
     )
 
+# Read in mesh and write function to file
 
 element = ("DG", 4, (3,))
 function_file = Path("MyFunction.bp")
 with ipp.Cluster(engines="mpi", n=2, log_level=logging.ERROR) as cluster:
-    # Read in mesh and write function to file
     cluster[:].push({"f": f})
     query = cluster[:].apply_async(write_function, mesh_file, function_file, element)
     query.wait()
@@ -124,8 +125,9 @@ def verify_checkpoint(
     )
 
 
+# Verify checkpoint by comparing to exact solution
+
 with ipp.Cluster(engines="mpi", n=5, log_level=logging.ERROR) as cluster:
-    # Read in mesh and write function to file
     cluster[:].push({"f": f})
     query = cluster[:].apply_async(verify_checkpoint, mesh_file, function_file, element)
     query.wait()
