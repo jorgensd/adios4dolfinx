@@ -22,6 +22,7 @@ mesh = dolfinx.mesh.create_unit_square(
 )
 
 # Next, we create a function, and interpolate a polynomial function into the function space
+
 el = "N1curl"
 degree = 3
 V = dolfinx.fem.functionspace(mesh, (el, degree))
@@ -34,7 +35,7 @@ def f(x):
 u = dolfinx.fem.Function(V)
 u.interpolate(f)
 
-# Next we start by storing the mesh
+# For the checkpointing, we start by storing the mesh to file
 
 filename = Path("function_checkpoint.bp")
 adios4dolfinx.write_mesh(filename, mesh)
