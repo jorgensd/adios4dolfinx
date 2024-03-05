@@ -23,6 +23,7 @@ mesh = dolfinx.mesh.create_unit_cube(MPI.COMM_WORLD, nx=3, ny=4, nz=5)
 
 # We start by computing the unique global index of each (owned) entity in the mesh
 # as well as its corresponding midpoint
+
 entity_midpoints = {}
 meshtags = {}
 for i in range(mesh.topology.dim + 1):
@@ -38,6 +39,7 @@ for i in range(mesh.topology.dim + 1):
 
 # We use adios4dolfinx to write the mesh and meshtags to file.
 # We associate each meshtag with a name
+
 filename = Path("mesh_with_meshtags.bp")
 adios4dolfinx.write_mesh(filename, mesh)
 for i, tag in meshtags.items():
@@ -73,6 +75,7 @@ def verify_meshtags(filename: Path):
                 err_msg=f"{prefix}: Midpoint ({i , global_pos}) do not match",
             )
         print(f"{prefix} Matching of all entities of dimension {i} successful")
+
 
 with ipp.Cluster(engines="mpi", n=3) as cluster:
     cluster[:].push({"entity_midpoints": entity_midpoints})
