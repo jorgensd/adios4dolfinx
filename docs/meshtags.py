@@ -7,6 +7,7 @@
 
 # As an example we will use a unit-cube, where each entity has been tagged with a unique index.
 
+import logging
 from pathlib import Path
 
 from mpi4py import MPI
@@ -77,7 +78,7 @@ def verify_meshtags(filename: Path):
         print(f"{prefix} Matching of all entities of dimension {i} successful")
 
 
-with ipp.Cluster(engines="mpi", n=3) as cluster:
+with ipp.Cluster(engines="mpi", n=3, log_level=logging.ERROR) as cluster:
     cluster[:].push({"entity_midpoints": entity_midpoints})
     query = cluster[:].apply_async(verify_meshtags, filename)
     query.wait()

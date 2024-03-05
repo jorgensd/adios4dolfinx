@@ -4,6 +4,7 @@
 #
 # We start by creating a simple unit-square mesh.
 
+import logging
 from pathlib import Path
 
 from mpi4py import MPI
@@ -57,7 +58,7 @@ def create_distributed_mesh(ghosted: bool, N: int = 10):
 # As we defined `print_mesh_info` locally on this process, we need to push it to all engines.
 
 # + tags=["hide-output"]
-with ipp.Cluster(engines="mpi", n=3) as cluster:
+with ipp.Cluster(engines="mpi", n=3, log_level=logging.ERROR) as cluster:
     # Push print_mesh_info to all engines
     cluster[:].push({"print_mesh_info": print_mesh_info})
 
@@ -109,7 +110,7 @@ def write_mesh(filename: Path):
 mesh_file = Path("mesh.bp")
 
 # + tags=["hide-output"]
-with ipp.Cluster(engines="mpi", n=2) as cluster:
+with ipp.Cluster(engines="mpi", n=2, log_level=logging.ERROR) as cluster:
     # Write mesh to file
     query = cluster[:].apply_async(write_mesh, mesh_file)
     query.wait()
@@ -138,7 +139,7 @@ def read_mesh(filename: Path):
 # We can now read the checkpoint on a different number of processes than we wrote it on.
 
 # + tags=["hide-output"]
-with ipp.Cluster(engines="mpi", n=4) as cluster:
+with ipp.Cluster(engines="mpi", n=4, log_level=logging.ERROR) as cluster:
     # Write mesh to file
     cluster[:].push({"print_mesh_info": print_mesh_info})
     query = cluster[:].apply_async(read_mesh, mesh_file)

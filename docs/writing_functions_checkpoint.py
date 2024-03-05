@@ -5,6 +5,7 @@
 
 # We start by creating a mesh and an appropriate function
 
+import logging
 from pathlib import Path
 
 from mpi4py import MPI
@@ -69,7 +70,7 @@ def read_function(filename: Path, timestamp: float):
     )
 
 
-with ipp.Cluster(engines="mpi", n=3) as cluster:
+with ipp.Cluster(engines="mpi", n=3, log_level=logging.ERROR) as cluster:
     cluster[:].push({"f": f, "el": el, "degree": degree})
     query = cluster[:].apply_async(read_function, filename, 0.3)
     query.wait()
