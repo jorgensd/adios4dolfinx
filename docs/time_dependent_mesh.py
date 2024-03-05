@@ -16,7 +16,7 @@ import ipyparallel as ipp
 
 import adios4dolfinx
 
-
+import logging
 def compute_volume(mesh, time_stamp):
     from mpi4py import MPI
 
@@ -67,7 +67,7 @@ def write_meshes(filename: Path):
 mesh_file = Path("timedep_mesh.bp")
 n = 3
 
-with ipp.Cluster(engines="mpi", n=n) as cluster:
+with ipp.Cluster(engines="mpi", n=n, log_level=logging.ERROR) as cluster:
     # Write mesh to file
     cluster[:].push({"compute_volume": compute_volume})
     query = cluster[:].apply_async(write_meshes, mesh_file)

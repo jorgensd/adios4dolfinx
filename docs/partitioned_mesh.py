@@ -10,7 +10,7 @@ from pathlib import Path
 
 import ipyparallel as ipp
 
-
+import logging
 def write_partitioned_mesh(filename: Path):
     import subprocess
 
@@ -43,7 +43,7 @@ mesh_file = Path("partitioned_mesh.bp")
 n = 3
 
 # + tags=["hide-output"]
-with ipp.Cluster(engines="mpi", n=n) as cluster:
+with ipp.Cluster(engines="mpi", n=n, log_level=logging.ERROR) as cluster:
     query = cluster[:].apply_async(write_partitioned_mesh, mesh_file)
     query.wait()
     assert query.successful(), query.error
@@ -70,7 +70,7 @@ def read_partitioned_mesh(filename: Path, read_from_partition: bool = True):
         print(f"{prefix} Caught exception: ", e)
 
 
-with ipp.Cluster(engines="mpi", n=n + 1) as cluster:
+with ipp.Cluster(engines="mpi", n=n + 1, log_level=logging.ERROR) as cluster:
     # Read mesh from file with different number of processes
     query = cluster[:].apply_async(read_partitioned_mesh, mesh_file)
     query.wait()
@@ -80,7 +80,7 @@ with ipp.Cluster(engines="mpi", n=n + 1) as cluster:
 # Read mesh from file with different number of processes (not using partitioning information).
 
 # + tags=["hide-output"]
-with ipp.Cluster(engines="mpi", n=n + 1) as cluster:
+with ipp.Cluster(engines="mpi", n=n + 1, log_level=logging.ERROR) as cluster:
     query = cluster[:].apply_async(read_partitioned_mesh, mesh_file, False)
     query.wait()
     assert query.successful()
@@ -91,7 +91,7 @@ with ipp.Cluster(engines="mpi", n=n + 1) as cluster:
 # re-using partitioning information.
 
 # + tags=["hide-output"]
-with ipp.Cluster(engines="mpi", n=n) as cluster:
+with ipp.Cluster(engines="mpi", n=n, log_level=logging.ERROR) as cluster:
     query = cluster[:].apply_async(read_partitioned_mesh, mesh_file, True)
     query.wait()
     assert query.successful()

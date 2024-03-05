@@ -13,7 +13,7 @@ import dolfinx
 import ipyparallel as ipp
 
 import adios4dolfinx
-
+import logging
 assert MPI.COMM_WORLD.size == 1, "This example should only be run with 1 MPI process"
 
 mesh = dolfinx.mesh.create_unit_square(
@@ -69,7 +69,7 @@ def read_function(filename: Path, timestamp: float):
     )
 
 
-with ipp.Cluster(engines="mpi", n=3) as cluster:
+with ipp.Cluster(engines="mpi", n=3, log_level=logging.ERROR) as cluster:
     cluster[:].push({"f": f, "el": el, "degree": degree})
     query = cluster[:].apply_async(read_function, filename, 0.3)
     query.wait()

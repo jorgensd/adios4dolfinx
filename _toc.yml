@@ -15,6 +15,7 @@ parts:
   - caption: Writing and reading functions
     chapters:
     - file: "docs/writing_functions_checkpoint"
+    - file: "docs/snapshot_checkpoint"
   #   - file: "docs/write_on_original_mesh"
 
   - caption: Python API
