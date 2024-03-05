@@ -117,7 +117,7 @@ with ipp.Cluster(engines="mpi", n=2) as cluster:
     print("".join(query.stdout))
 
 # -
-# We observe that we have stored all the dataneeded to re-create the mesh in the file `mesh.bp`.
+# We observe that we have stored all the data needed to re-create the mesh in the file `mesh.bp`.
 # We can therefore read it (to any number of processes) with `adios4dolfinx.read_mesh`
 
 

@@ -1,7 +1,7 @@
 # # Storing mesh partition
 # This data is re-ordered when reading in a mesh, as the mesh is partitioned.
 # This means that when storing the mesh to disk from DOLFINx, the geometry and
-# connecitivity arrays are re-ordered.
+# connectivity arrays are re-ordered.
 # If we want to avoid to re-partition the mesh every time you run a simulation
 # (on a fixed number of processes), one can store the partitioning of the mesh
 # in the checkpoint.
@@ -37,14 +37,13 @@ def write_partitioned_mesh(filename: Path):
         print(output.stdout.decode("utf-8"))
 
 
-# We inspect the partioned mesh
+# We inspect the partitioned mesh
 
 mesh_file = Path("partitioned_mesh.bp")
 n = 3
 
 # + tags=["hide-output"]
 with ipp.Cluster(engines="mpi", n=n) as cluster:
-    # Write mesh to file
     query = cluster[:].apply_async(write_partitioned_mesh, mesh_file)
     query.wait()
     assert query.successful(), query.error
@@ -61,7 +60,7 @@ def read_partitioned_mesh(filename: Path, read_from_partition: bool = True):
 
     import adios4dolfinx
 
-    prefix = f"{MPI.COMM_WORLD.rank}/{MPI.COMM_WORLD.size-1}: "
+    prefix = f"{MPI.COMM_WORLD.rank + 1}/{MPI.COMM_WORLD.size}: "
     try:
         mesh = adios4dolfinx.read_mesh(
             filename, comm=MPI.COMM_WORLD, engine="BP4", read_from_partition=read_from_partition
@@ -71,7 +70,6 @@ def read_partitioned_mesh(filename: Path, read_from_partition: bool = True):
         print(f"{prefix} Caught exception: ", e)
 
 
-# + tags=["hide-output"]
 with ipp.Cluster(engines="mpi", n=n + 1) as cluster:
     # Read mesh from file with different number of processes
     query = cluster[:].apply_async(read_partitioned_mesh, mesh_file)
@@ -79,7 +77,6 @@ with ipp.Cluster(engines="mpi", n=n + 1) as cluster:
     assert query.successful()
     print("".join(query.stdout))
 
-# -
 # Read mesh from file with different number of processes (not using partitioning information).
 
 # + tags=["hide-output"]
