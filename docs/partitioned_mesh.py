@@ -73,7 +73,7 @@ with ipp.Cluster(engines="mpi", n=n + 1, log_level=logging.ERROR) as cluster:
     # Read mesh from file with different number of processes
     query = cluster[:].apply_async(read_partitioned_mesh, mesh_file)
     query.wait()
-    assert query.successful()
+    assert query.successful(), query.error
     print("".join(query.stdout))
 
 # Read mesh from file with different number of processes (not using partitioning information).
@@ -81,7 +81,7 @@ with ipp.Cluster(engines="mpi", n=n + 1, log_level=logging.ERROR) as cluster:
 with ipp.Cluster(engines="mpi", n=n + 1, log_level=logging.ERROR) as cluster:
     query = cluster[:].apply_async(read_partitioned_mesh, mesh_file, False)
     query.wait()
-    assert query.successful()
+    assert query.successful(), query.error
     print("".join(query.stdout))
 
 # Read mesh from file with same number of processes as was written,
@@ -90,5 +90,5 @@ with ipp.Cluster(engines="mpi", n=n + 1, log_level=logging.ERROR) as cluster:
 with ipp.Cluster(engines="mpi", n=n, log_level=logging.ERROR) as cluster:
     query = cluster[:].apply_async(read_partitioned_mesh, mesh_file, True)
     query.wait()
-    assert query.successful()
+    assert query.successful(), query.error
     print("".join(query.stdout))
