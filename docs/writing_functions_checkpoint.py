@@ -40,7 +40,7 @@ adios4dolfinx.write_mesh(filename, mesh)
 
 # Next, we store the function to file, and associate it with a name.
 # Note that we can also associate a time stamp with it, as done for meshes in
-# [Writing time-dependent mesh checkpoint](./writing_time_dependent_mesh_checkpoint)
+# [Writing time-dependent mesh checkpoint](./time_dependent_mesh)
 
 adios4dolfinx.write_function(filename, u, time=0.3, name="my_curl_function")
 
