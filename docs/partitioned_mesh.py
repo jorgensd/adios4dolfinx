@@ -43,14 +43,12 @@ def write_partitioned_mesh(filename: Path):
 mesh_file = Path("partitioned_mesh.bp")
 n = 3
 
-# + tags=["hide-output"]
 with ipp.Cluster(engines="mpi", n=n, log_level=logging.ERROR) as cluster:
     query = cluster[:].apply_async(write_partitioned_mesh, mesh_file)
     query.wait()
     assert query.successful(), query.error
     print("".join(query.stdout))
 
-# -
 # # Reading a partitioned mesh
 
 # If we try to read the mesh in on a different number of processes, we will get an error
@@ -80,18 +78,15 @@ with ipp.Cluster(engines="mpi", n=n + 1, log_level=logging.ERROR) as cluster:
 
 # Read mesh from file with different number of processes (not using partitioning information).
 
-# + tags=["hide-output"]
 with ipp.Cluster(engines="mpi", n=n + 1, log_level=logging.ERROR) as cluster:
     query = cluster[:].apply_async(read_partitioned_mesh, mesh_file, False)
     query.wait()
     assert query.successful()
     print("".join(query.stdout))
 
-# -
 # Read mesh from file with same number of processes as was written,
 # re-using partitioning information.
 
-# + tags=["hide-output"]
 with ipp.Cluster(engines="mpi", n=n, log_level=logging.ERROR) as cluster:
     query = cluster[:].apply_async(read_partitioned_mesh, mesh_file, True)
     query.wait()

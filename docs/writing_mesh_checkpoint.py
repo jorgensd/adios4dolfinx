@@ -57,7 +57,6 @@ def create_distributed_mesh(ghosted: bool, N: int = 10):
 # Next we start up a new cluster with three engines.
 # As we defined `print_mesh_info` locally on this process, we need to push it to all engines.
 
-# + tags=["hide-output"]
 with ipp.Cluster(engines="mpi", n=3, log_level=logging.ERROR) as cluster:
     # Push print_mesh_info to all engines
     cluster[:].push({"print_mesh_info": print_mesh_info})
@@ -73,7 +72,6 @@ with ipp.Cluster(engines="mpi", n=3, log_level=logging.ERROR) as cluster:
     assert query_false.successful(), query_false.error
     print("".join(query_false.stdout))
 
-# -
 # ## Writing a mesh checkpoint
 # The input data to a mesh is:
 # - A geometry: the set of points in R^D that are part of each cell
@@ -109,7 +107,6 @@ def write_mesh(filename: Path):
 
 mesh_file = Path("mesh.bp")
 
-# + tags=["hide-output"]
 with ipp.Cluster(engines="mpi", n=2, log_level=logging.ERROR) as cluster:
     # Write mesh to file
     query = cluster[:].apply_async(write_mesh, mesh_file)
@@ -117,7 +114,6 @@ with ipp.Cluster(engines="mpi", n=2, log_level=logging.ERROR) as cluster:
     assert query.successful(), query.error
     print("".join(query.stdout))
 
-# -
 # We observe that we have stored all the data needed to re-create the mesh in the file `mesh.bp`.
 # We can therefore read it (to any number of processes) with `adios4dolfinx.read_mesh`
 
@@ -138,7 +134,6 @@ def read_mesh(filename: Path):
 # ## Reading mesh checkpoints (N-to-M)
 # We can now read the checkpoint on a different number of processes than we wrote it on.
 
-# + tags=["hide-output"]
 with ipp.Cluster(engines="mpi", n=4, log_level=logging.ERROR) as cluster:
     # Write mesh to file
     cluster[:].push({"print_mesh_info": print_mesh_info})
@@ -146,4 +141,3 @@ with ipp.Cluster(engines="mpi", n=4, log_level=logging.ERROR) as cluster:
     query.wait()
     assert query.successful(), query.error
     print("".join(query.stdout))
-# -
