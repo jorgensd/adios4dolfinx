@@ -16,7 +16,7 @@ parts:
     chapters:
     - file: "docs/writing_functions_checkpoint"
     - file: "docs/snapshot_checkpoint"
-  #   - file: "docs/write_on_original_mesh"
+    - file: "docs/original_checkpoint"
 
   - caption: Python API
     chapters:

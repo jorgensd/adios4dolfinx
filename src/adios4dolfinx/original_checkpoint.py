@@ -198,7 +198,9 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     )
 
 
-def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionData:
+def create_function_data_on_original_mesh(
+    u: dolfinx.fem.Function, name: str | None = None
+) -> FunctionData:
     """
     Create data object to save with ADIOS2
     """
@@ -308,6 +310,7 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
     num_dofs_local = dofmap.index_map.size_local * dofmap.index_map_bs
     num_dofs_global = dofmap.index_map.size_global * dofmap.index_map_bs
     local_range = np.asarray(dofmap.index_map.local_range, dtype=np.int64) * dofmap.index_map_bs
+    func_name = name if name is not None else u.name
     return FunctionData(
         cell_permutations=cell_permutation_info,
         local_cell_range=local_cell_range,
@@ -319,7 +322,7 @@ def create_function_data_on_original_mesh(u: dolfinx.fem.Function) -> FunctionDa
         num_dofs_global=num_dofs_global,
         dofmap_range=dofmap_imap.local_range,
         global_dofs_in_dofmap=dofmap_imap.size_global,
-        name=u.name,
+        name=func_name,
     )
 
 
@@ -329,6 +332,7 @@ def write_function_on_input_mesh(
     engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Append,
     time: float = 0.0,
+    name: str | None = None,
 ):
     """
     Write function checkpoint (to be read with the input mesh).
@@ -339,10 +343,10 @@ def write_function_on_input_mesh(
         engine: The ADIOS2 engine to use
         mode: The ADIOS2 mode to use (write or append)
         time: Time-stamp associated with function at current write step
-
+        name: Name of function. If None, the name of the function is used.
     """
     mesh = u.function_space.mesh
-    function_data = create_function_data_on_original_mesh(u)
+    function_data = create_function_data_on_original_mesh(u, name)
     fname = Path(filename)
     write_function(
         fname,

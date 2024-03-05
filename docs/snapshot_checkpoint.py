@@ -66,5 +66,5 @@ with ipp.Cluster(engines="mpi", n=3, log_level=logging.ERROR) as cluster:
         mesh_file,
     )
     query.wait()
-    assert query.successful(), query.stderr
+    assert query.successful(), query.error
     print("".join(query.stdout))
