@@ -61,14 +61,16 @@ A *N-to-M* checkpoint is a checkpoint that can be written with N processes and r
 Two versions of this checkpoint is supported; One where storage of the mesh is required and without mesh storage. The reasoning for such a split is that when a mesh is read into DOLFINx and passed to an appropriate partitioner, the ordering mesh nodes (coordinates) and connectivity (cells) is changed.
 Writing these back into *global arrays* requires MPI communication to ensure contiguous writing of data.
 
-The usage of *N-to-M* checkpointing with mesh storage is achieved by using `write_mesh` and then in turn `write_checkpoint`.
-These operations only write a contiguous chunk of data owned by the current process, to a *Global Array* that can be read in with a different number of processes at a later stage.
-This operation requires no MPI-communication for writing.
+THe *N-to-M* checkpoint with mesh storage exclusively write contiguous chunks of data owned by the current process, to an ADIOS2 *Global Array* that can be read in with a different number of processes at a later stage. This operation requires no MPI-communication for writing such checkpoints.
 
-In many cases, the input mesh might stem from an external mesh generator, and is stored together with mesh entity markers in an external file, for instance an XDMF-file. To store only function data that relates to this mesh, for a later *N-to-M* checkpointing, the user can call `write_function_on_input_mesh`, which creates a stand-alone file that can be associated with the XDMF file for a later restart. This method requires some neighborhood collective calls, to move data from the process that currently owns it, to the relevant process for writing it out into a ADIOS2 *Global Array* in contiguous chunks.
+In many cases, the input mesh might stem from an external mesh generator and is stored together with mesh entity markers in an external file, for instance an XDMF-file.
+To avoid duplication of this mesh data, a stand-alone file that can be associated with the XDMF file for a later restart can be created.
+This method requires some MPI neighborhood collective calls to move data from the process that currently owns it, to the relevant process for writing it out into a *Global Array* in contiguous chunks.
 Both *N-to-M* checkpoint routines uses the `read_checkpoint` function to read in a function checkpoint.
 
-In certain scenarios, mesh partitioning might be time-consuming, as a developer is running the same problem over and over again with the same number of processes. As DOLFINx supports custom partitioning [@Baratta:2023], we use this feature to read in partition data from a previous run. This functionality is activated in `write_mesh` by enabling `store_partition_info` and in `read_mesh` by enabling `read_from_partition`. As opposed to the checkpoints in the old version of DOLFIN, these checkpoints handle any ghosting, that being a custom ghosting provided by the user, or the shared-facet mode in DOLFINx.
+In certain scenarios, mesh partitioning might be time-consuming, as a developer is running the same problem over and over again with the same number of processes.
+As DOLFINx supports custom partitioning [@Baratta:2023], we use this feature to read in partition data from a previous run.
+As opposed to the checkpoints in the old version of DOLFIN, these checkpoints handle any ghosting, that being a custom ghosting provided by the user, or the shared-facet mode in DOLFINx.
 
 # Examples
 A large variety of examples covering all the functions in adios4dolfinx is available at [https://jorgensd.github.io/adios4dolfinx](https://jorgensd.github.io/adios4dolfinx).
