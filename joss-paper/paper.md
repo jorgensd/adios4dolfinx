@@ -21,7 +21,7 @@ bibliography: paper.bib
 
 We introduce a checkpointing framework for the latest version of the FEniCS project, known as DOLFINx.
 The framework leverages the data-centric approach of DOLFINx along with a state of the art adaptable Input/Output system called ADIOS2.
-Several variations of checkpointing are supported, including *N-to-M* checkpointing of function data, storage of mesh partitioning information for N-to-N checkpointing and snapshot checkpointing for RAM reduction during simulation.
+Several variations of checkpointing are supported, including *N-to-M* checkpointing of function data, storage of mesh partitioning information for *N-to-N* checkpointing and snapshot checkpointing for RAM reduction during simulation.
 All MPI operations are using MPI-3 Neighborhood collectives.
 
 # Statement of need
