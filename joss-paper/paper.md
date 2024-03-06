@@ -82,6 +82,6 @@ A large variety of examples covering all the functions in adios4dolfinx is avail
 # Acknowledgements
 
 We acknowledge the valuable feedback on the documentation and manuscript by Thomas M. Surowiec and Halvor Herlyng. 
-Additionally, we acknowledge the scientific discussion regarding feature development and code contributions by Henrik N. Finsberg and Francesco Ballarin.
+Additionally, we acknowledge the scientific discussion regarding feature development and code contributions by Francesco Ballarin, Henrik N. Finsberg and Nathan Sime.
 
 # References
