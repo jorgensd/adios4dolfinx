@@ -111,7 +111,7 @@ def read_attributes(
         for k in adios_file.io.AvailableAttributes().keys():
             if k.startswith(f"{name}_"):
                 a = adios_file.io.InquireAttribute(k)
-                attributes[k[len(name) + 1:]] = a.Data()
+                attributes[k[len(name) + 1 :]] = a.Data()
         adios_file.file.EndStep()
     return attributes
 
@@ -381,17 +381,21 @@ def read_function(
         np.testing.assert_allclose(num_dofs_per_cell, num_dofs_per_cell[0])
 
         from adios4dolfinx.utils import unroll_insert_position
+
         # Sort dofmap by input local cell index
         input_perms_sorted = input_perms[input_local_cell_index]
         unrolled_dofmap_position = unroll_insert_position(
-            input_local_cell_index, num_dofs_per_cell[0])
+            input_local_cell_index, num_dofs_per_cell[0]
+        )
         dofmap_sorted_by_input = recv_array[unrolled_dofmap_position]
 
         # First invert input data to reference element then transform to current mesh
         element.pre_apply_transpose_dof_transformation(
-            dofmap_sorted_by_input, input_perms_sorted, bs)
+            dofmap_sorted_by_input, input_perms_sorted, bs
+        )
         element.pre_apply_inverse_transpose_dof_transformation(
-            dofmap_sorted_by_input, inc_perms, bs)
+            dofmap_sorted_by_input, inc_perms, bs
+        )
         inverted_perm = np.argsort(unrolled_dofmap_position)
         recv_array = dofmap_sorted_by_input[inverted_perm]
 
