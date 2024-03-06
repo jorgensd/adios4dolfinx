@@ -52,6 +52,7 @@ jobs:
         with:
           adios2: ${{ matrix.adios2 }}
           petsc_arch: ${{ env.PETSC_ARCH }}
+          dolfinx:  dokken/subspan-looping
 
       - name: Download legacy data
         uses: actions/download-artifact@v4
