@@ -21,8 +21,7 @@ bibliography: paper.bib
 
 We introduce a checkpointing framework for the latest version of the FEniCS project, known as DOLFINx.
 The framework leverages the data-centric approach of DOLFINx along with a state of the art adaptable Input/Output system called ADIOS2.
-Several variations of checkpointing are supported, including *N-to-M* checkpointing of function data, storage of mesh partitioning information
-for N-to-N checkpointing and snapshot checkpointing for RAM reduction during simulation.
+Several variations of checkpointing are supported, including *N-to-M* checkpointing of function data, storage of mesh partitioning information for N-to-N checkpointing and snapshot checkpointing for RAM reduction during simulation. All MPI operations are using MPI-3 Neighborhood collectives.
 
 # Statement of need
 
@@ -54,14 +53,17 @@ The following features are supported:
 - *N-to-M* checkpointing without mesh storage
 - *N-to-N* checkpointing storing partitioning information
 
-A *snapshot checkpoint* is a checkpoint that is only valid during the run of a simulation. It is lightweight (only stores the local portion of the global dof array to file), and is stored using the *Local Array* feature in ADIOS2 [@Godoy:2020] to store data local to the MPI process. This feature is intended for use-cases where many solutions have to be aggregated to the end of a simulation to some post-processing step,
-or as a fall-back mechanism when restarting a divergence iterative solver.
+A *snapshot checkpoint* is a checkpoint that is only valid during the run of a simulation.
+It is lightweight (only stores the local portion of the global dof array to file), and is stored using the *Local Array* feature in ADIOS2 [@Godoy:2020] to store data local to the MPI process.
+This feature is intended for use-cases where many solutions have to be aggregated to the end of a simulation to some post-processing step, or as a fall-back mechanism when restarting a divergence iterative solver.
 
 A *N-to-M* checkpoint is a checkpoint that can be written with N processes and read back in with M processes.
-Two versions of this checkpoint is supported; One where storage of the mesh is required and without mesh storage. The reasoning for such a split is that when a mesh is read into DOLFINx and passed to an appropriate partitioner, the ordering mesh nodes (coordinates) and connectivity (cells) is changed.
+Two versions of this checkpoint is supported; One where storage of the mesh is required and without mesh storage.
+The reasoning for such a split is that when a mesh is read into DOLFINx and passed to an appropriate partitioner, the ordering mesh nodes (coordinates) and connectivity (cells) is changed.
 Writing these back into *global arrays* requires MPI communication to ensure contiguous writing of data.
 
-THe *N-to-M* checkpoint with mesh storage exclusively write contiguous chunks of data owned by the current process, to an ADIOS2 *Global Array* that can be read in with a different number of processes at a later stage. This operation requires no MPI-communication for writing such checkpoints.
+THe *N-to-M* checkpoint with mesh storage exclusively write contiguous chunks of data owned by the current process, to an ADIOS2 *Global Array* that can be read in with a different number of processes at a later stage.
+This operation requires no MPI-communication for writing such checkpoints.
 
 In many cases, the input mesh might stem from an external mesh generator and is stored together with mesh entity markers in an external file, for instance an XDMF-file.
 To avoid duplication of this mesh data, a stand-alone file that can be associated with the XDMF file for a later restart can be created.
