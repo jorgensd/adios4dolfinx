@@ -31,20 +31,21 @@ These are often non-linear and time-dependent, which typically amounts to thousa
 As it might uncover bugs and unphysical solutions, the ability to run parts of the simulation, inspect the result and then resume simulation becomes a key factor to enable efficient development.
 If this is discovered early on, the simulation can be terminated saving the developer time, money and energy-usage.
 
-The proposed framework enables users of the FEniCS project to store solutions during simulation, and read them in at their convenience to resume simulations at a later stage.
+The proposed framework enables users of the FEniCS project [@Baratta:2023] to store solutions during simulation, and read them in at their convenience to resume simulations at a later stage.
 Several checkpointing methods are implemented, including *N-to-M* checkpointing, which means saving data from a program executed with N processes, and loading it back in on M processes.
 
 Functionality for *N-to-M* checkpointing was implemented for the old version of DOLFIN by [@Habera:2018].
 However, this functionality is not present in the newest version of the FEniCS Project [@Baratta:2023].
 The storage principles in the ADIOS4DOLFINx are based on the ideas present in this implementation.
 However, the implementation for non-Lagrangian finite element spaces vastly differs, due to the usage of dof-permutations [@Scroggs:2022].
+Additionally, all global MPI-calls in the old implementation have been reimplemented with scalable MPI-communication using the MPI-3 Neighborhood Collectives [@MPI-Forum:2012].
+
 The framework also extends the checkpointing functionality with special routines for storing partitioning information for *N-to-N* checkpointing, as well as very lightweight snapshot checkpoints.
 The difference in  implementation on non-Lagrangian spaces also distinguishes this framework from *N-to-M* checkpointing in Firedrake [@Rathgeber:2016; @Ham:2024].
 
 # Functionality
 
 The software as written as a Python-extension to DOLFINx, which can be installed using the Python Package installer `pip` directly from the Github repository or using the [ADIOS4DOLFINx - Python Package Index](https://pypi.org/project/adios4dolfinx/).
-All MPI-communication in the library is done by using the MPI-3 Neighborhood Collectives [@MPI-Forum:2012].
 
 The following features are supported:
 
