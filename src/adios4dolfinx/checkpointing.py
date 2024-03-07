@@ -30,7 +30,13 @@ from .comm_helpers import (
     send_dofs_and_recv_values,
 )
 from .structures import FunctionData, MeshData
-from .utils import compute_dofmap_pos, compute_local_range, index_owner, unroll_dofmap
+from .utils import (
+    compute_dofmap_pos,
+    compute_local_range,
+    index_owner,
+    unroll_dofmap,
+    unroll_insert_position,
+)
 from .writers import write_function as _internal_function_writer
 from .writers import write_mesh as _internal_mesh_writer
 
@@ -378,9 +384,7 @@ def read_function(
         )
         # Start by sorting data array by cell permutation
         num_dofs_per_cell = input_dofmap.offsets[1:] - input_dofmap.offsets[:-1]
-        np.testing.assert_allclose(num_dofs_per_cell, num_dofs_per_cell[0])
-
-        from adios4dolfinx.utils import unroll_insert_position
+        assert np.allclose(num_dofs_per_cell, num_dofs_per_cell[0])
 
         # Sort dofmap by input local cell index
         input_perms_sorted = input_perms[input_local_cell_index]
@@ -396,7 +400,11 @@ def read_function(
         element.pre_apply_inverse_transpose_dof_transformation(
             dofmap_sorted_by_input, inc_perms, bs
         )
-        inverted_perm = np.argsort(unrolled_dofmap_position)
+        # Compute invert permutation
+        inverted_perm = np.empty_like(unrolled_dofmap_position)
+        inverted_perm[unrolled_dofmap_position] = np.arange(
+            len(unrolled_dofmap_position), dtype=inverted_perm.dtype
+        )
         recv_array = dofmap_sorted_by_input[inverted_perm]
 
     # ------------------Step 6----------------------------------------
