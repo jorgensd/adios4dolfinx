@@ -1,34 +1,56 @@
-# ADIOS2Wrappers for DOLFINx
+# ADIOS4DOLFINx - A framework for checkpointing in DOLFINx
 
-[![MIT](https://img.shields.io/github/license/jorgensd/adios4dolfinx)](LICENSE)
+![MIT](https://img.shields.io/github/license/jorgensd/adios4dolfinx)
 [Read Latest Documentation](https://jsdokken.com/adios4dolfinx/)
 
-This is an extension for [DOLFINx](https://github.com/FEniCS/dolfinx/) to checkpoint meshes, meshtags and functions using [ADIOS2](https://adios2.readthedocs.io/en/latest/).
+ADIOS4DOLFINx is an extension for [DOLFINx](https://github.com/FEniCS/dolfinx/) to checkpoint meshes, meshtags and functions using [ADIOS2](https://adios2.readthedocs.io/en/latest/).
 
 The code uses the adios2 Python-wrappers to write DOLFINx objects to file, supporting N-to-M (_recoverable_) and N-to-N (_snapshot_) checkpointing.
-See: [Checkpointing in DOLFINx - FEniCS 23](https://jsdokken.com/checkpointing-presentation/#/) for more information.
+See: [Checkpointing in DOLFINx - FEniCS 23](https://jsdokken.com/checkpointing-presentation/#/) or the examples ine Documentation for more information.
 
 For scalability, the code uses [MPI Neighbourhood collectives](https://www.mpi-forum.org/docs/mpi-3.1/mpi31-report/node200.htm) for communication across processes.
 
 ## Installation
+Compatibility with DOLFINx:
+- ADIOS4DOLFINx v0.7.3 is compatible with DOLFINx v0.7.x
+- ADIOS4DOLFINx v0.8.x is compatible with the main branch of DOLFINx
 
 ### Docker
 
-ADIOS2 is installed in the official DOLFINx containers.
+ADIOS2 is installed in the official DOLFINx containers, and thus there are no additional dependencies required to install `adios4dolfinx`
+on top of DOLFINx in these images.
 
+Create a Docker container, named for instance `dolfinx-checkpoint`.
+Use the `nightly` tag to get the main branch of DOLFINx, or `stable` to get the lastest stable release
 ```bash
 docker run -ti -v $(pwd):/root/shared -w /root/shared --name=dolfinx-checkpoint ghcr.io/fenics/dolfinx/dolfinx:nightly
 ```
+For the latest version compatible with nightly, use
+```bash
+python3 -m pip install git+https://github.com/jorgensd/adios4dolfinx@main
+```
+If you are using the `stable` image, you can install `adios4dolfinx` from [PYPI](https://pypi.org/project/adios4dolfinx/) with
+```bash
+python3 -m pip install adios4dolfinx
+```
+
+This docker container can be opened with
+```bash
+docker container start -i dolfinx-checkpoint
+```
+at a later instance
 
 ### Conda
 
-To use with conda (DOLFINx release v0.7.0 works with v0.7.3 of ADIOS4DOLFINx)
+> [!NOTE]  
+> Conda supports the stable release of DOLFINx, and thus the appropriate version should be installed, see the section above for more details.
 
+Following is a minimal recipe of how to install adios4dolfinx, given that you have conda installed on your system.
 ```bash
 conda create -n dolfinx-checkpoint python=3.10
 conda activate dolfinx-checkpoint
 conda install -c conda-forge fenics-dolfinx pip adios2
-python3 -m pip install git+https://github.com/jorgensd/adios4dolfinx@v0.7.2
+python3 -m pip install git+https://github.com/jorgensd/adios4dolfinx@v0.7.3
 ```
 
 ## Functionality
