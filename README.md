@@ -1,34 +1,57 @@
-# ADIOS2Wrappers for DOLFINx
+# ADIOS4DOLFINx - A framework for checkpointing in DOLFINx
 
-[![MIT](https://img.shields.io/github/license/jorgensd/adios4dolfinx)](LICENSE)
-[Read Latest Documentation](https://jsdokken.com/adios4dolfinx/)
+![MIT](https://img.shields.io/github/license/jorgensd/adios4dolfinx)
+[![status](https://joss.theoj.org/papers/7866cb142db8a803e32d79a109573d25/status.svg)](https://joss.theoj.org/papers/7866cb142db8a803e32d79a109573d25)
 
-This is an extension for [DOLFINx](https://github.com/FEniCS/dolfinx/) to checkpoint meshes, meshtags and functions using [ADIOS2](https://adios2.readthedocs.io/en/latest/).
 
-The code uses the adios2 Python-wrappers to write DOLFINx objects to file, supporting N-to-M (_recoverable_) and N-to-N (_snapshot_) checkpointing.
-See: [Checkpointing in DOLFINx - FEniCS 23](https://jsdokken.com/checkpointing-presentation/#/) for more information.
+ADIOS4DOLFINx is an extension for [DOLFINx](https://github.com/FEniCS/dolfinx/) to checkpoint meshes, meshtags and functions using [ADIOS 2](https://adios2.readthedocs.io/en/latest/).
+
+The code uses the ADIOS2 Python-wrappers to write DOLFINx objects to file, supporting N-to-M (_recoverable_) and N-to-N (_snapshot_) checkpointing.
+See: [Checkpointing in DOLFINx - FEniCS 23](https://jsdokken.com/checkpointing-presentation/#/) or the examples in thee [Documentation](https://jsdokken.com/adios4dolfinx/) for more information.
 
 For scalability, the code uses [MPI Neighbourhood collectives](https://www.mpi-forum.org/docs/mpi-3.1/mpi31-report/node200.htm) for communication across processes.
 
 ## Installation
+Compatibility with DOLFINx:
+- ADIOS4DOLFINx v0.7.3 is compatible with DOLFINx v0.7.x
+- ADIOS4DOLFINx v0.8.x is compatible with the main branch of DOLFINx
 
 ### Docker
 
-ADIOS2 is installed in the official DOLFINx containers.
+ADIOS2 is installed in the official DOLFINx containers, and thus there are no additional dependencies required to install `adios4dolfinx`
+on top of DOLFINx in these images.
 
+Create a Docker container, named for instance `dolfinx-checkpoint`.
+Use the `nightly` tag to get the main branch of DOLFINx, or `stable` to get the lastest stable release
 ```bash
 docker run -ti -v $(pwd):/root/shared -w /root/shared --name=dolfinx-checkpoint ghcr.io/fenics/dolfinx/dolfinx:nightly
 ```
+For the latest version compatible with nightly, use
+```bash
+python3 -m pip install git+https://github.com/jorgensd/adios4dolfinx@main
+```
+If you are using the `stable` image, you can install `adios4dolfinx` from [PYPI](https://pypi.org/project/adios4dolfinx/) with
+```bash
+python3 -m pip install adios4dolfinx
+```
+
+This docker container can be opened with
+```bash
+docker container start -i dolfinx-checkpoint
+```
+at a later instance
 
 ### Conda
 
-To use with conda (DOLFINx release v0.7.0 works with v0.7.3 of ADIOS4DOLFINx)
+> [!NOTE]  
+> Conda supports the stable release of DOLFINx, and thus the appropriate version should be installed, see the section above for more details.
 
+Following is a minimal recipe of how to install adios4dolfinx, given that you have conda installed on your system.
 ```bash
 conda create -n dolfinx-checkpoint python=3.10
 conda activate dolfinx-checkpoint
 conda install -c conda-forge fenics-dolfinx pip adios2
-python3 -m pip install git+https://github.com/jorgensd/adios4dolfinx@v0.7.2
+python3 -m pip install git+https://github.com/jorgensd/adios4dolfinx@v0.7.3
 ```
 
 ## Functionality
@@ -68,46 +91,3 @@ See the [API](./docs/api) for more information.
 ## Long term plan
 
 The long term plan is to get this library merged into DOLFINx (rewritten in C++ with appropriate Python-bindings).
-
-# Contributor guidelines
-When contributing to this repository, please first [create an issue](https://github.com/jorgensd/adios4dolfinx/issues/new/choose) containing information about the missing feature or the bug that you would like to fix. Here you can discuss the change you want to make with the maintainers of the repository.
-
-Please note we have a code of conduct, please follow it in all your interactions with the project.
-
-## New contributor guide
-
-To get an overview of the project, read the [documentation](https://jorgensd.github.io/adios4dolfinx). Here are some resources to help you get started with open source contributions:
-
-- [Finding ways to contribute to open source on GitHub](https://docs.github.com/en/get-started/exploring-projects-on-github/finding-ways-to-contribute-to-open-source-on-github)
-- [Set up Git](https://docs.github.com/en/get-started/quickstart/set-up-git)
-- [GitHub flow](https://docs.github.com/en/get-started/quickstart/github-flow)
-- [Collaborating with pull requests](https://docs.github.com/en/github/collaborating-with-pull-requests)
-
-## Pull Request Process
-
-
-### Pull Request
-
-- When you're finished with the changes, create a pull request, also known as a PR. It is also OK to create a [draft pull request](https://github.blog/2019-02-14-introducing-draft-pull-requests/) from the very beginning. Once you are done you can click on the ["Ready for review"] button. You can also [request a review](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/requesting-a-pull-request-review) from one of the maintainers.
-- Don't forget to [link PR to the issue that you opened ](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue).
-- Enable the checkbox to [allow maintainer edits](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/allowing-changes-to-a-pull-request-branch-created-from-a-fork) so the branch can be updated for a merge.
-Once you submit your PR, a team member will review your proposal. We may ask questions or request for additional information.
-- We may ask for changes to be made before a PR can be merged, either using [suggested changes](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/incorporating-feedback-in-your-pull-request) or pull request comments. You can apply suggested changes directly through the UI. You can make any other changes in your fork, then commit them to your branch.
-- As you update your PR and apply changes, mark each conversation as [resolved](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/commenting-on-a-pull-request#resolving-conversations).
-- If you run into any merge issues, checkout this [git tutorial](https://lab.github.com/githubtraining/managing-merge-conflicts) to help you resolve merge conflicts and other issues.
-- Please make sure that all tests are passing, github pages renders nicely, and code coverage are are not lower than before your contribution. You see the different github action workflows by clicking the "Action" tab in the GitHub repository.
-
-Note that for a pull request to be accepted, it has to pass all the tests on CI, which includes:
-- `mypy`: typechecking
-- `ruff`: Code formatting
-- `pytest`: Successfull execution of all tests in the `tests` folder.
-
-
-### Our Pledge
-
-In the interest of fostering an open and welcoming environment, we as
-contributors and maintainers pledge to making participation in our project and
-our community a harassment-free experience for everyone, regardless of age, body
-size, disability, ethnicity, gender identity and expression, level of experience,
-nationality, personal appearance, race, religion, or sexual identity and
-orientation.
