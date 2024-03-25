@@ -26,13 +26,13 @@ Use the `nightly` tag to get the main branch of DOLFINx, or `stable` to get the 
 ```bash
 docker run -ti -v $(pwd):/root/shared -w /root/shared --name=dolfinx-checkpoint ghcr.io/fenics/dolfinx/dolfinx:nightly
 ```
-For the latest version compatible with nightly, use
+For the latest version compatible with nightly (with the ability to run the test suite), use
 ```bash
-python3 -m pip install git+https://github.com/jorgensd/adios4dolfinx@main
+python3 -m pip install adios4dolfinx[test]@git+https://github.com/jorgensd/adios4dolfinx@main
 ```
 If you are using the `stable` image, you can install `adios4dolfinx` from [PYPI](https://pypi.org/project/adios4dolfinx/) with
 ```bash
-python3 -m pip install adios4dolfinx
+python3 -m pip install adios4dolfinx[test]
 ```
 
 This docker container can be opened with
