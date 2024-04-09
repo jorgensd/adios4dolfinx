@@ -30,7 +30,13 @@ from .comm_helpers import (
     send_dofs_and_recv_values,
 )
 from .structures import FunctionData, MeshData
-from .utils import compute_dofmap_pos, compute_local_range, index_owner, unroll_dofmap
+from .utils import (
+    compute_dofmap_pos,
+    compute_local_range,
+    index_owner,
+    unroll_dofmap,
+    unroll_insert_position,
+)
 from .writers import write_function as _internal_function_writer
 from .writers import write_mesh as _internal_mesh_writer
 
@@ -376,18 +382,31 @@ def read_function(
         input_perms = read_cell_perms(
             adios, comm, filename, "CellPermutations", num_cells_global, engine
         )
+        # Start by sorting data array by cell permutation
+        num_dofs_per_cell = input_dofmap.offsets[1:] - input_dofmap.offsets[:-1]
+        assert np.allclose(num_dofs_per_cell, num_dofs_per_cell[0])
+
+        # Sort dofmap by input local cell index
+        input_perms_sorted = input_perms[input_local_cell_index]
+        unrolled_dofmap_position = unroll_insert_position(
+            input_local_cell_index, num_dofs_per_cell[0]
+        )
+        dofmap_sorted_by_input = recv_array[unrolled_dofmap_position]
 
         # First invert input data to reference element then transform to current mesh
-        for i, l_cell in enumerate(input_local_cell_index):
-            start, end = input_dofmap.offsets[l_cell : l_cell + 2]
-            # FIXME: Tempoary cast uint32 to integer as transformations
-            # doesn't support uint32 with the switch to nanobind
-            element.pre_apply_transpose_dof_transformation(
-                recv_array[int(start) : int(end)], int(input_perms[l_cell]), bs
-            )
-            element.pre_apply_inverse_transpose_dof_transformation(
-                recv_array[int(start) : int(end)], int(inc_perms[i]), bs
-            )
+        element.pre_apply_transpose_dof_transformation(
+            dofmap_sorted_by_input, input_perms_sorted, bs
+        )
+        element.pre_apply_inverse_transpose_dof_transformation(
+            dofmap_sorted_by_input, inc_perms, bs
+        )
+        # Compute invert permutation
+        inverted_perm = np.empty_like(unrolled_dofmap_position)
+        inverted_perm[unrolled_dofmap_position] = np.arange(
+            len(unrolled_dofmap_position), dtype=inverted_perm.dtype
+        )
+        recv_array = dofmap_sorted_by_input[inverted_perm]
+
     # ------------------Step 6----------------------------------------
     # For each dof owned by a process, find the local position in the dofmap.
     V = u.function_space
