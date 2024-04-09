@@ -17,7 +17,6 @@ on:
     - cron: "0 8 * * *"
 
 jobs:
-
   create-datasets:
     uses: ./.github/workflows/create_legacy_data.yml
     with:
@@ -40,7 +39,7 @@ jobs:
 
     strategy:
       matrix:
-        adios2: ["default", "v2.10.0-rc1"]
+        adios2: ["default", "v2.10.0"]
     steps:
       - uses: actions/checkout@v4
 
