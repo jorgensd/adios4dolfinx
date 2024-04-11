@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import typing
 from pathlib import Path
 
 from mpi4py import MPI
@@ -43,6 +44,7 @@ from .writers import write_mesh as _internal_mesh_writer
 adios2 = resolve_adios_scope(adios2)
 
 __all__ = [
+    "read_mesh_data",
     "read_mesh",
     "write_function",
     "read_function",
@@ -438,7 +440,7 @@ def read_function(
     u.x.scatter_forward()
 
 
-def read_mesh(
+def read_mesh_data(
     filename: Path | str,
     comm: MPI.Intracomm,
     engine: str = "BP4",
@@ -446,9 +448,10 @@ def read_mesh(
     time: float = 0.0,
     legacy: bool = False,
     read_from_partition: bool = False,
-) -> dolfinx.mesh.Mesh:
+) -> tuple[np.ndarray[np.int64], np.ndarray[np.floating], ufl.Mesh,
+           typing.Callable]:
     """
-    Read an ADIOS2 mesh into DOLFINx.
+    Read an ADIOS2 mesh data for use with DOLFINx.
 
     Args:
         filename: Path to input file
@@ -460,7 +463,7 @@ def read_mesh(
         legacy: If checkpoint was made prior to time-dependent mesh-writer set to True
         read_from_partition: Read mesh with partition from file
     Returns:
-        The distributed mesh
+        The mesh topology, geometry, UFL domain and partition function
     """
     adios = adios2.ADIOS(comm)
 
@@ -571,7 +574,36 @@ def read_mesh(
     else:
         partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)
 
-    return dolfinx.mesh.create_mesh(comm, mesh_topology, mesh_geometry, domain, partitioner)
+    return mesh_topology, mesh_geometry, domain, partitioner
+
+
+def read_mesh(
+    filename: Path | str,
+    comm: MPI.Intracomm,
+    engine: str = "BP4",
+    ghost_mode: dolfinx.mesh.GhostMode = dolfinx.mesh.GhostMode.shared_facet,
+    time: float = 0.0,
+    legacy: bool = False,
+    read_from_partition: bool = False,
+) -> dolfinx.mesh.Mesh:
+    """
+    Read an ADIOS2 mesh into DOLFINx.
+
+    Args:
+        filename: Path to input file
+        comm: The MPI communciator to distribute the mesh over
+        engine: ADIOS engine to use for reading (BP4, BP5 or HDF5)
+        ghost_mode: Ghost mode to use for mesh. If `read_from_partition`
+            is set to `True` this option is ignored.
+        time: Time stamp associated with mesh
+        legacy: If checkpoint was made prior to time-dependent mesh-writer set to True
+        read_from_partition: Read mesh with partition from file
+    Returns:
+        The distributed mesh
+    """
+    return dolfinx.mesh.create_mesh(comm, *read_mesh_data(
+        filename, comm, engine=engine, ghost_mode=ghost_mode, time=time,
+        legacy=legacy, read_from_partition=read_from_partition))
 
 
 def write_mesh(
