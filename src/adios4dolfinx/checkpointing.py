@@ -448,7 +448,7 @@ def read_mesh_data(
     time: float = 0.0,
     legacy: bool = False,
     read_from_partition: bool = False,
-) -> tuple[np.ndarray[np.int64], np.ndarray[np.floating], ufl.Mesh, typing.Callable]:
+) -> tuple[np.ndarray, np.ndarray, ufl.Mesh, typing.Callable]:
     """
     Read an ADIOS2 mesh data for use with DOLFINx.
 
