@@ -448,8 +448,7 @@ def read_mesh_data(
     time: float = 0.0,
     legacy: bool = False,
     read_from_partition: bool = False,
-) -> tuple[np.ndarray[np.int64], np.ndarray[np.floating], ufl.Mesh,
-           typing.Callable]:
+) -> tuple[np.ndarray[np.int64], np.ndarray[np.floating], ufl.Mesh, typing.Callable]:
     """
     Read an ADIOS2 mesh data for use with DOLFINx.
 
@@ -601,9 +600,18 @@ def read_mesh(
     Returns:
         The distributed mesh
     """
-    return dolfinx.mesh.create_mesh(comm, *read_mesh_data(
-        filename, comm, engine=engine, ghost_mode=ghost_mode, time=time,
-        legacy=legacy, read_from_partition=read_from_partition))
+    return dolfinx.mesh.create_mesh(
+        comm,
+        *read_mesh_data(
+            filename,
+            comm,
+            engine=engine,
+            ghost_mode=ghost_mode,
+            time=time,
+            legacy=legacy,
+            read_from_partition=read_from_partition,
+        ),
+    )
 
 
 def write_mesh(
