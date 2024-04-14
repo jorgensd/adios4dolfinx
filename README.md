@@ -78,6 +78,15 @@ python3 -m pip install adios4dolfinx[test]@git+https://github.com/jorgensd/adios
 > [!IMPORTANT]  
 > Only one mesh per file is allowed
 
+## Example Usage
+The repository contains many documented examples of usage, in the `docs`-folder, including
+- [Reading and writing mesh checkpoints](./docs/writing_mesh_checkpoint.py)
+- [Storing mesh partitioning data](./docs/partitioned_mesh.py)
+- [Writing mesh-tags to a checkpoint](./docs/meshtags.py.py)
+- [Reading and writing function checkpoints](./docs/writing_functions_checkpoint.py)
+- [Checkpoint on input mesh](./docs/original_checkpoint.py)
+Further examples can be found at [ADIOS4DOLFINx examples](https://jsdokken.com/adios4dolfinx/)
+
 ### Backwards compatibility
 
 > [!WARNING]
