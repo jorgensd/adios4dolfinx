@@ -11,6 +11,13 @@ See: [Checkpointing in DOLFINx - FEniCS 23](https://jsdokken.com/checkpointing-p
 
 For scalability, the code uses [MPI Neighbourhood collectives](https://www.mpi-forum.org/docs/mpi-3.1/mpi31-report/node200.htm) for communication across processes.
 
+## Statement of Need
+As the usage of high performance computing clusters increases, more and more large-scale, long-running simulations are deployed.
+The need for storing intermediate solutions from such simulations are crucial, as the HPC system might crash, or the simulation might crash or exceed the alloted computational budget.
+Having a checkpoint of related variables, such as the solutions to partial differential equations (PDEs) is therefore essential.
+The `adios4dolfinx` library extends the [DOLFINx](https://github.com/FEniCS/dolfinx/) computational framework for solving PDEs with checkpointing functionality, such that immediate solutions and mesh information can be stored and re-used in another simulation.
+
+
 ## Installation
 Compatibility with DOLFINx:
 - ADIOS4DOLFINx v0.7.3 is compatible with DOLFINx v0.7.x
