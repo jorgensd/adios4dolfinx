@@ -24,7 +24,7 @@ DOLFINx is a general framework for solving partial differential equations using 
 The input to simulations using the finite element method is the computational domain (mesh), mesh markers, initial conditions and boundary conditions.
 To be able to restart a simulation at any point, one has to have the capability to read in all of the aforementioned variables.
 The adios4dolfinx package implements all of these operations, using the Message Passing Interface (MPI) for communication across multiple processes and ADIOS2 to for writing/reading data to/from file.
-In particular, the functionality of adios4dolfinx includes "N-to-M"-checkpointing, which means that one can store a result of a simulation that was generated with N number of processes,
+In particular, the functionality of adios4dolfinx includes *N-to-M*-checkpointing, which means that one can store a result of a simulation that was generated with N number of processes,
 and read it into a program running on M processes.
 
 # Statement of need
