@@ -276,6 +276,11 @@ def read_mesh_from_legacy_h5(
         group: Name of mesh in `h5`-file
         cell_type: What type of cell type, by default tetrahedron.
     """
+    # Make sure we use the HDF5File and check that the file is present
+    filename = pathlib.Path(filename).with_suffix(".h5")
+    if not filename.is_file():
+        raise FileNotFoundError(f"File {filename} does not exist")
+
     # Create ADIOS2 reader
     adios = adios2.ADIOS(comm)
     with ADIOSFile(
@@ -285,11 +290,6 @@ def read_mesh_from_legacy_h5(
         io_name="Mesh reader",
         engine="HDF5",
     ) as adios_file:
-        # Make sure we use the HDF5File and check that the file is present
-        filename = pathlib.Path(filename).with_suffix(".h5")
-        if not filename.is_file():
-            raise FileNotFoundError(f"File {filename} does not exist")
-
         # Get mesh topology (distributed)
         if f"{group}/topology" not in adios_file.io.AvailableVariables().keys():
             raise KeyError(f"Mesh topology not found at '{group}/topology'")
