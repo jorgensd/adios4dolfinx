@@ -285,7 +285,7 @@ def read_meshtags(
         adios_file.file.EndStep()
 
     local_entities, local_values = dolfinx.io.distribute_entity_data(
-        mesh, int(dim), mesh_entities, tag_values
+        mesh, int(dim), mesh_entities.astype(np.int32), tag_values
     )
     mesh.topology.create_connectivity(dim, 0)
     mesh.topology.create_connectivity(dim, mesh.topology.dim)
