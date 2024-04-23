@@ -285,7 +285,7 @@ def read_meshtags(
         adios_file.file.EndStep()
 
     local_entities, local_values = dolfinx.io.distribute_entity_data(
-        mesh, int(dim), mesh_entities, tag_values
+        mesh, int(dim), mesh_entities.astype(np.int32), tag_values
     )
     mesh.topology.create_connectivity(dim, 0)
     mesh.topology.create_connectivity(dim, mesh.topology.dim)
@@ -396,12 +396,8 @@ def read_function(
         dofmap_sorted_by_input = recv_array[unrolled_dofmap_position]
 
         # First invert input data to reference element then transform to current mesh
-        element.pre_apply_transpose_dof_transformation(
-            dofmap_sorted_by_input, input_perms_sorted, bs
-        )
-        element.pre_apply_inverse_transpose_dof_transformation(
-            dofmap_sorted_by_input, inc_perms, bs
-        )
+        element.Tt_apply(dofmap_sorted_by_input, input_perms_sorted, bs)
+        element.Tt_inv_apply(dofmap_sorted_by_input, inc_perms, bs)
         # Compute invert permutation
         inverted_perm = np.empty_like(unrolled_dofmap_position)
         inverted_perm[unrolled_dofmap_position] = np.arange(
