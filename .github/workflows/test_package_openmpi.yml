@@ -51,7 +51,7 @@ jobs:
         with:
           adios2: ${{ matrix.adios2 }}
           petsc_arch: ${{ env.PETSC_ARCH }}
-          dolfinx:  main
+          dolfinx: main
 
       - name: Download legacy data
         uses: actions/download-artifact@v4
@@ -74,4 +74,4 @@ jobs:
 
       - name: Run tests in parallel
         run: |
-          mpirun -n 2 coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
+          mpirun -n 4 coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
