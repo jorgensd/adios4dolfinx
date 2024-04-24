@@ -36,6 +36,7 @@ jobs:
       PETSC_ARCH: "linux-gnu-real64-32"
       OMPI_ALLOW_RUN_AS_ROOT: 1
       OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
+      PRTE_MCA_rmaps_default_mapping_policy: :oversubscribe
 
     strategy:
       matrix:
@@ -74,4 +75,4 @@ jobs:
 
       - name: Run tests in parallel
         run: |
-          mpirun -n 4 --map-by :OVERSUBSCRIBE coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
+          mpirun -n 4 coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
