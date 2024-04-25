@@ -35,10 +35,11 @@ jobs:
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
       PETSC_ARCH: ""
       PETSC_DIR: "/usr/local/"
+      PYTHONPATH: "/usr/local/lib/:${PYTHONPATH}"
 
     strategy:
       matrix:
-        adios2: ["default"] # Install adios2 using pup
+        adios2: ["v2.10.0"]
     steps:
       - uses: actions/checkout@v4
 
