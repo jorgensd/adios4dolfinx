@@ -37,7 +37,7 @@ jobs:
 
     strategy:
       matrix:
-        adios2: ["v2.10.0"]
+        adios2: ["default"] # Install adios2 using pup
     steps:
       - uses: actions/checkout@v4
 
