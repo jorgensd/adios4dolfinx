@@ -33,7 +33,7 @@ jobs:
     container: docker.io/fenicsproject/test-env:current-redhat
     env:
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
-      PETSC_ARCH: "linux-gnu-real64-32"
+      PETSC_ARCH: ""
 
     strategy:
       matrix:
