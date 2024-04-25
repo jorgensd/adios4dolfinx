@@ -10,6 +10,8 @@ Vectorized numpy operations used internally in adios4dolfinx
 
 from __future__ import annotations
 
+import typing
+
 from mpi4py import MPI
 
 import dolfinx
@@ -25,8 +27,8 @@ __all__ = [
     "unroll_insert_position",
 ]
 
-valid_function_types = np.float32 | np.float64 | np.complex64 | np.complex128
-valid_real_types = np.float32 | np.float64
+valid_function_types = typing.Union[np.float32, np.float64, np.complex64, np.complex128]
+valid_real_types = typing.Union[np.float32, np.float64]
 
 
 def compute_insert_position(

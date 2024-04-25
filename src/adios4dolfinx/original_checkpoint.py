@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import typing
 from pathlib import Path
 
 from mpi4py import MPI
@@ -199,7 +200,7 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
 
 
 def create_function_data_on_original_mesh(
-    u: dolfinx.fem.Function, name: str | None = None
+    u: dolfinx.fem.Function, name: typing.Optional[str] = None
 ) -> FunctionData:
     """
     Create data object to save with ADIOS2
@@ -327,12 +328,12 @@ def create_function_data_on_original_mesh(
 
 
 def write_function_on_input_mesh(
-    filename: Path | str,
+    filename: typing.Union[Path, str],
     u: dolfinx.fem.Function,
     engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Append,
     time: float = 0.0,
-    name: str | None = None,
+    name: typing.Optional[str] = None,
 ):
     """
     Write function checkpoint (to be read with the input mesh).
@@ -359,7 +360,9 @@ def write_function_on_input_mesh(
     )
 
 
-def write_mesh_input_order(filename: Path | str, mesh: dolfinx.mesh.Mesh, engine: str = "BP4"):
+def write_mesh_input_order(
+    filename: typing.Union[Path, str], mesh: dolfinx.mesh.Mesh, engine: str = "BP4"
+):
     """
     Write mesh to checkpoint file in original input ordering
     """
