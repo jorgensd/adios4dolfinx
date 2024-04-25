@@ -34,6 +34,7 @@ jobs:
     env:
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
       PETSC_ARCH: ""
+      PETSC_DIR: "/usr/local/"
 
     strategy:
       matrix:
@@ -49,6 +50,7 @@ jobs:
         with:
           adios2: ${{ matrix.adios2 }}
           petsc_arch: ${{ env.PETSC_ARCH }}
+          petsc_dir: ${{ env.PETSC_DIR }}
           dolfinx: v0.8.0
           basix: v0.8.0
           ufl: 2024.1.0.post0
