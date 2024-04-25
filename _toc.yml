@@ -2,6 +2,22 @@ format: jb-book
 root: README
 
 parts:
+  - caption: Introduction to IPyParallel
+    chapters:
+    - file: "docs/ipyparallel_intro"
+  - caption: Writing and reading mesh data
+    chapters:
+    - file: "docs/writing_mesh_checkpoint"
+    - file: "docs/partitioned_mesh"
+    - file: "docs/time_dependent_mesh"
+    - file: "docs/meshtags"
+
+  - caption: Writing and reading functions
+    chapters:
+    - file: "docs/writing_functions_checkpoint"
+    - file: "docs/snapshot_checkpoint"
+    - file: "docs/original_checkpoint"
+
   - caption: Python API
     chapters:
     - file: "docs/api"

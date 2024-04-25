@@ -11,15 +11,19 @@ Functions to create checkpoints with adios4dolfinx v0.7.x
 
 import argparse
 import pathlib
-
-import numpy as np
-from mpi4py import MPI
-import adios4dolfinx
-import dolfinx
 from importlib.metadata import version
 
+from mpi4py import MPI
+
+import dolfinx
+import numpy as np
+
+import adios4dolfinx
+
 a4d_version = version("adios4dolfinx")
-assert a4d_version < "0.7.2", f"Creating a legacy checkpoint requires adios4dolfinx < 0.7.2, you have {a4d_version}."
+assert (
+    a4d_version < "0.7.2"
+), f"Creating a legacy checkpoint requires adios4dolfinx < 0.7.2, you have {a4d_version}."
 
 
 def f(x):
@@ -39,7 +43,9 @@ def write_checkpoint(filename, mesh, el, f):
 
 
 def verify_checkpoint(filename, el, f):
-    mesh = adios4dolfinx.read_mesh(MPI.COMM_WORLD, filename, "BP4", dolfinx.mesh.GhostMode.shared_facet)
+    mesh = adios4dolfinx.read_mesh(
+        MPI.COMM_WORLD, filename, "BP4", dolfinx.mesh.GhostMode.shared_facet
+    )
     V = dolfinx.fem.FunctionSpace(mesh, el)
     uh = dolfinx.fem.Function(V, dtype=np.float64)
     adios4dolfinx.read_function(uh, filename)
@@ -51,9 +57,7 @@ def verify_checkpoint(filename, el, f):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--output-dir", type=str, default="legacy_checkpoint", dest="dir")
 
     inputs = parser.parse_args()

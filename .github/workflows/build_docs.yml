@@ -1,25 +1,21 @@
-# Simple workflow for deploying static content to GitHub Pages
-name: Deploy static content to Pages
+name: Build documentation
 
 on:
   pull_request:
-    # The CI is executed on every pull request to the main branch
     branches:
       - main
 
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
   workflow_call:
 
 env:
-  # Directory that will be published on github pages
   PUBLISH_DIR: ./_build/html
   DEB_PYTHON_INSTALL_LAYOUT: deb_system
+  ARTIFACT_NAME: "docs"
 
 jobs:
   build-docs:
     env:
-      PYTHONPATH: /usr/local/lib/python3/dist-packages:/usr/local/lib:/usr/local/dolfinx-real/lib/python3.10/dist-packages
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
 
     runs-on: ubuntu-22.04
@@ -39,8 +35,9 @@ jobs:
 
       - name: Upload documentation as artifact
         uses: actions/upload-artifact@v4
+        if: github.event_name != 'workflow_call'
         with:
-          name: documentation
+          name: ${{ env.ARTIFACT_NAME }}
           path: ${{ env.PUBLISH_DIR }}
           if-no-files-found: error
 

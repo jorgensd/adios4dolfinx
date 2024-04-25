@@ -6,7 +6,6 @@ on:
 jobs:
   check-code:
     env: 
-      PYTHONPATH: /usr/local/lib/python3/dist-packages:/usr/local/lib:/usr/local/dolfinx-real/lib/python3.10/dist-packages
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
 
     runs-on: ubuntu-22.04
@@ -21,8 +20,10 @@ jobs:
       - name: Install code
         run: python3 -m pip install .[dev]
 
-      - name: Flake8 code
-        run: python3 -m flake8 -v
+      - name: Check code formatting with ruff
+        run: |
+          ruff check .
+          ruff format --check .
 
       - name: Mypy check
         run: python3 -m mypy -v
