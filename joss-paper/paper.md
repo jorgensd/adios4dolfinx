@@ -38,7 +38,7 @@ If this is discovered early on, the simulation can be terminated, saving the dev
 ADIOS4DOLFINx enables users of the FEniCS project [@Baratta:2023] to store solutions during simulation, and read them in at their convenience to resume simulations at a later stage.
 Several checkpointing methods are implemented, including *N-to-M* checkpointing, which means saving data from a program executed with N processes, and loading it back in on M processes.
 
-Functionality for *N-to-M* checkpointing was implemented for the old version of DOLFIN by[@Habera:2018.
+Functionality for *N-to-M* checkpointing was implemented for the old version of DOLFIN by @Habera:2018.
 However, this functionality is not present in the newest version of the FEniCS Project [@Baratta:2023].
 The storage principles in the ADIOS4DOLFINx are based on the ideas present in this implementation.
 However, the implementation for non-Lagrangian finite element spaces vastly differs, due to the usage of dof-permutations [@Scroggs:2022].
