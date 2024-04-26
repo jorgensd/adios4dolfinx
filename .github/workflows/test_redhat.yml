@@ -1,4 +1,4 @@
-name: Test package with openmpi
+name: Test package with redhat
 
 on:
   push:
@@ -30,18 +30,17 @@ jobs:
   test-code:
     runs-on: "ubuntu-22.04"
     needs: [create-datasets, create-legacy-datasets]
-    container: ghcr.io/fenics/test-env:current-openmpi
+    container: docker.io/fenicsproject/test-env:current-redhat
     env:
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
-      PETSC_ARCH: "linux-gnu-real64-32"
-      OMPI_ALLOW_RUN_AS_ROOT: 1
-      OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
-      PRTE_MCA_rmaps_default_mapping_policy: :oversubscribe
+      PETSC_ARCH: ""
+      PETSC_DIR: "/usr/local/"
+      PYTHONPATH: "/usr/local/lib/:${PYTHONPATH}"
       working-directory: ./src
 
     strategy:
       matrix:
-        adios2: ["default", "v2.10.0"]
+        adios2: ["v2.10.0"]
     steps:
       - uses: actions/checkout@v4
 
@@ -53,6 +52,7 @@ jobs:
         with:
           adios2: ${{ matrix.adios2 }}
           petsc_arch: ${{ env.PETSC_ARCH }}
+          petsc_dir: ${{ env.PETSC_DIR }}
           dolfinx: v0.8.0
           basix: v0.8.0
           ufl: 2024.1.0.post0
@@ -76,8 +76,8 @@ jobs:
 
       - name: Run tests
         run: |
-          coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
+          coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests
 
       - name: Run tests in parallel
         run: |
-          mpirun -n 4 coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
+          mpirun -n 4 coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests

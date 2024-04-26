@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, Union
 
 from mpi4py import MPI
 
@@ -44,7 +44,7 @@ class AdiosFile(NamedTuple):
 @contextmanager
 def ADIOSFile(
     adios: adios2.ADIOS,
-    filename: Path | str,
+    filename: Union[Path, str],
     engine: str,
     mode: adios2.Mode,
     io_name: str,
@@ -62,7 +62,7 @@ def ADIOSFile(
 def read_cell_perms(
     adios: adios2.ADIOS,
     comm: MPI.Intracomm,
-    filename: Path | str,
+    filename: Union[Path, str],
     variable: str,
     num_cells_global: np.int64,
     engine: str,
@@ -126,12 +126,12 @@ def read_cell_perms(
 def read_adjacency_list(
     adios: adios2.ADIOS,
     comm: MPI.Intracomm,
-    filename: Path | str,
+    filename: Union[Path, str],
     dofmap: str,
     dofmap_offsets: str,
     num_cells_global: np.int64,
     engine: str,
-) -> dolfinx.cpp.graph.AdjacencyList_int64 | dolfinx.cpp.graph.AdjacencyList_int32:
+) -> Union[dolfinx.cpp.graph.AdjacencyList_int64, dolfinx.cpp.graph.AdjacencyList_int32]:
     """
     Read an adjacency-list from an ADIOS file with given communicator.
     The adjancency list is split in to a flat array (data) and its corresponding offset.
@@ -205,7 +205,7 @@ def read_adjacency_list(
 
 def read_array(
     adios: adios2.ADIOS,
-    filename: Path | str,
+    filename: Union[Path, str],
     array_name: str,
     engine: str,
     comm: MPI.Intracomm,
