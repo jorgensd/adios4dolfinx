@@ -58,13 +58,13 @@ Following is a minimal recipe of how to install adios4dolfinx, given that you ha
 conda create -n dolfinx-checkpoint python=3.10
 conda activate dolfinx-checkpoint
 conda install -c conda-forge fenics-dolfinx pip adios2
-python3 -m pip install adios4dolfinx[test]@git+https://github.com/jorgensd/adios4dolfinx@v0.8.0
+python3 -m pip install adios4dolfinx[test]@git+https://github.com/jorgensd/adios4dolfinx@v0.8.1
 ```
 
 > [!NOTE]
 > To run the tests or demos associated with the code, install `ipyparallel` in your environment, for instance by calling
 > ```bash
-> python3 -m pip install adios4dolfinx[test]@git+https://github.com/jorgensd/adios4dolfinx@v0.8.0
+> python3 -m pip install adios4dolfinx[test]@git+https://github.com/jorgensd/adios4dolfinx@v0.8.1
 > ```
 ## Functionality
 
