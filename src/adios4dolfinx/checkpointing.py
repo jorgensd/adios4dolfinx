@@ -57,7 +57,7 @@ __all__ = [
 
 
 def write_attributes(
-    filename: Path | str,
+    filename: typing.Union[Path, str],
     comm: MPI.Intracomm,
     name: str,
     attributes: dict[str, np.ndarray],
@@ -72,6 +72,7 @@ def write_attributes(
         attributes: Dictionary of attributes to write to file
         engine: ADIOS2 engine to use
     """
+
     adios = adios2.ADIOS(comm)
     with ADIOSFile(
         adios=adios,
@@ -90,7 +91,7 @@ def write_attributes(
 
 
 def read_attributes(
-    filename: Path | str,
+    filename: typing.Union[Path, str],
     comm: MPI.Intracomm,
     name: str,
     engine: str = "BP4",
@@ -105,7 +106,6 @@ def read_attributes(
     Returns:
         The attributes
     """
-
     adios = adios2.ADIOS(comm)
     with ADIOSFile(
         adios=adios,
@@ -125,11 +125,11 @@ def read_attributes(
 
 
 def write_meshtags(
-    filename: Path | str,
+    filename: typing.Union[Path, str],
     mesh: dolfinx.mesh.Mesh,
     meshtags: dolfinx.mesh.MeshTags,
     engine: str = "BP4",
-    meshtag_name: str | None = None,
+    meshtag_name: typing.Optional[str] = None,
 ):
     """
     Write meshtags associated with input mesh to file.
@@ -204,7 +204,7 @@ def write_meshtags(
 
 
 def read_meshtags(
-    filename: Path | str,
+    filename: typing.Union[Path, str],
     mesh: dolfinx.mesh.Mesh,
     meshtag_name: str,
     engine: str = "BP4",
@@ -301,12 +301,12 @@ def read_meshtags(
 
 
 def read_function(
-    filename: Path | str,
+    filename: typing.Union[Path, str],
     u: dolfinx.fem.Function,
     engine: str = "BP4",
     time: float = 0.0,
     legacy: bool = False,
-    name: str | None = None,
+    name: typing.Optional[str] = None,
 ):
     """
     Read checkpoint from file and fill it into `u`.
@@ -437,7 +437,7 @@ def read_function(
 
 
 def read_mesh_data(
-    filename: Path | str,
+    filename: typing.Union[Path, str],
     comm: MPI.Intracomm,
     engine: str = "BP4",
     ghost_mode: dolfinx.mesh.GhostMode = dolfinx.mesh.GhostMode.shared_facet,
@@ -573,7 +573,7 @@ def read_mesh_data(
 
 
 def read_mesh(
-    filename: Path | str,
+    filename: typing.Union[Path, str],
     comm: MPI.Intracomm,
     engine: str = "BP4",
     ghost_mode: dolfinx.mesh.GhostMode = dolfinx.mesh.GhostMode.shared_facet,
@@ -709,12 +709,12 @@ def write_mesh(
 
 
 def write_function(
-    filename: Path | str,
+    filename: typing.Union[Path, str],
     u: dolfinx.fem.Function,
     engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Append,
     time: float = 0.0,
-    name: str | None = None,
+    name: typing.Optional[str] = None,
 ):
     """
     Write function checkpoint to file.

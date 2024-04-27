@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import typing
 from dataclasses import dataclass
 
 import numpy as np
@@ -33,11 +34,13 @@ class MeshData:
 
     # Partitioning_information
     store_partition: bool
-    partition_processes: int | None  # Number of processes in partition
-    ownership_array: npt.NDArray[np.int32] | None  # Ownership array for cells
-    ownership_offset: npt.NDArray[np.int32] | None  # Ownership offset for cells
-    partition_range: tuple[int, int] | None  # Local insert position for partitioning information
-    partition_global: int | None
+    partition_processes: typing.Optional[int]  # Number of processes in partition
+    ownership_array: typing.Optional[npt.NDArray[np.int32]]  # Ownership array for cells
+    ownership_offset: typing.Optional[npt.NDArray[np.int32]]  # Ownership offset for cells
+    partition_range: typing.Optional[
+        tuple[int, int]
+    ]  # Local insert position for partitioning information
+    partition_global: typing.Optional[int]
 
 
 @dataclass

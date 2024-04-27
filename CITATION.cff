@@ -1,9 +1,9 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 authors:
-- family-names: "Dokken"
-  given-names: "Jørgen S."
-  orcid: "0000-0001-6489-8858"
+  - family-names: "Dokken"
+    given-names: "Jørgen S."
+    orcid: "0000-0001-6489-8858"
 title: "ADIOS2Wrappers"
-version: "0.7.2"
-date-released: "2023-02-07"
+version: "0.8.1"
+date-released: "2023-04-25"

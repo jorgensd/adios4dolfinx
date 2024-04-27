@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+import typing
 from collections import ChainMap
 
 from mpi4py import MPI
@@ -67,7 +68,7 @@ def generate_reference_map(
     meshtag: dolfinx.mesh.MeshTags,
     comm: MPI.Intracomm,
     root: int,
-) -> None | dict[str, tuple[int, npt.NDArray]]:
+) -> typing.Optional[dict[str, tuple[int, npt.NDArray]]]:
     """
     Helper function to generate map from meshtag value to its corresponding index and midpoint.
 

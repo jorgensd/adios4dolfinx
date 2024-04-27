@@ -37,6 +37,7 @@ jobs:
       OMPI_ALLOW_RUN_AS_ROOT: 1
       OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
       PRTE_MCA_rmaps_default_mapping_policy: :oversubscribe
+      working-directory: ./src
 
     strategy:
       matrix:
@@ -48,11 +49,15 @@ jobs:
         run: python3 -m pip install --upgrade pip setuptools
 
       - name: Install DOLFINx
-        uses: jorgensd/actions/install-dolfinx@v0.2.0
+        uses: jorgensd/actions/install-dolfinx@v0.3.0
         with:
           adios2: ${{ matrix.adios2 }}
           petsc_arch: ${{ env.PETSC_ARCH }}
-          dolfinx: main
+          dolfinx: v0.8.0
+          basix: v0.8.0
+          ufl: 2024.1.0.post0
+          ffcx: v0.8.0
+          working-directory: ${{ env.working-directory}}
 
       - name: Download legacy data
         uses: actions/download-artifact@v4
