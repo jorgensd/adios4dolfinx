@@ -9,10 +9,16 @@ import pytest
 import adios4dolfinx
 
 
+
+def get_sys_path():
+    import sys
+    return sys.path
+
 @pytest.fixture(scope="module")
 def cluster():
     cluster = ipp.Cluster(engines="mpi", n=2)
     rc = cluster.start_and_connect_sync()
+    print(rc[:].apply_sync(get_sys_path))
     yield rc
     cluster.stop_cluster_sync()
 
