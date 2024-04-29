@@ -9,10 +9,11 @@ import pytest
 import adios4dolfinx
 
 
-
 def get_sys_path():
     import sys
+
     return sys.path
+
 
 @pytest.fixture(scope="module")
 def cluster():
