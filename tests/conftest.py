@@ -15,7 +15,7 @@ import adios4dolfinx
 def cluster():
     cluster = ipp.Cluster(engines="mpi", n=2)
     rc = cluster.start_and_connect_sync()
-    print(rc[:].apply_sync(os.getcwd).get())
+    print(rc[:].apply_sync(os.chdir, os.getcwd()))
     yield rc
     cluster.stop_cluster_sync()
 
