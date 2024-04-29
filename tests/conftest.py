@@ -1,4 +1,3 @@
-import os
 
 from mpi4py import MPI
 
@@ -11,11 +10,19 @@ import pytest
 import adios4dolfinx
 
 
+def get_sys_path():
+    import os
+    import sys
+
+    return sys.path, os.cwd
+
+
 @pytest.fixture(scope="module")
 def cluster():
     cluster = ipp.Cluster(engines="mpi", n=2)
     rc = cluster.start_and_connect_sync()
-    print(rc[:].apply_sync(os.chdir, os.getcwd()))
+    print(rc[:].apply_sync(get_sys_path))
+
     yield rc
     cluster.stop_cluster_sync()
 
