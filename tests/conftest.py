@@ -14,7 +14,7 @@ def get_sys_path():
     import os
     import sys
 
-    return sys.path, os.cwd
+    return sys.path, os.getcwd()
 
 
 @pytest.fixture(scope="module")
