@@ -1,3 +1,6 @@
+import os
+import sys
+
 from mpi4py import MPI
 
 import dolfinx
@@ -9,10 +12,29 @@ import pytest
 import adios4dolfinx
 
 
+# @ipp.interactive avoids requiring the current module
+# to be importable
+@ipp.interactive
+def sync_sys_path(cwd: str, sys_path: list[str]):
+    """Sync sys.path between client and engines
+
+    Send current process os.getcwd and sys.path
+    to engines, to ensure imports resolve the same
+    locally as remotely.
+    """
+    import os  # noqa
+    import sys  # noqa
+
+    os.chdir(cwd)
+    sys.path[:] = sys_path
+
+
 @pytest.fixture(scope="module")
 def cluster():
     cluster = ipp.Cluster(engines="mpi", n=2)
     rc = cluster.start_and_connect_sync()
+    rc[:].apply_sync(sync_sys_path, os.getcwd(), sys.path)
+
     yield rc
     cluster.stop_cluster_sync()
 
