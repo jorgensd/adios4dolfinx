@@ -1,5 +1,5 @@
 ---
-title: 'ADIOS4DOLFINx: A framework for checkpointing in FEniCS'
+title: "ADIOS4DOLFINx: A framework for checkpointing in FEniCS"
 tags:
   - Python
   - finite element simulations
@@ -10,11 +10,10 @@ authors:
     corresponding: true
     affiliation: 1
 affiliations:
- - name: Simula Research Laboratory
-   index: 1
-date: 14 April 2024
+  - name: Simula Research Laboratory
+    index: 1
+date: 30 April 2024
 bibliography: paper.bib
-
 ---
 
 # Summary
@@ -84,7 +83,7 @@ A large variety of examples covering all the functions in ADIOS4DOLFINx is avail
 
 # Acknowledgements
 
-We acknowledge the valuable feedback on the documentation and manuscript by Thomas M. Surowiec and Halvor Herlyng. 
+We acknowledge the valuable feedback on the documentation and manuscript by Thomas M. Surowiec and Halvor Herlyng and packaging support by Min Ragan-Kelley.
 Additionally, we acknowledge the scientific discussion regarding feature development and code contributions by Francesco Ballarin, Henrik N. Finsberg, and Nathan Sime.
 
 # References
