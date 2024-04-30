@@ -10,7 +10,7 @@ authors:
     corresponding: true
     affiliation: 1
 affiliations:
-  - name: Simula Research Laboratory
+  - name: Simula Research Laboratory, Oslo, Norway
     index: 1
 date: 30 April 2024
 bibliography: paper.bib
