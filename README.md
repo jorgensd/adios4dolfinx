@@ -2,6 +2,7 @@
 
 ![MIT](https://img.shields.io/github/license/jorgensd/adios4dolfinx)
 [![status](https://joss.theoj.org/papers/7866cb142db8a803e32d79a109573d25/status.svg)](https://joss.theoj.org/papers/7866cb142db8a803e32d79a109573d25)
+[![Anaconda-Server Badge](https://anaconda.org/conda-forge/adios4dolfinx/badges/version.svg)](https://anaconda.org/conda-forge/adios4dolfinx)
 
 ADIOS4DOLFINx is an extension for [DOLFINx](https://github.com/FEniCS/dolfinx/) to checkpoint meshes, meshtags and functions using [ADIOS 2](https://adios2.readthedocs.io/en/latest/).
 
@@ -21,12 +22,13 @@ The `adios4dolfinx` library extends the [DOLFINx](https://github.com/FEniCS/dolf
 
 Compatibility with DOLFINx:
 
-- ADIOS4DOLFINx v0.7.3 is compatible with DOLFINx v0.7.x
 - ADIOS4DOLFINx v0.8.1 is compatible with DOLFINx v0.8.x
+- ADIOS4DOLFINx v0.7.3 is compatible with DOLFINx v0.7.x
 
 ### Dependencies
 
-The library depends on the Python-interface of [DOLFINx](https://github.com/) and an MPI-build of [ADIOS2](https://adios2.readthedocs.io/en/latest/setting_up/setting_up.html#as-package) and can therefore not be installed through PyPi, but has to be installed through Conda, Spack or from source.
+The library depends on the Python-interface of [DOLFINx](https://github.com/) and an MPI-build of [ADIOS2](https://adios2.readthedocs.io/en/latest/setting_up/setting_up.html#as-package).
+Therefore `ADIOS2` should not be install through PYPI/pip, but has to be installed through Conda, Spack or from source.
 
 ### Docker
 
@@ -70,16 +72,17 @@ Following is a minimal recipe of how to install adios4dolfinx, given that you ha
 ```bash
 conda create -n dolfinx-checkpoint python=3.10
 conda activate dolfinx-checkpoint
-conda install -c conda-forge fenics-dolfinx pip adios2=*=mpi_*
-python3 -m pip install adios4dolfinx[test]@git+https://github.com/jorgensd/adios4dolfinx@v0.8.1
+conda install -c conda-forge adios4dolfinx
 ```
 
 > [!NOTE]
-> To run the tests or demos associated with the code, install `ipyparallel` in your environment, for instance by calling
->
-> ```bash
-> python3 -m pip install adios4dolfinx[test]@git+https://github.com/jorgensd/adios4dolfinx@v0.8.1
-> ```
+> Remember to download the appropriate version of `adios4dolfinx` from Github [adios4dolfinx: Releases](https://github.com/jorgensd/adios4dolfinx/releases)
+
+To run the test suite, you should also install `ipyparallel`, `pytest` and `coverage`, which can all be installed with conda
+
+```bash
+conda install -c conda-forge ipyparallel pytest coverage
+```
 
 ## Functionality
 
