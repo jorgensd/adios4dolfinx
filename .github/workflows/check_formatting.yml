@@ -18,7 +18,7 @@ jobs:
         run: python3 -m pip install --break-system-packages --upgrade pip setuptools
 
       - name: Install code
-        run: python3 -m pip install --break-system-packages.[dev]
+        run: python3 -m pip install --break-system-packages .[dev]
 
       - name: Check code formatting with ruff
         run: |
