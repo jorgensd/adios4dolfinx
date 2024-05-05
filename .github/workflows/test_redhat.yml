@@ -48,7 +48,7 @@ jobs:
         run: python3 -m pip install --upgrade pip setuptools
 
       - name: Install DOLFINx
-        uses: jorgensd/actions/install-dolfinx@v0.3.0
+        uses: jorgensd/actions/install-dolfinx@v0.3
         with:
           adios2: ${{ matrix.adios2 }}
           petsc_arch: ${{ env.PETSC_ARCH }}

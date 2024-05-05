@@ -33,7 +33,7 @@ jobs:
   test-code:
     runs-on: "ubuntu-22.04"
     needs: [create-datasets, create-legacy-datasets, check-formatting]
-    container: ghcr.io/fenics/dolfinx/dolfinx:v0.8.0
+    container: ghcr.io/fenics/dolfinx/dolfinx:nightly
     env:
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
 
