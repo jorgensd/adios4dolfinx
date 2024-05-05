@@ -46,7 +46,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Update pip
-        run: python3 -m pip install --upgrade pip setuptools
+        run: python3 -m pip --break-system-packages install --upgrade pip setuptools
 
       - name: Install DOLFINx
         uses: jorgensd/actions/install-dolfinx@v0.3
@@ -72,7 +72,7 @@ jobs:
           path: ./legacy_checkpoint
 
       - name: Install package
-        run: python3 -m pip install .[test]
+        run: python3 -m pip install --break-system-packages .[test]
 
       - name: Run tests
         run: |
