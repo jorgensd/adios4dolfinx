@@ -56,7 +56,7 @@ def test_read_write_2D(
 ):
     mesh = simplex_mesh_2D
     f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
-    el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
+    el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree, dtype=mesh.geometry.x.dtype)
 
     def f(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
@@ -81,7 +81,7 @@ def test_read_write_3D(
 ):
     mesh = simplex_mesh_3D
     f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
-    el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
+    el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree, dtype=mesh.geometry.x.dtype)
 
     def f(x):
         values = np.empty((3, x.shape[1]), dtype=f_dtype)
@@ -114,7 +114,7 @@ def test_read_write_2D_quad(
 ):
     mesh = non_simplex_mesh_2D
     f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
-    el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
+    el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree, dtype=mesh.geometry.x.dtype)
 
     def f(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)
@@ -146,7 +146,7 @@ def test_read_write_hex(
 ):
     mesh = non_simplex_mesh_3D
     f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
-    el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
+    el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree, dtype=mesh.geometry.x.dtype)
 
     def f(x):
         values = np.empty((3, x.shape[1]), dtype=f_dtype)
@@ -179,7 +179,7 @@ def test_read_write_multiple(
 ):
     mesh = non_simplex_mesh_2D
     f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
-    el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
+    el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree, dtype=mesh.geometry.x.dtype)
 
     def f(x):
         values = np.empty((2, x.shape[1]), dtype=f_dtype)

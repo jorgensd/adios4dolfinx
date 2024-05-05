@@ -87,6 +87,7 @@ def test_read_write_P_3D(
         degree,
         basix.LagrangeVariant.gll_warped,
         shape=(mesh.geometry.dim,),
+        dtype=mesh.geometry.x.dtype,
     )
 
     def f(x):
@@ -178,6 +179,7 @@ def test_read_write_P_3D_time(
         degree,
         basix.LagrangeVariant.gll_warped,
         shape=(mesh.geometry.dim,),
+        dtype=mesh.geometry.x.dtype,
     )
 
     def f(x):
