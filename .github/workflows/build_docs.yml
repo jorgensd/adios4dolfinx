@@ -18,17 +18,17 @@ jobs:
     env:
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
 
-    runs-on: ubuntu-22.04
-    container: ghcr.io/fenics/dolfinx/dolfinx:v0.8.0
+    runs-on: ubuntu-latest
+    container: ghcr.io/fenics/dolfinx/dolfinx:nightly
     steps:
       # This action sets the current path to the root of your github repo
       - uses: actions/checkout@v4
 
       - name: Update pip
-        run: python3 -m pip install --upgrade pip setuptools
+        run: python3 -m pip install --break-system-packages --upgrade pip setuptools
 
       - name: Install dependencies
-        run: python3 -m pip install -e ".[docs]"
+        run: python3 -m pip install --break-system-packages -e ".[docs]"
 
       - name: Build docs
         run: jupyter book build -W .
