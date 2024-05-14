@@ -2,18 +2,44 @@ name: Check formatting
 
 on:
   workflow_call:
+    inputs:
+      tag:
+        description: "Tag of DOLFINx docker image"
+        default: "nightly"
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag of DOLFINx docker image"
+        default: "nightly"
+        required: true
+        type: string
+
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: "0 8 * * *"
+
+env:
+  DEB_PYTHON_INSTALL_LAYOUT: deb_system
+  DEFAULT_TAG: nightly
 
 jobs:
-  check-code:
-    env: 
-      DEB_PYTHON_INSTALL_LAYOUT: deb_system
-
+  get_image_tag:
     runs-on: ubuntu-latest
-    container: ghcr.io/fenics/dolfinx/dolfinx:nightly
+    outputs:
+      image: ${{ steps.docker_tag.outputs.image }}
     steps:
-      # This action sets the current path to the root of your github repo
-      - uses: actions/checkout@v4
-      
+      - id: docker_tag
+        run: echo "image=${{ inputs.tag || env.DEFAULT_TAG }}" >> $GITHUB_OUTPUT
+
+  build:
+    needs: get_image_tag
+    runs-on: ubuntu-22.04
+    container: ghcr.io/fenics/dolfinx/dolfinx:${{ needs.get_image_tag.outputs.image }}
+    steps:
       - name: Update pip
         run: python3 -m pip install --break-system-packages --upgrade pip setuptools
 
