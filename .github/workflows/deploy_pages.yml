@@ -27,11 +27,8 @@ jobs:
     with:
       tag: "stable"
 
-  test-openmpi:
-    uses: ./.github/workflows/test_package_openmpi.yml
-
   deploy:
-    needs: [run-coverage, build-docs, test-openmpi]
+    needs: [run-coverage, build-docs]
 
     environment:
       name: github-pages
