@@ -1,25 +1,49 @@
 name: Build documentation
 
 on:
+  workflow_call:
+    inputs:
+      tag:
+        description: "Tag of DOLFINx docker image"
+        default: "nightly"
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag of DOLFINx docker image"
+        default: "nightly"
+        required: true
+        type: string
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
-
-  workflow_dispatch:
-  workflow_call:
+  schedule:
+    - cron: "0 8 * * *"
 
 env:
-  PUBLISH_DIR: ./_build/html
   DEB_PYTHON_INSTALL_LAYOUT: deb_system
-  ARTIFACT_NAME: "docs"
+  DEFAULT_TAG: nightly
+  ARTIFACT_NAME: docs
+  PUBLISH_DIR: ./_build/html
 
 jobs:
-  build-docs:
-    env:
-      DEB_PYTHON_INSTALL_LAYOUT: deb_system
-
+  get_image_tag:
     runs-on: ubuntu-latest
-    container: ghcr.io/fenics/dolfinx/dolfinx:nightly
+    outputs:
+      image: ${{ steps.docker_tag.outputs.image }}
+    steps:
+      - id: docker_tag
+        run: echo "image=${{ inputs.tag || env.DEFAULT_TAG }}" >> $GITHUB_OUTPUT
+
+  build-docs:
+    needs: get_image_tag
+    runs-on: ubuntu-latest
+    container: ghcr.io/fenics/dolfinx/dolfinx:${{ needs.get_image_tag.outputs.image }}
+
     steps:
       # This action sets the current path to the root of your github repo
       - uses: actions/checkout@v4
@@ -35,9 +59,8 @@ jobs:
 
       - name: Upload documentation as artifact
         uses: actions/upload-artifact@v4
-        if: github.event_name != 'workflow_call'
+        if: always()
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ env.PUBLISH_DIR }}
           if-no-files-found: error
-
