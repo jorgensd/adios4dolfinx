@@ -2,9 +2,10 @@ name: Github Pages
 
 on:
   push:
-    branches: [main]
+    branches: [release]
+  pull_request:
+    branches: [release]
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
@@ -18,10 +19,13 @@ concurrency:
 jobs:
   build-docs:
     uses: ./.github/workflows/build_docs.yml
-
+    with:
+      tag: "stable"
 
   run-coverage:
     uses: ./.github/workflows/test_package.yml
+    with:
+      tag: "stable"
 
   test-openmpi:
     uses: ./.github/workflows/test_package_openmpi.yml
@@ -58,7 +62,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v5
 
       - name: Deploy to GitHub Pages
         id: deployment

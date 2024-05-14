@@ -2,18 +2,15 @@ name: Test package with redhat
 
 on:
   push:
-    # The CI is executed on every push on every branch
     branches:
-      - "**"
+      - main
   pull_request:
-    # The CI is executed on every pull request to the main branch
     branches:
       - main
 
   workflow_call:
   workflow_dispatch:
   schedule:
-    # The CI is executed every day at 8am
     - cron: "0 8 * * *"
 
 jobs:
@@ -44,8 +41,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Get pip flags based on version
+        id: python-version
+        shell: bash -el {0}
+        run: |
+          MODERN_PIP=$(python3 -c "import sys; t = sys.version_info >= (3, 11, 0); sys.stdout.write(str(t))")
+          if [ ${MODERN_PIP} == "True" ]; then
+            FLAGS="--break-system-packages"
+          else
+            FLAGS=""
+            python3 -m pip install --upgrade pip
+          fi
+          echo "PYTHON_FLAGS=${FLAGS}" >> "$GITHUB_OUTPUT"
+
       - name: Update pip
-        run: python3 -m pip install --break-system-packages --upgrade pip setuptools
+        run: python3 -m pip install ${{ steps.python-version.outputs.PYTHON_FLAGS}} --upgrade pip setuptools
 
       - name: Install DOLFINx
         uses: jorgensd/actions/install-dolfinx@v0.3
@@ -53,10 +63,10 @@ jobs:
           adios2: ${{ matrix.adios2 }}
           petsc_arch: ${{ env.PETSC_ARCH }}
           petsc_dir: ${{ env.PETSC_DIR }}
-          dolfinx: v0.8.0
-          basix: v0.8.0
-          ufl: 2024.1.0.post0
-          ffcx: v0.8.0
+          dolfinx: main
+          basix: main
+          ufl: main
+          ffcx: main
           working-directory: ${{ env.working-directory}}
 
       - name: Download legacy data
@@ -72,7 +82,7 @@ jobs:
           path: ./legacy_checkpoint
 
       - name: Install package
-        run: python3 -m pip install --break-system-packages .[test]
+        run: python3 -m pip install ${{ steps.python-version.outputs.PYTHON_FLAGS}} --check-build-dependencies .[test]
 
       - name: Run tests
         run: |
