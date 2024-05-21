@@ -48,11 +48,13 @@ def test_mesh_read_writer(encoder, suffix, ghost_mode, tmp_path, store_partition
         new_cell_map = mesh_adios.topology.index_map(mesh_adios.topology.dim)
         assert cell_map.size_local == new_cell_map.size_local
         assert cell_map.num_ghosts == new_cell_map.num_ghosts
+        mesh.topology.create_connectivity(mesh.topology.dim, mesh.topology.dim)
         midpoints = dolfinx.mesh.compute_midpoints(
             mesh,
             mesh.topology.dim,
             np.arange(cell_map.size_local + cell_map.num_ghosts, dtype=np.int32),
         )
+        mesh_adios.topology.create_connectivity(mesh_adios.topology.dim, mesh_adios.topology.dim)
         new_midpoints = dolfinx.mesh.compute_midpoints(
             mesh_adios,
             mesh_adios.topology.dim,
