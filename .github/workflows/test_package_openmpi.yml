@@ -38,7 +38,7 @@ jobs:
 
     strategy:
       matrix:
-        adios2: ["default", "v2.9.2", "v2.10.0"]
+        adios2: ["default", "v2.9.2", "v2.10.1"]
     steps:
       - uses: actions/checkout@v4
 
