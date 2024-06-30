@@ -24,7 +24,10 @@ from .snapshot import snapshot_checkpoint
 
 meta = metadata("adios4dolfinx")
 __version__ = meta["Version"]
-__author__ = meta["Author"]
+try:
+    __author__ = meta["Author"]
+except KeyError:
+    pass
 __license__ = meta["License"]
 __email__ = meta["Author-email"]
 __program_name__ = meta["Name"]
