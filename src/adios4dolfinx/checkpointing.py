@@ -159,7 +159,7 @@ def write_meshtags(
     num_dofs_per_entity = dof_layout.num_entity_closure_dofs(dim)
 
     entities_to_geometry = dolfinx.cpp.mesh.entities_to_geometry(
-        mesh._cpp_object, dim, tag_entities, False
+        mesh._cpp_object, dim, local_tag_entities, False
     )
 
     indices = mesh.geometry.index_map().local_to_global(entities_to_geometry.reshape(-1))
