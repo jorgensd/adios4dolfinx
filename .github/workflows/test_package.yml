@@ -52,7 +52,7 @@ jobs:
       artifact_name: "legacy_checkpoint_mpich"
 
   test-code:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs:
       [create-datasets, create-legacy-datasets, check-formatting, get_image_tag]
     container: ghcr.io/fenics/dolfinx/dolfinx:${{ needs.get_image_tag.outputs.image }}
