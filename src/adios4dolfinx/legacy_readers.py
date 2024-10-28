@@ -152,7 +152,8 @@ def read_dofmap_legacy(
         # Extract dofmap data
         global_dofs = np.zeros_like(cells, dtype=np.int64)
         input_cell_positions = cells - local_cell_range[0]
-        read_pos = in_offsets[input_cell_positions].astype(np.int32) + dof_pos - in_offsets[0]
+        read_pos = (in_offsets[input_cell_positions] + dof_pos - in_offsets[0]).astype(np.int32)
+
         global_dofs = mapped_dofmap[read_pos]
         del input_cell_positions, read_pos
 
