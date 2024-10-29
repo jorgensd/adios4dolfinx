@@ -22,6 +22,7 @@ The `adios4dolfinx` library extends the [DOLFINx](https://github.com/FEniCS/dolf
 
 Compatibility with DOLFINx:
 
+- ADIOS4DOLFINx v0.9.0 is compatible with DOLFINx v0.9.x
 - ADIOS4DOLFINx v0.8.1 is compatible with DOLFINx v0.8.x
 - ADIOS4DOLFINx v0.7.3 is compatible with DOLFINx v0.7.x
 
@@ -29,6 +30,10 @@ Compatibility with DOLFINx:
 
 The library depends on the Python-interface of [DOLFINx](https://github.com/) and an MPI-build of [ADIOS2](https://adios2.readthedocs.io/en/latest/setting_up/setting_up.html#as-package).
 Therefore `ADIOS2` should not be install through PYPI/pip, but has to be installed through Conda, Spack or from source.
+
+> [!IMPORTANT]  
+> ADIOS2<2.10.2 does not work properly with `numpy>=2.0.0`. Everyone is adviced to use the newest version of ADIOS2.
+> This is for instance available through `conda` or the `ghcr.io/fenics/dolfinx/dolfinx:nightly` Docker-image.
 
 ### Docker
 
