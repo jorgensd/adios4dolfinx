@@ -653,7 +653,8 @@ def write_mesh(
         partition_processes = mesh.comm.size
 
         # Get partitioning
-        cell_map = mesh.topology.index_map(mesh.topology.dim).index_to_dest_ranks()
+        consensus_tag = 1202
+        cell_map = mesh.topology.index_map(mesh.topology.dim).index_to_dest_ranks(consensus_tag)
         num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
         cell_offsets = cell_map.offsets[: num_cells_local + 1]
         if cell_offsets[-1] == 0:
