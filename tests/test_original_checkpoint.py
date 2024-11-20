@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import itertools
 from collections.abc import Callable
 from pathlib import Path
@@ -270,6 +271,9 @@ def read_function_vector(
     np.testing.assert_allclose(u.x.array, u_ex.x.array, atol=atol)  # type: ignore
 
 
+@pytest.mark.skipif(
+    os.cpu_count() == 1, reason="Test requires that the system has more than one process"
+)
 @pytest.mark.skipif(MPI.COMM_WORLD.size > 1, reason="Test uses ipythonparallel for MPI")
 @pytest.mark.parametrize("is_complex", [True, False])
 @pytest.mark.parametrize("family", ["Lagrange", "DG"])
@@ -314,6 +318,9 @@ def test_read_write_P_2D(
     assert query.successful(), query.error
 
 
+@pytest.mark.skipif(
+    os.cpu_count() == 1, reason="Test requires that the system has more than one process"
+)
 @pytest.mark.skipif(MPI.COMM_WORLD.size > 1, reason="Test uses ipythonparallel for MPI")
 @pytest.mark.parametrize("is_complex", [True, False])
 @pytest.mark.parametrize("family", ["Lagrange", "DG"])
@@ -360,6 +367,9 @@ def test_read_write_P_3D(
     assert query.successful(), query.error
 
 
+@pytest.mark.skipif(
+    os.cpu_count() == 1, reason="Test requires that the system has more than one process"
+)
 @pytest.mark.skipif(MPI.COMM_WORLD.size > 1, reason="Test uses ipythonparallel for MPI")
 @pytest.mark.parametrize("write_mesh", [True, False])
 @pytest.mark.parametrize("is_complex", [True, False])
@@ -397,6 +407,9 @@ def test_read_write_2D_vector_simplex(
     read_function_vector(mesh_fname, file_path, "u_original", family, degree, f, f_dtype)
 
 
+@pytest.mark.skipif(
+    os.cpu_count() == 1, reason="Test requires that the system has more than one process"
+)
 @pytest.mark.skipif(MPI.COMM_WORLD.size > 1, reason="Test uses ipythonparallel for MPI")
 @pytest.mark.parametrize("write_mesh", [True, False])
 @pytest.mark.parametrize("is_complex", [True, False])
@@ -435,6 +448,9 @@ def test_read_write_3D_vector_simplex(
     read_function_vector(mesh_fname, file_path, "u_original", family, degree, f, f_dtype)
 
 
+@pytest.mark.skipif(
+    os.cpu_count() == 1, reason="Test requires that the system has more than one process"
+)
 @pytest.mark.skipif(MPI.COMM_WORLD.size > 1, reason="Test uses ipythonparallel for MPI")
 @pytest.mark.parametrize("write_mesh", [True, False])
 @pytest.mark.parametrize("is_complex", [True, False])
@@ -472,6 +488,9 @@ def test_read_write_2D_vector_non_simplex(
     read_function_vector(mesh_fname, file_path, "u_original", family, degree, f, f_dtype)
 
 
+@pytest.mark.skipif(
+    os.cpu_count() == 1, reason="Test requires that the system has more than one process"
+)
 @pytest.mark.skipif(MPI.COMM_WORLD.size > 1, reason="Test uses ipythonparallel for MPI")
 @pytest.mark.parametrize("write_mesh", [True, False])
 @pytest.mark.parametrize("is_complex", [True, False])
