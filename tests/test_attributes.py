@@ -2,12 +2,18 @@ from pathlib import Path
 
 from mpi4py import MPI
 
+import adios2
 import numpy as np
 import pytest
+from packaging.version import parse as _v
 
 import adios4dolfinx
 
 
+@pytest.mark.skipif(
+    _v(np.__version__) >= _v("2.0.0") and _v(adios2.__version__) < _v("2.10.2"),
+    reason="Cannot use numpy>=2.0.0 and adios2<2.10.2",
+)
 @pytest.mark.parametrize("comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
 def test_read_write_attributes(comm, tmp_path):
     attributes1 = {
