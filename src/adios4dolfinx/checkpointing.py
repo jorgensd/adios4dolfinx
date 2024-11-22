@@ -564,7 +564,7 @@ def read_mesh_data(
         )
 
         def partitioner(comm: MPI.Intracomm, n, m, topo):
-            assert len(partition_graph.offsets) - 1 == topo.num_nodes
+            assert len(topo[0]) % (len(partition_graph.offsets) - 1) == 0
             return partition_graph
     else:
         partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)

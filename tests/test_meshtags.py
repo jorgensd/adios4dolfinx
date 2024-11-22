@@ -80,6 +80,7 @@ def generate_reference_map(
     Returns:
         Root rank returns the map, all other ranks return None
     """
+    mesh.topology.create_connectivity(meshtag.dim, mesh.topology.dim)
     midpoints = dolfinx.mesh.compute_midpoints(mesh, meshtag.dim, meshtag.indices)
     e_map = mesh.topology.index_map(meshtag.dim)
     value_to_midpoint = {}

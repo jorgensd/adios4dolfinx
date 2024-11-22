@@ -33,6 +33,7 @@ for i in range(mesh.topology.dim + 1):
 
     # Compute midpoints of entities
     entities = np.arange(e_map.size_local, dtype=np.int32)
+    mesh.topology.create_connectivity(i, mesh.topology.dim)
     entity_midpoints[i] = dolfinx.mesh.compute_midpoints(mesh, i, entities)
     # Associate each local index with its global index
     values = np.arange(e_map.size_local, dtype=np.int32) + e_map.local_range[0]
@@ -67,6 +68,7 @@ def verify_meshtags(filename: Path):
         meshtags = adios4dolfinx.read_meshtags(filename, read_mesh, meshtag_name=f"meshtags_{i}")
 
         # Compute midpoints for all local entities on process
+        read_mesh.topology.create_connectivity(i, read_mesh.topology.dim)
         midpoints = dolfinx.mesh.compute_midpoints(read_mesh, i, meshtags.indices)
         # Compare locally computed midpoint with reference data
         for global_pos, midpoint in zip(meshtags.values, midpoints):
