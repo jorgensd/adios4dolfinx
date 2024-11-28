@@ -17,6 +17,7 @@ from .checkpointing import (
     write_function,
     write_mesh,
     write_meshtags,
+    read_timestamps,
 )
 from .legacy_readers import read_function_from_legacy_h5, read_mesh_from_legacy_h5
 from .original_checkpoint import write_function_on_input_mesh, write_mesh_input_order

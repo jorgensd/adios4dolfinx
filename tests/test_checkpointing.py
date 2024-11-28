@@ -8,6 +8,8 @@ import dolfinx
 import numpy as np
 import pytest
 
+import adios4dolfinx
+
 dtypes = [np.float64, np.float32]  # Mesh geometry dtypes
 write_comm = [MPI.COMM_SELF, MPI.COMM_WORLD]  # Communicators for creating mesh
 
@@ -208,3 +210,42 @@ def test_read_write_P_3D_time(
     hash = write_function_time_dep(mesh, el, g, f, t0, t1, f_dtype)
     MPI.COMM_WORLD.Barrier()
     read_function_time_dep(read_comm, el, g, f, t0, t1, hash, f_dtype)
+
+
+def test_read_timestamps(get_dtype, mesh_2D, tmp_path):
+    mesh = mesh_2D
+    dtype = get_dtype(mesh.geometry.x.dtype, False)
+
+    el = basix.ufl.element(
+        "Lagrange",
+        mesh.ufl_cell().cellname(),
+        1,
+        shape=(mesh.geometry.dim,),
+        dtype=mesh.geometry.x.dtype,
+    )
+    V = dolfinx.fem.functionspace(mesh, el)
+
+    u = dolfinx.fem.Function(V, dtype=dtype, name="u")
+    v = dolfinx.fem.Function(V, dtype=dtype, name="v")
+
+    f_path = MPI.COMM_WORLD.bcast(tmp_path, root=0)
+    filename = f_path / f"read_time_stamps.bp"
+
+    t_u = [0.1, 1.4]
+    t_v = [0.45, 1.2]
+
+    adios4dolfinx.write_mesh(filename, mesh)
+    adios4dolfinx.write_function(filename, u, time=t_u[0])
+    adios4dolfinx.write_function(filename, v, time=t_v[0])
+    adios4dolfinx.write_function(filename, u, time=t_u[1])
+    adios4dolfinx.write_function(filename, v, time=t_v[1])
+
+    timestamps_u = adios4dolfinx.read_timestamps(
+        comm=mesh.comm, filename=filename, function_name="u"
+    )
+    timestamps_v = adios4dolfinx.read_timestamps(
+        comm=mesh.comm, filename=filename, function_name="v"
+    )
+
+    assert np.allclose(timestamps_u, t_u)
+    assert np.allclose(timestamps_v, t_v)
