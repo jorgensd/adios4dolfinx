@@ -228,7 +228,7 @@ def test_read_timestamps(get_dtype, mesh_2D, tmp_path):
     u = dolfinx.fem.Function(V, dtype=dtype, name="u")
     v = dolfinx.fem.Function(V, dtype=dtype, name="v")
 
-    f_path = MPI.COMM_WORLD.bcast(tmp_path, root=0)
+    f_path = mesh.comm.bcast(tmp_path, root=0)
     filename = f_path / "read_time_stamps.bp"
 
     t_u = [0.1, 1.4]
