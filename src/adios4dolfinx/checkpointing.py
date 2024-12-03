@@ -334,7 +334,10 @@ def read_meshtags(
     mesh.topology.create_connectivity(dim, 0)
     mesh.topology.create_connectivity(dim, mesh.topology.dim)
 
-    adj = dolfinx.cpp.graph.AdjacencyList_int32(local_entities)
+    try:
+        adj = dolfinx.graph.adjacencylist(local_entities)
+    except AttributeError:
+        adj = dolfinx.cpp.graph.AdjacencyList_int32(local_entities)
 
     local_values = np.array(local_values, dtype=np.int32)
 
