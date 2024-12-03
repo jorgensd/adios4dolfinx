@@ -334,7 +334,7 @@ def read_meshtags(
     mesh.topology.create_connectivity(dim, 0)
     mesh.topology.create_connectivity(dim, mesh.topology.dim)
 
-    adj = dolfinx.cpp.graph.AdjacencyList_int32(local_entities)
+    adj = dolfinx.graph.adjacencylist(local_entities)
 
     local_values = np.array(local_values, dtype=np.int32)
 
@@ -609,7 +609,7 @@ def read_mesh_data(
 
         def partitioner(comm: MPI.Intracomm, n, m, topo):
             assert len(topo[0]) % (len(partition_graph.offsets) - 1) == 0
-            return partition_graph
+            return partition_graph._cpp_object
     else:
         partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)
 
