@@ -25,8 +25,7 @@ def write_function(tmp_path):
         uh.interpolate(f)
         uh.name = name
         el_hash = (
-            V.element.signature
-            .replace(" ", "")
+            V.element.signature.replace(" ", "")
             .replace(",", "")
             .replace("(", "")
             .replace(")", "")
@@ -98,8 +97,7 @@ def write_function_time_dep(tmp_path):
         uh = dolfinx.fem.Function(V, dtype=dtype)
         uh.interpolate(f0)
         el_hash = (
-            V.element.signature
-            .replace(" ", "")
+            V.element.signature.replace(" ", "")
             .replace(",", "")
             .replace("(", "")
             .replace(")", "")
