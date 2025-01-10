@@ -29,7 +29,7 @@ def compute_volume(mesh, time_stamp):
     vol_local = dolfinx.fem.assemble_scalar(vol_form)
     vol_glob = mesh.comm.allreduce(vol_local, op=MPI.SUM)
     if mesh.comm.rank == 0:
-        print(f"{mesh.comm.rank+1}/{mesh.comm.size} Time: {time_stamp} Mesh Volume: {vol_glob}")
+        print(f"{mesh.comm.rank + 1}/{mesh.comm.size} Time: {time_stamp} Mesh Volume: {vol_glob}")
 
 
 def write_meshes(filename: Path):

@@ -36,7 +36,7 @@ def create_xdmf_mesh(filename: Path):
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, filename.with_suffix(".xdmf"), "w") as xdmf:
         xdmf.write_mesh(mesh)
         xdmf.write_meshtags(facet_tag, mesh.geometry)
-    print(f"{mesh.comm.rank+1}/{mesh.comm.size} Mesh written to {filename.with_suffix('.xdmf')}")
+    print(f"{mesh.comm.rank + 1}/{mesh.comm.size} Mesh written to {filename.with_suffix('.xdmf')}")
 
 
 mesh_file = Path("MyMesh.xdmf")
@@ -79,7 +79,7 @@ def write_function(
         name="Output",
     )
     print(
-        f"{mesh.comm.rank+1}/{mesh.comm.size} Function written to ",
+        f"{mesh.comm.rank + 1}/{mesh.comm.size} Function written to ",
         f"{function_filename.with_suffix('.bp')}",
     )
 
