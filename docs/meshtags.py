@@ -75,7 +75,7 @@ def verify_meshtags(filename: Path):
             np.testing.assert_allclose(
                 entity_midpoints[i][global_pos],
                 midpoint,
-                err_msg=f"{prefix}: Midpoint ({i , global_pos}) do not match",
+                err_msg=f"{prefix}: Midpoint ({i, global_pos}) do not match",
             )
         print(f"{prefix} Matching of all entities of dimension {i} successful")
 
