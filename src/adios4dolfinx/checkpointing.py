@@ -388,9 +388,11 @@ def read_function(
             io_name="FunctionReader",
         ) as adios_file:
             variables = set(
-                map(
-                    lambda x: x.split("_time")[0],
-                    filter(lambda x: x.endswith("_time"), adios_file.io.AvailableVariables()),
+                sorted(
+                    map(
+                        lambda x: x.split("_time")[0],
+                        filter(lambda x: x.endswith("_time"), adios_file.io.AvailableVariables()),
+                    )
                 )
             )
             if name not in variables:
