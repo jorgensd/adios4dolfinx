@@ -133,7 +133,7 @@ def read_attributes(
 
 
 def read_timestamps(
-    comm: MPI.Intracomm, filename: typing.Union[Path, str], function_name: str, engine="BP4"
+    filename: typing.Union[Path, str], comm: MPI.Intracomm, function_name: str, engine="BP4"
 ) -> npt.NDArray[np.float64]:
     """
     Read time-stamps from a checkpoint file.
@@ -377,6 +377,24 @@ def read_function(
     adios = adios2.ADIOS(comm)
     if name is None:
         name = u.name
+
+    # Check that file contains the function to read
+    with ADIOSFile(
+        adios=adios,
+        filename=filename,
+        mode=adios2.Mode.Read,
+        engine=engine,
+        io_name="FunctionReader",
+    ) as adios_file:
+        variables = set(
+            map(
+                lambda x: x.split("_time")[0],
+                filter(lambda x: x.endswith("_time"), adios_file.io.AvailableVariables()),
+            )
+        )
+        if name not in variables:
+            raise KeyError(f"{name} not found in {filename}. Did you mean one of {variables}?")
+
     # ----------------------Step 1---------------------------------
     # Compute index of input cells and get cell permutation
     num_owned_cells = mesh.topology.index_map(mesh.topology.dim).size_local

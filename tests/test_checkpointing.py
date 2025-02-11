@@ -225,3 +225,21 @@ def test_read_write_P_3D_time(
 def test_read_nonexisting_file_raises_FileNotFoundError(func, args):
     with pytest.raises(FileNotFoundError):
         func(*args)
+
+
+def test_read_function_with_invalid_name_raises_KeyError(tmp_path):
+    comm = MPI.COMM_WORLD
+    f_path = comm.bcast(tmp_path, root=0)
+    filename = f_path / "func.bp"
+    mesh = dolfinx.mesh.create_unit_square(comm, 10, 10, cell_type=dolfinx.mesh.CellType.triangle)
+    V = dolfinx.fem.functionspace(mesh, ("P", 1))
+    u = dolfinx.fem.Function(V)
+    adios4dolfinx.write_function(filename, u, time=0, name="some_name")
+    adios4dolfinx.write_function(filename, u, time=0, name="some_other_name")
+    with pytest.raises(KeyError) as e:
+        adios4dolfinx.read_function(filename, u, time=0, name="nonexisting_name")
+
+    assert e.value.args[0] == (
+        f"nonexisting_name not found in {filename}. "
+        "Did you mean one of {'some_other_name', 'some_name'}?"
+    )
