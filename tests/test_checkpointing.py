@@ -241,5 +241,5 @@ def test_read_function_with_invalid_name_raises_KeyError(tmp_path):
 
     assert e.value.args[0] == (
         f"nonexisting_name not found in {filename}. "
-        "Did you mean one of {'some_other_name', 'some_name'}?"
+        "Did you mean one of {'some_name', 'some_other_name'}?"
     )
