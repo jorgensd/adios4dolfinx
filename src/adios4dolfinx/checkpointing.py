@@ -379,21 +379,22 @@ def read_function(
         name = u.name
 
     # Check that file contains the function to read
-    with ADIOSFile(
-        adios=adios,
-        filename=filename,
-        mode=adios2.Mode.Read,
-        engine=engine,
-        io_name="FunctionReader",
-    ) as adios_file:
-        variables = set(
-            map(
-                lambda x: x.split("_time")[0],
-                filter(lambda x: x.endswith("_time"), adios_file.io.AvailableVariables()),
+    if not legacy:
+        with ADIOSFile(
+            adios=adios,
+            filename=filename,
+            mode=adios2.Mode.Read,
+            engine=engine,
+            io_name="FunctionReader",
+        ) as adios_file:
+            variables = set(
+                map(
+                    lambda x: x.split("_time")[0],
+                    filter(lambda x: x.endswith("_time"), adios_file.io.AvailableVariables()),
+                )
             )
-        )
-        if name not in variables:
-            raise KeyError(f"{name} not found in {filename}. Did you mean one of {variables}?")
+            if name not in variables:
+                raise KeyError(f"{name} not found in {filename}. Did you mean one of {variables}?")
 
     # ----------------------Step 1---------------------------------
     # Compute index of input cells and get cell permutation
