@@ -15,6 +15,7 @@ import adios2
 import basix
 import dolfinx
 import numpy as np
+import numpy.typing as npt
 import ufl
 
 from .adios2_helpers import (
@@ -54,6 +55,12 @@ __all__ = [
     "read_attributes",
     "write_attributes",
 ]
+
+
+def check_file_exists(filename: typing.Union[Path, str]):
+    """Check if file exists."""
+    if not Path(filename).exists():
+        raise FileNotFoundError(f"{filename} not found")
 
 
 def write_attributes(
@@ -106,6 +113,7 @@ def read_attributes(
     Returns:
         The attributes
     """
+    check_file_exists(filename)
     adios = adios2.ADIOS(comm)
     with ADIOSFile(
         adios=adios,
@@ -122,6 +130,49 @@ def read_attributes(
                 attributes[k[len(name) + 1 :]] = a.Data()
         adios_file.file.EndStep()
     return attributes
+
+
+def read_timestamps(
+    comm: MPI.Intracomm, filename: typing.Union[Path, str], function_name: str, engine="BP4"
+) -> npt.NDArray[np.float64]:
+    """
+    Read time-stamps from a checkpoint file.
+
+    Args:
+        comm: MPI communicator
+        filename: Path to file
+        function_name: Name of the function to read time-stamps for
+        engine: ADIOS2 engine
+    Returns:
+        The time-stamps
+    """
+    check_file_exists(filename)
+    adios = adios2.ADIOS(comm)
+
+    with ADIOSFile(
+        adios=adios,
+        filename=filename,
+        mode=adios2.Mode.Read,
+        engine=engine,
+        io_name="TimestepReader",
+    ) as adios_file:
+        time_name = f"{function_name}_time"
+        time_stamps = []
+        for i in range(adios_file.file.Steps()):
+            adios_file.file.BeginStep()
+            if time_name in adios_file.io.AvailableVariables().keys():
+                arr = adios_file.io.InquireVariable(time_name)
+                time_shape = arr.Shape()
+                arr.SetSelection([[0], [time_shape[0]]])
+                times = np.empty(
+                    time_shape[0],
+                    dtype=adios_to_numpy_dtype[arr.Type()],
+                )
+                adios_file.file.Get(arr, times, adios2.Mode.Sync)
+                time_stamps.append(times[0])
+            adios_file.file.EndStep()
+
+    return np.array(time_stamps)
 
 
 def write_meshtags(
@@ -220,6 +271,7 @@ def read_meshtags(
     Returns:
         The meshtags
     """
+    check_file_exists(filename)
     adios = adios2.ADIOS(mesh.comm)
     with ADIOSFile(
         adios=adios,
@@ -319,6 +371,7 @@ def read_function(
         legacy: If checkpoint is from prior to time-dependent writing set to True
         name: If not provided, `u.name` is used to search through the input file for the function
     """
+    check_file_exists(filename)
     mesh = u.function_space.mesh
     comm = mesh.comm
     adios = adios2.ADIOS(comm)
@@ -460,6 +513,7 @@ def read_mesh_data(
     Returns:
         The mesh topology, geometry, UFL domain and partition function
     """
+    check_file_exists(filename)
     adios = adios2.ADIOS(comm)
 
     with ADIOSFile(
@@ -596,6 +650,7 @@ def read_mesh(
     Returns:
         The distributed mesh
     """
+    check_file_exists(filename)
     return dolfinx.mesh.create_mesh(
         comm,
         *read_mesh_data(
