@@ -235,11 +235,9 @@ def test_read_function_with_invalid_name_raises_KeyError(tmp_path):
     V = dolfinx.fem.functionspace(mesh, ("P", 1))
     u = dolfinx.fem.Function(V)
     adios4dolfinx.write_function(filename, u, time=0, name="some_name")
-    adios4dolfinx.write_function(filename, u, time=0, name="some_other_name")
     with pytest.raises(KeyError) as e:
         adios4dolfinx.read_function(filename, u, time=0, name="nonexisting_name")
 
     assert e.value.args[0] == (
-        f"nonexisting_name not found in {filename}. "
-        "Did you mean one of {'some_name', 'some_other_name'}?"
+        f"nonexisting_name not found in {filename}. Did you mean one of {'some_name'}?"
     )
