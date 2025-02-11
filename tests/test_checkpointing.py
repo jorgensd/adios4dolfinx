@@ -8,6 +8,8 @@ import dolfinx
 import numpy as np
 import pytest
 
+import adios4dolfinx
+
 dtypes = [np.float64, np.float32]  # Mesh geometry dtypes
 write_comm = [MPI.COMM_SELF, MPI.COMM_WORLD]  # Communicators for creating mesh
 
@@ -208,3 +210,18 @@ def test_read_write_P_3D_time(
     hash = write_function_time_dep(mesh, el, g, f, t0, t1, f_dtype)
     MPI.COMM_WORLD.Barrier()
     read_function_time_dep(read_comm, el, g, f, t0, t1, hash, f_dtype)
+
+
+@pytest.mark.parametrize(
+    "func, args",
+    [
+        (adios4dolfinx.read_attributes, ("nonexisting_file.bp", MPI.COMM_WORLD, "")),
+        (adios4dolfinx.read_timestamps, ("nonexisting_file.bp", MPI.COMM_WORLD, "")),
+        (adios4dolfinx.read_meshtags, ("nonexisting_file.bp", MPI.COMM_WORLD, None, "")),
+        (adios4dolfinx.read_function, ("nonexisting_file.bp", None)),
+        (adios4dolfinx.read_mesh, ("nonexisting_file.bp", MPI.COMM_WORLD)),
+    ],
+)
+def test_read_nonexisting_file_raises_FileNotFoundError(func, args):
+    with pytest.raises(FileNotFoundError):
+        func(*args)
