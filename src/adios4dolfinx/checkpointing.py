@@ -10,7 +10,6 @@ import typing
 from pathlib import Path
 
 from mpi4py import MPI
-from packaging.version import Version
 
 import adios2
 import basix
@@ -18,6 +17,7 @@ import dolfinx
 import numpy as np
 import numpy.typing as npt
 import ufl
+from packaging.version import Version
 
 from .adios2_helpers import (
     ADIOSFile,
@@ -643,9 +643,9 @@ def read_mesh_data(
         def partitioner(comm: MPI.Intracomm, n, m, topo):
             assert len(topo[0]) % (len(partition_graph.offsets) - 1) == 0
             if Version(dolfinx.__version__) > Version("0.9.0"):
-              return partition_graph._cpp_object
+                return partition_graph._cpp_object
             else:
-              return partition_graph
+                return partition_graph
     else:
         partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)
 

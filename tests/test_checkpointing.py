@@ -244,6 +244,7 @@ def test_read_function_with_invalid_name_raises_KeyError(tmp_path):
         f"nonexisting_name not found in {filename}. Did you mean one of {variables}?"
     )
 
+
 def test_read_timestamps(get_dtype, mesh_2D, tmp_path):
     mesh = mesh_2D
     dtype = get_dtype(mesh.geometry.x.dtype, False)
