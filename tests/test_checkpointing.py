@@ -212,6 +212,39 @@ def test_read_write_P_3D_time(
     read_function_time_dep(read_comm, el, g, f, t0, t1, hash, f_dtype)
 
 
+@pytest.mark.parametrize(
+    "func, args",
+    [
+        (adios4dolfinx.read_attributes, ("nonexisting_file.bp", MPI.COMM_WORLD, "")),
+        (adios4dolfinx.read_timestamps, ("nonexisting_file.bp", MPI.COMM_WORLD, "")),
+        (adios4dolfinx.read_meshtags, ("nonexisting_file.bp", MPI.COMM_WORLD, None, "")),
+        (adios4dolfinx.read_function, ("nonexisting_file.bp", None)),
+        (adios4dolfinx.read_mesh, ("nonexisting_file.bp", MPI.COMM_WORLD)),
+    ],
+)
+def test_read_nonexisting_file_raises_FileNotFoundError(func, args):
+    with pytest.raises(FileNotFoundError):
+        func(*args)
+
+
+def test_read_function_with_invalid_name_raises_KeyError(tmp_path):
+    comm = MPI.COMM_WORLD
+    f_path = comm.bcast(tmp_path, root=0)
+    filename = f_path / "func.bp"
+    mesh = dolfinx.mesh.create_unit_square(comm, 10, 10, cell_type=dolfinx.mesh.CellType.triangle)
+    V = dolfinx.fem.functionspace(mesh, ("P", 1))
+    u = dolfinx.fem.Function(V)
+    adios4dolfinx.write_function(filename, u, time=0, name="some_name")
+    adios4dolfinx.write_function(filename, u, time=0, name="some_other_name")
+    variables = set(sorted(["some_name", "some_other_name"]))
+    with pytest.raises(KeyError) as e:
+        adios4dolfinx.read_function(filename, u, time=0, name="nonexisting_name")
+
+    assert e.value.args[0] == (
+        f"nonexisting_name not found in {filename}. Did you mean one of {variables}?"
+    )
+
+
 def test_read_timestamps(get_dtype, mesh_2D, tmp_path):
     mesh = mesh_2D
     dtype = get_dtype(mesh.geometry.x.dtype, False)

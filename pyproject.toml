@@ -3,12 +3,12 @@ requires = ["setuptools>=61.0.0", "wheel"]
 
 [project]
 name = "adios4dolfinx"
-version = "0.9.0.dev0"
+version = "0.9.2"
 description = "Checkpointing functionality for DOLFINx meshes/functions with ADIOS2"
 authors = [{ name = "Jørgen S. Dokken", email = "dokken@simula.no" }]
 license = { file = "LICENSE" }
 readme = "README.md"
-dependencies = ["fenics-dolfinx>0.9.0"]
+dependencies = ["fenics-dolfinx>0.9.0", "packaging"]
 
 [project.optional-dependencies]
 test = ["pytest", "coverage", "ipyparallel"]

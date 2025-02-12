@@ -17,6 +17,7 @@ import dolfinx
 import numpy as np
 import numpy.typing as npt
 import ufl
+from packaging.version import Version
 
 from .adios2_helpers import (
     ADIOSFile,
@@ -55,6 +56,12 @@ __all__ = [
     "read_attributes",
     "write_attributes",
 ]
+
+
+def check_file_exists(filename: typing.Union[Path, str]):
+    """Check if file exists."""
+    if not Path(filename).exists():
+        raise FileNotFoundError(f"{filename} not found")
 
 
 def write_attributes(
@@ -107,6 +114,7 @@ def read_attributes(
     Returns:
         The attributes
     """
+    check_file_exists(filename)
     adios = adios2.ADIOS(comm)
     with ADIOSFile(
         adios=adios,
@@ -126,7 +134,7 @@ def read_attributes(
 
 
 def read_timestamps(
-    comm: MPI.Intracomm, filename: typing.Union[Path, str], function_name: str, engine="BP4"
+    filename: typing.Union[Path, str], comm: MPI.Intracomm, function_name: str, engine="BP4"
 ) -> npt.NDArray[np.float64]:
     """
     Read time-stamps from a checkpoint file.
@@ -139,6 +147,7 @@ def read_timestamps(
     Returns:
         The time-stamps
     """
+    check_file_exists(filename)
 
     adios = adios2.ADIOS(comm)
 
@@ -264,6 +273,7 @@ def read_meshtags(
     Returns:
         The meshtags
     """
+    check_file_exists(filename)
     adios = adios2.ADIOS(mesh.comm)
     with ADIOSFile(
         adios=adios,
@@ -363,11 +373,33 @@ def read_function(
         legacy: If checkpoint is from prior to time-dependent writing set to True
         name: If not provided, `u.name` is used to search through the input file for the function
     """
+    check_file_exists(filename)
     mesh = u.function_space.mesh
     comm = mesh.comm
     adios = adios2.ADIOS(comm)
     if name is None:
         name = u.name
+
+    # Check that file contains the function to read
+    if not legacy:
+        with ADIOSFile(
+            adios=adios,
+            filename=filename,
+            mode=adios2.Mode.Read,
+            engine=engine,
+            io_name="FunctionReader",
+        ) as adios_file:
+            variables = set(
+                sorted(
+                    map(
+                        lambda x: x.split("_time")[0],
+                        filter(lambda x: x.endswith("_time"), adios_file.io.AvailableVariables()),
+                    )
+                )
+            )
+            if name not in variables:
+                raise KeyError(f"{name} not found in {filename}. Did you mean one of {variables}?")
+
     # ----------------------Step 1---------------------------------
     # Compute index of input cells and get cell permutation
     num_owned_cells = mesh.topology.index_map(mesh.topology.dim).size_local
@@ -504,6 +536,7 @@ def read_mesh_data(
     Returns:
         The mesh topology, geometry, UFL domain and partition function
     """
+    check_file_exists(filename)
     adios = adios2.ADIOS(comm)
 
     with ADIOSFile(
@@ -609,7 +642,10 @@ def read_mesh_data(
 
         def partitioner(comm: MPI.Intracomm, n, m, topo):
             assert len(topo[0]) % (len(partition_graph.offsets) - 1) == 0
-            return partition_graph._cpp_object
+            if Version(dolfinx.__version__) > Version("0.9.0"):
+                return partition_graph._cpp_object
+            else:
+                return partition_graph
     else:
         partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)
 
@@ -640,6 +676,7 @@ def read_mesh(
     Returns:
         The distributed mesh
     """
+    check_file_exists(filename)
     return dolfinx.mesh.create_mesh(
         comm,
         *read_mesh_data(
