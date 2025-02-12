@@ -128,8 +128,7 @@ def write_function_original(
     uh.interpolate(f)
     uh.name = name
     el_hash = (
-        V.element.signature()
-        .replace(" ", "")
+        V.element.signature.replace(" ", "")
         .replace(",", "")
         .replace("(", "")
         .replace(")", "")
@@ -219,8 +218,7 @@ def write_function_vector(
     uh.interpolate(f)
     uh.name = name
     el_hash = (
-        V.element.signature()
-        .replace(" ", "")
+        V.element.signature.replace(" ", "")
         .replace(",", "")
         .replace("(", "")
         .replace(")", "")

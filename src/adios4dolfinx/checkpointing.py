@@ -10,6 +10,7 @@ import typing
 from pathlib import Path
 
 from mpi4py import MPI
+from packaging.version import Version
 
 import adios2
 import basix
@@ -147,6 +148,7 @@ def read_timestamps(
         The time-stamps
     """
     check_file_exists(filename)
+
     adios = adios2.ADIOS(comm)
 
     with ADIOSFile(
@@ -210,7 +212,7 @@ def write_meshtags(
     num_dofs_per_entity = dof_layout.num_entity_closure_dofs(dim)
 
     entities_to_geometry = dolfinx.cpp.mesh.entities_to_geometry(
-        mesh._cpp_object, dim, tag_entities, False
+        mesh._cpp_object, dim, local_tag_entities, False
     )
 
     indices = mesh.geometry.index_map().local_to_global(entities_to_geometry.reshape(-1))
@@ -342,7 +344,7 @@ def read_meshtags(
     mesh.topology.create_connectivity(dim, 0)
     mesh.topology.create_connectivity(dim, mesh.topology.dim)
 
-    adj = dolfinx.cpp.graph.AdjacencyList_int32(local_entities)
+    adj = dolfinx.graph.adjacencylist(local_entities)
 
     local_values = np.array(local_values, dtype=np.int32)
 
@@ -640,7 +642,10 @@ def read_mesh_data(
 
         def partitioner(comm: MPI.Intracomm, n, m, topo):
             assert len(topo[0]) % (len(partition_graph.offsets) - 1) == 0
-            return partition_graph
+            if Version(dolfinx.__version__) > Version("0.9.0"):
+              return partition_graph._cpp_object
+            else:
+              return partition_graph
     else:
         partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)
 
@@ -729,7 +734,8 @@ def write_mesh(
         partition_processes = mesh.comm.size
 
         # Get partitioning
-        cell_map = mesh.topology.index_map(mesh.topology.dim).index_to_dest_ranks()
+        consensus_tag = 1202
+        cell_map = mesh.topology.index_map(mesh.topology.dim).index_to_dest_ranks(consensus_tag)
         num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
         cell_offsets = cell_map.offsets[: num_cells_local + 1]
         if cell_offsets[-1] == 0:
