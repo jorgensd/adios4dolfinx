@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import typing
 
+from packaging.version import Version
 from mpi4py import MPI
 
 import dolfinx
@@ -29,6 +30,12 @@ __all__ = [
 
 valid_function_types = typing.Union[np.float32, np.float64, np.complex64, np.complex128]
 valid_real_types = typing.Union[np.float32, np.float64]
+
+def element_signature(V):
+    if Version(dolfinx.__version__) > Version("0.9.0"):
+        return V.element.signature
+    else:
+        return V.element.signature()
 
 
 def compute_insert_position(
