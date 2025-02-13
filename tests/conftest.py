@@ -9,7 +9,6 @@ import pytest
 import adios4dolfinx
 
 
-
 @pytest.fixture(scope="module")
 def cluster():
     cluster = ipp.Cluster(engines="mpi", n=2)
@@ -26,7 +25,8 @@ def write_function(tmp_path):
         uh.interpolate(f)
         uh.name = name
         el_hash = (
-            adios4dolfinx.utils.element_signature(V).replace(" ", "")
+            adios4dolfinx.utils.element_signature(V)
+            .replace(" ", "")
             .replace(",", "")
             .replace("(", "")
             .replace(")", "")
@@ -98,7 +98,8 @@ def write_function_time_dep(tmp_path):
         uh = dolfinx.fem.Function(V, dtype=dtype)
         uh.interpolate(f0)
         el_hash = (
-            adios4dolfinx.utils.element_signature(V).replace(" ", "")
+            adios4dolfinx.utils.element_signature(V)
+            .replace(" ", "")
             .replace(",", "")
             .replace("(", "")
             .replace(")", "")

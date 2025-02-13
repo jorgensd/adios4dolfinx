@@ -128,7 +128,8 @@ def write_function_original(
     uh.interpolate(f)
     uh.name = name
     el_hash = (
-        adios4dolfinx.utils.element_signature(V).replace(" ", "")
+        adios4dolfinx.utils.element_signature(V)
+        .replace(" ", "")
         .replace(",", "")
         .replace("(", "")
         .replace(")", "")
@@ -218,7 +219,8 @@ def write_function_vector(
     uh.interpolate(f)
     uh.name = name
     el_hash = (
-        adios4dolfinx.utils.element_signature(V).replace(" ", "")
+        adios4dolfinx.utils.element_signature(V)
+        .replace(" ", "")
         .replace(",", "")
         .replace("(", "")
         .replace(")", "")
