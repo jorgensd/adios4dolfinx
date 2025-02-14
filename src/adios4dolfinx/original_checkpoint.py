@@ -178,6 +178,9 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     assert local_node_range[1] - local_node_range[0] == geometry.shape[0]
     cmap = mesh.geometry.cmap
 
+    cell_to_output_comm.Free()
+    geometry_to_owner_comm.Free()
+
     # NOTE: Could in theory store partitioning information, but would not work nicely
     # as one would need to read this data rather than the xdmffile.
     return MeshData(
@@ -312,6 +315,7 @@ def create_function_data_on_original_mesh(
     num_dofs_global = dofmap.index_map.size_global * dofmap.index_map_bs
     local_range = np.asarray(dofmap.index_map.local_range, dtype=np.int64) * dofmap.index_map_bs
     func_name = name if name is not None else u.name
+    cell_to_output_comm.Free()
     return FunctionData(
         cell_permutations=cell_permutation_info,
         local_cell_range=local_cell_range,
