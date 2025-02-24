@@ -21,9 +21,9 @@ import numpy as np
 import adios4dolfinx
 
 a4d_version = version("adios4dolfinx")
-assert (
-    a4d_version < "0.7.2"
-), f"Creating a legacy checkpoint requires adios4dolfinx < 0.7.2, you have {a4d_version}."
+assert a4d_version < "0.7.2", (
+    f"Creating a legacy checkpoint requires adios4dolfinx < 0.7.2, you have {a4d_version}."
+)
 
 
 def f(x):
