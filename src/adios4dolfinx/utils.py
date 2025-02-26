@@ -17,6 +17,7 @@ from mpi4py import MPI
 import dolfinx
 import numpy as np
 import numpy.typing as npt
+from packaging.version import Version
 
 __all__ = [
     "compute_local_range",
@@ -29,6 +30,13 @@ __all__ = [
 
 valid_function_types = typing.Union[np.float32, np.float64, np.complex64, np.complex128]
 valid_real_types = typing.Union[np.float32, np.float64]
+
+
+def element_signature(V):
+    if Version(dolfinx.__version__) > Version("0.9.0"):
+        return V.element.signature
+    else:
+        return V.element.signature()
 
 
 def compute_insert_position(
