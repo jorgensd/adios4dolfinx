@@ -288,7 +288,7 @@ def test_read_timestamps(get_dtype, mesh_2D, tmp_path):
 
 def test_write_submesh():
     comm = MPI.COMM_WORLD
-    mesh = dolfinx.mesh.create_unit_square(comm, 100, 100)
+    mesh = dolfinx.mesh.create_unit_square(comm, 50, 50, ghost_mode=dolfinx.mesh.GhostMode.shared_facet)
 
 
     def locate_cells(x):
@@ -296,22 +296,40 @@ def test_write_submesh():
     dim = mesh.topology.dim-1
     cells = dolfinx.mesh.locate_entities(mesh, dim, locate_cells)
 
-    submesh, cell_map, _, _ = dolfinx.mesh.create_submesh(mesh,dim, cells)
+    submesh, cell_map, _, node_map= dolfinx.mesh.create_submesh(mesh,dim, cells)
+
+    local_range = submesh.topology.index_map(submesh.topology.dim).local_range
+    num_subcells_local = submesh.topology.index_map(submesh.topology.dim).size_local
+    ft = dolfinx.mesh.meshtags(submesh, submesh.topology.dim, np.arange(num_subcells_local, dtype=np.int32), np.arange(local_range[0], local_range[1], dtype=np.int32))
+    with dolfinx.io.XDMFFile(comm, "submesh_pre_checkpoint.xdmf", "w") as xdmf:
+        xdmf.write_mesh(submesh)
+        xdmf.write_meshtags(ft, submesh.geometry)
+
     import adios4dolfinx
     import adios2
     from pathlib import Path
     adios2 = adios4dolfinx.adios2_helpers.resolve_adios_scope(adios2)
     outfile = Path("submesh.bp")
     adios4dolfinx.write_mesh(outfile, mesh, name="mesh")
-    adios4dolfinx.write_mesh(outfile, submesh,mode=adios2.Mode.Append ,name="submesh")
-    submesh.geometry.x[:,0] += 0.1*np.sin(submesh.geometry.x[:,0])
-    adios4dolfinx.write_mesh(outfile, submesh, time = 2, mode=adios2.Mode.Append ,name="submesh")
-    adios4dolfinx.checkpointing.write_submesh_relation(outfile, mesh, submesh,"mesh", "submesh", cell_map)
+    #adios4dolfinx.write_mesh(outfile, submesh,mode=adios2.Mode.Append ,name="submesh")
 
+    #adios4dolfinx.write_mesh(outfile, submesh, time = 2, mode=adios2.Mode.Append ,name="submesh")
+    #adios4dolfinx.checkpointing.write_submesh_relation(outfile, mesh, submesh,"mesh", "submesh", cell_map)
+    adios4dolfinx.checkpointing.write_submesh(outfile, mesh, submesh, "submesh", node_map)
+
+    mesh.comm.Barrier()
+    new_mesh = adios4dolfinx.read_mesh(outfile, comm, name="mesh")
+    new_submesh, cell_map, _,_, input_indices = adios4dolfinx.checkpointing.read_submesh(outfile, new_mesh, "submesh")
+
+    num_cells_local = new_submesh.topology.index_map(new_submesh.topology.dim).size_local
+    sub_tag = dolfinx.mesh.meshtags(new_submesh,new_submesh.topology.dim, np.arange(num_cells_local, dtype=np.int32), input_indices[:num_cells_local].astype(np.int32))
+    with dolfinx.io.XDMFFile(comm, "submesh_after_checkpoint.xdmf", "w") as xdmf:
+        xdmf.write_mesh(new_submesh)
+        xdmf.write_meshtags(sub_tag, new_submesh.geometry)
     # print(mesh.topology.index_map(mesh.topology.dim).local_to_global(cell_map))
-    if MPI.COMM_WORLD.rank == 0:
-        comm = MPI.COMM_SELF
-        new_submesh = adios4dolfinx.read_mesh(outfile, comm, name="submesh", time=2)
+    # if MPI.COMM_WORLD.rank == 0:
+    #     comm = MPI.COMM_SELF
+    #     new_submesh = adios4dolfinx.read_mesh(outfile, comm, name="submesh", time=2)
 
-        with dolfinx.io.XDMFFile(comm, "new_submesh.xdmf", "w") as xdmf:
-            xdmf.write_mesh(new_submesh)
+    #     with dolfinx.io.XDMFFile(comm, "new_submesh.xdmf", "w") as xdmf:
+    #         xdmf.write_mesh(new_submesh)

@@ -933,3 +933,127 @@ def write_submesh_relation(
             )
         adios_file.file.Put(map_var, global_map)
         adios_file.file.PerformPuts()
+
+
+def write_submesh(filename:Path, mesh:dolfinx.mesh.Mesh, submesh:dolfinx.mesh.Mesh, name:str, node_map:npt.NDArray[np.int32],mode:adios2.Mode=adios2.Mode.Append, engine="BP5"):
+    """
+    Write submesh to file as parent mesh original indices    
+    """
+
+    # Need to map submesh geometry to parent geometry
+    submesh_geometry_dm = submesh.geometry.dofmap
+    parent_geometry_dm = node_map[submesh_geometry_dm]
+    global_parent_dm = mesh.geometry.index_map().local_to_global(parent_geometry_dm.flatten())
+    global_parent_dm = global_parent_dm.reshape(submesh_geometry_dm.shape)
+    
+    
+    # Get insert position for submesh "topology" in parent mesh
+    sub_cell_dim = submesh.topology.dim
+    submesh_cell_map = submesh.topology.index_map(sub_cell_dim)
+    submesh_cell_insert_pos = submesh_cell_map.local_range[0]
+    num_submesh_cells = submesh_cell_map.size_global
+    num_local_cells = submesh_cell_map.size_local
+
+    io_name = "SubMeshWriter"
+    # Write map
+    adios = adios2.ADIOS(submesh.comm)
+    with ADIOSFile(
+        adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name
+    ) as adios_file:
+        adios_file.file.BeginStep()
+
+        submesh_var = adios_file.io.DefineVariable(
+            f"{name}_sub_topology",
+                global_parent_dm,
+                shape=[num_submesh_cells, submesh_geometry_dm.shape[1]],
+                start=[submesh_cell_insert_pos,0],
+                count=[num_local_cells, submesh_geometry_dm.shape[1]]
+            )
+        adios_file.file.Put(submesh_var, global_parent_dm)
+        adios_file.io.DefineAttribute(f"{name}_dim", sub_cell_dim)
+
+        adios_file.file.PerformPuts()
+
+
+def read_submesh(filename:Path, mesh:dolfinx.mesh.Mesh, name:str,engine="BP5"):
+
+    check_file_exists(filename)
+    adios = adios2.ADIOS(mesh.comm)
+    with ADIOSFile(
+        adios=adios,
+        filename=filename,
+        mode=adios2.Mode.Read,
+        engine=engine,
+        io_name="MeshTagsReader",
+    ) as adios_file:
+        # Get mesh cell type
+        dim_attr_name = f"{name}_dim"
+        step = 0
+        for i in range(adios_file.file.Steps()):
+            adios_file.file.BeginStep()
+            if dim_attr_name in adios_file.io.AvailableAttributes().keys():
+                step = i
+                break
+            adios_file.file.EndStep()
+        if dim_attr_name not in adios_file.io.AvailableAttributes().keys():
+            raise KeyError(f"{dim_attr_name} not found in {filename}")
+
+        m_dim = adios_file.io.InquireAttribute(dim_attr_name)
+        dim = int(m_dim.Data()[0])
+
+        # Get mesh tags entites
+        topology_name = f"{name}_sub_topology"
+        for i in range(step, adios_file.file.Steps()):
+            if i > step:
+                adios_file.file.BeginStep()
+            if topology_name in adios_file.io.AvailableVariables().keys():
+                break
+            adios_file.file.EndStep()
+        if topology_name not in adios_file.io.AvailableVariables().keys():
+            raise KeyError(f"{topology_name} not found in {filename}")
+
+        topology = adios_file.io.InquireVariable(topology_name)
+        top_shape = topology.Shape()
+        topology_range = compute_local_range(mesh.comm, top_shape[0])
+        topology.SetSelection(
+            [
+                [topology_range[0], 0],
+                [topology_range[1] - topology_range[0], top_shape[1]],
+            ]
+        )
+        mesh_entities = np.empty(
+            (topology_range[1] - topology_range[0], top_shape[1]), dtype=np.int64
+        )
+        adios_file.file.Get(topology, mesh_entities, adios2.Mode.Deferred)
+
+
+        adios_file.file.PerformGets()
+        adios_file.file.EndStep()
+
+    tag_values = np.arange(topology_range[0], topology_range[1], dtype=np.int32)
+    # NOTE: Need to expose int64 in dolfixn for this to work.
+    local_entities, local_values = dolfinx.io.distribute_entity_data(
+        mesh, int(dim), mesh_entities.astype(np.int32), tag_values
+    )
+
+
+    mesh.topology.create_connectivity(dim, 0)
+    mesh.topology.create_connectivity(dim, mesh.topology.dim)
+
+    adj = dolfinx.graph.adjacencylist(local_entities)
+
+    local_values = np.array(local_values, dtype=np.int32)
+    mt = dolfinx.mesh.meshtags_from_entities(mesh, int(dim), adj, local_values)
+
+    # Given the parent mesh entities and their input index, we can create a submesh
+    entity_map = mesh.topology.index_map(dim)
+    vec = dolfinx.la.vector(entity_map, dtype=np.int64)
+    vec.array[:] = -1
+    vec.array[mt.indices] = mt.values
+    vec.scatter_forward()
+    submesh_cells =  np.flatnonzero(vec.array >=0)
+    submesh, cell_map, vertex_map, node_map = dolfinx.mesh.create_submesh(mesh, dim, submesh_cells)
+    submesh_input_indices = vec.array[cell_map]
+    return submesh, cell_map, vertex_map, node_map, submesh_input_indices
+
+
