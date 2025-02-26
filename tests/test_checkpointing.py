@@ -1,5 +1,6 @@
 import itertools
 
+import adios4dolfinx.adios2_helpers
 from mpi4py import MPI
 
 import basix
@@ -282,3 +283,35 @@ def test_read_timestamps(get_dtype, mesh_2D, tmp_path):
 
     assert np.allclose(timestamps_u, t_u)
     assert np.allclose(timestamps_v, t_v)
+
+
+
+def test_write_submesh():
+    comm = MPI.COMM_WORLD
+    mesh = dolfinx.mesh.create_unit_square(comm, 100, 100)
+
+
+    def locate_cells(x):
+        return (x[0]-0.2)**2 + (x[1]-0.2)**2 < 0.2
+    dim = mesh.topology.dim-1
+    cells = dolfinx.mesh.locate_entities(mesh, dim, locate_cells)
+
+    submesh, cell_map, _, _ = dolfinx.mesh.create_submesh(mesh,dim, cells)
+    import adios4dolfinx
+    import adios2
+    from pathlib import Path
+    adios2 = adios4dolfinx.adios2_helpers.resolve_adios_scope(adios2)
+    outfile = Path("submesh.bp")
+    adios4dolfinx.write_mesh(outfile, mesh, name="mesh")
+    adios4dolfinx.write_mesh(outfile, submesh,mode=adios2.Mode.Append ,name="submesh")
+    submesh.geometry.x[:,0] += 0.1*np.sin(submesh.geometry.x[:,0])
+    adios4dolfinx.write_mesh(outfile, submesh, time = 2, mode=adios2.Mode.Append ,name="submesh")
+    adios4dolfinx.checkpointing.write_submesh_relation(outfile, mesh, submesh,"mesh", "submesh", cell_map)
+
+    # print(mesh.topology.index_map(mesh.topology.dim).local_to_global(cell_map))
+    if MPI.COMM_WORLD.rank == 0:
+        comm = MPI.COMM_SELF
+        new_submesh = adios4dolfinx.read_mesh(outfile, comm, name="submesh", time=2)
+
+        with dolfinx.io.XDMFFile(comm, "new_submesh.xdmf", "w") as xdmf:
+            xdmf.write_mesh(new_submesh)

@@ -23,10 +23,11 @@ def write_mesh(
     filename: Path,
     comm: MPI.Intracomm,
     mesh: MeshData,
-    engine: str = "BP4",
+    engine: str = "BP5",
     mode: adios2.Mode = adios2.Mode.Write,
     time: float = 0.0,
     io_name: str = "MeshWriter",
+    name: str = ""
 ):
     """
     Write a mesh to file using ADIOS2
@@ -38,17 +39,32 @@ def write_mesh(
         engine: ADIOS2 engine to use
         mode: ADIOS2 mode to use (write or append)
         io_name: Internal name used for the ADIOS IO object
+        name: Prefix to mesh data structures.
     """
-
     gdim = mesh.local_geometry.shape[1]
     adios = adios2.ADIOS(comm)
+    
+    # Check if topology has already been written to file
+    topology_exists = False
+    if mode == adios2.Mode.Append:
+        with ADIOSFile(
+            adios=adios, filename=filename, mode=adios2.Mode.Read, engine=engine, io_name=io_name
+        ) as read_file:
+            for i in range(read_file.file.Steps()):
+                read_file.file.BeginStep()
+                if f"{name}Topology" in read_file.io.AvailableVariables():
+                    topology_exists = True
+                    read_file.file.EndStep()
+                    break
+                read_file.file.EndStep()
+
     with ADIOSFile(
         adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name
     ) as adios_file:
         adios_file.file.BeginStep()
         # Write geometry
         pointvar = adios_file.io.DefineVariable(
-            "Points",
+            f"{name}Points",
             mesh.local_geometry,
             shape=[mesh.num_nodes_global, gdim],
             start=[mesh.local_geometry_pos[0], 0],
@@ -56,16 +72,16 @@ def write_mesh(
         )
         adios_file.file.Put(pointvar, mesh.local_geometry, adios2.Mode.Sync)
 
-        if mode == adios2.Mode.Write:
-            adios_file.io.DefineAttribute("CellType", mesh.cell_type)
-            adios_file.io.DefineAttribute("Degree", np.array([mesh.degree], dtype=np.int32))
+        if not topology_exists:
+            adios_file.io.DefineAttribute(f"{name}CellType", mesh.cell_type)
+            adios_file.io.DefineAttribute(f"{name}Degree", np.array([mesh.degree], dtype=np.int32))
             adios_file.io.DefineAttribute(
-                "LagrangeVariant", np.array([mesh.lagrange_variant], dtype=np.int32)
+                f"{name}LagrangeVariant", np.array([mesh.lagrange_variant], dtype=np.int32)
             )
             # Write topology (on;y on first write as topology is constant)
             num_dofs_per_cell = mesh.local_topology.shape[1]
             dvar = adios_file.io.DefineVariable(
-                "Topology",
+                f"{name}Topology",
                 mesh.local_topology,
                 shape=[mesh.num_cells_global, num_dofs_per_cell],
                 start=[mesh.local_topology_pos[0], 0],
@@ -80,7 +96,7 @@ def write_mesh(
             if mesh.store_partition:
                 assert mesh.partition_range is not None
                 par_data = adios_file.io.DefineVariable(
-                    "PartitioningData",
+                    f"{name}PartitioningData",
                     mesh.ownership_array,
                     shape=[mesh.partition_global],
                     start=[mesh.partition_range[0]],
@@ -91,7 +107,7 @@ def write_mesh(
                 adios_file.file.Put(par_data, mesh.ownership_array)
                 assert mesh.ownership_offset is not None
                 par_offset = adios_file.io.DefineVariable(
-                    "PartitioningOffset",
+                    f"{name}PartitioningOffset",
                     mesh.ownership_offset,
                     shape=[mesh.num_cells_global + 1],
                     start=[mesh.local_topology_pos[0]],
@@ -100,7 +116,7 @@ def write_mesh(
                 adios_file.file.Put(par_offset, mesh.ownership_offset)
                 assert mesh.partition_processes is not None
                 adios_file.io.DefineAttribute(
-                    "PartitionProcesses", np.array([mesh.partition_processes], dtype=np.int32)
+                    f"{name}PartitionProcesses", np.array([mesh.partition_processes], dtype=np.int32)
                 )
         if mode == adios2.Mode.Append and mesh.store_partition:
             warnings.warn("Partitioning data is not written in append mode")
@@ -108,7 +124,7 @@ def write_mesh(
         # Add time step to file
         t_arr = np.array([time], dtype=np.float64)
         time_var = adios_file.io.DefineVariable(
-            "MeshTime",
+            f"{name}MeshTime",
             t_arr,
             shape=[1],
             start=[0],
@@ -124,7 +140,7 @@ def write_function(
     filename: Path,
     comm: MPI.Intracomm,
     u: FunctionData,
-    engine: str = "BP4",
+    engine: str = "BP5",
     mode: adios2.Mode = adios2.Mode.Append,
     time: float = 0.0,
     io_name: str = "FunctionWriter",
