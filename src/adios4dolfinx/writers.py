@@ -143,6 +143,7 @@ def write_function(
     engine: str = "BP5",
     mode: adios2.Mode = adios2.Mode.Append,
     time: float = 0.0,
+    name: str = None,
     io_name: str = "FunctionWriter",
 ):
     """
@@ -155,17 +156,18 @@ def write_function(
         engine: ADIOS2 engine to use
         mode: ADIOS2 mode to use (write or append)
         time: Time stamp associated with function
+        name: Mesh name (to associate cell permutation with).
         io_name: Internal name used for the ADIOS IO object
     """
     adios = adios2.ADIOS(comm)
-
+    name = "" if name is None else name
     with ADIOSFile(
         adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name
     ) as adios_file:
         adios_file.file.BeginStep()
         # Add mesh permutations
         pvar = adios_file.io.DefineVariable(
-            "CellPermutations",
+            f"{name}CellPermutations",
             u.cell_permutations,
             shape=[u.num_cells_global],
             start=[u.local_cell_range[0]],

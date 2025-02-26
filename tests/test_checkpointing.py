@@ -311,16 +311,12 @@ def test_write_submesh():
     adios2 = adios4dolfinx.adios2_helpers.resolve_adios_scope(adios2)
     outfile = Path("submesh.bp")
     adios4dolfinx.write_mesh(outfile, mesh, name="mesh")
-    #adios4dolfinx.write_mesh(outfile, submesh,mode=adios2.Mode.Append ,name="submesh")
 
-    #adios4dolfinx.write_mesh(outfile, submesh, time = 2, mode=adios2.Mode.Append ,name="submesh")
-    #adios4dolfinx.checkpointing.write_submesh_relation(outfile, mesh, submesh,"mesh", "submesh", cell_map)
     adios4dolfinx.checkpointing.write_submesh(outfile, mesh, submesh, "submesh", node_map)
 
     mesh.comm.Barrier()
     new_mesh = adios4dolfinx.read_mesh(outfile, comm, name="mesh")
     new_submesh, cell_map, _,_, input_indices = adios4dolfinx.checkpointing.read_submesh(outfile, new_mesh, "submesh")
-
     num_cells_local = new_submesh.topology.index_map(new_submesh.topology.dim).size_local
     sub_tag = dolfinx.mesh.meshtags(new_submesh,new_submesh.topology.dim, np.arange(num_cells_local, dtype=np.int32), input_indices[:num_cells_local].astype(np.int32))
     with dolfinx.io.XDMFFile(comm, "submesh_after_checkpoint.xdmf", "w") as xdmf:
