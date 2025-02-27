@@ -125,13 +125,14 @@ def read_attributes(
         engine=engine,
         io_name="AttributesReader",
     ) as adios_file:
-        adios_file.file.BeginStep()
         attributes = {}
-        for k in adios_file.io.AvailableAttributes().keys():
-            if k.startswith(f"{name}_"):
-                a = adios_file.io.InquireAttribute(k)
-                attributes[k[len(name) + 1 :]] = a.Data()
-        adios_file.file.EndStep()
+        for i in range(adios_file.file.Steps()):
+            adios_file.file.BeginStep()
+            for k in adios_file.io.AvailableAttributes().keys():
+                if k.startswith(f"{name}_"):
+                    a = adios_file.io.InquireAttribute(k)
+                    attributes[k[len(name) + 1 :]] = a.Data()
+            adios_file.file.EndStep()
     return attributes
 
 
