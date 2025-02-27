@@ -44,7 +44,6 @@ from .writers import write_function as _internal_function_writer
 from .writers import write_mesh as _internal_mesh_writer
 
 adios2 = resolve_adios_scope(adios2)
-
 __all__ = [
     "read_mesh_data",
     "read_mesh",
@@ -70,6 +69,7 @@ def write_attributes(
     name: str,
     attributes: dict[str, np.ndarray],
     engine: str = "BP4",
+    mode: adios2.Mode = adios2.Mode.Append,
 ):
     """Write attributes to file using ADIOS2.
 
@@ -79,13 +79,15 @@ def write_attributes(
         name: Name of the attributes
         attributes: Dictionary of attributes to write to file
         engine: ADIOS2 engine to use
+        mode: ADIOS2 mode to use (write or append)
     """
+    assert mode in [adios2.Mode.Write, adios2.Mode.Append]
 
     adios = adios2.ADIOS(comm)
     with ADIOSFile(
         adios=adios,
         filename=filename,
-        mode=adios2.Mode.Append,
+        mode=mode,
         engine=engine,
         io_name="AttributesWriter",
     ) as adios_file:
@@ -474,9 +476,11 @@ def read_function(
         # Read input cell permutations on dofmap process
         local_input_range = compute_local_range(comm, num_cells_global)
         input_local_cell_index = inc_cells - local_input_range[0]
-        input_perms = read_cell_perms(
-            adios, comm, filename, f"{name}CellPermutations", num_cells_global, engine
-        )
+        if legacy:
+            perm_name = "CellPermutations"
+        else:
+            perm_name = f"{name}CellPermutations"
+        input_perms = read_cell_perms(adios, comm, filename, perm_name, num_cells_global, engine)
         # Start by sorting data array by cell permutation
         num_dofs_per_cell = input_dofmap.offsets[1:] - input_dofmap.offsets[:-1]
         assert np.allclose(num_dofs_per_cell, num_dofs_per_cell[0])
