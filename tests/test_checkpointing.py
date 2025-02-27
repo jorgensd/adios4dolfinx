@@ -1,20 +1,20 @@
 import itertools
-
 from pathlib import Path
 
-import adios2
-
-import adios4dolfinx
 from mpi4py import MPI
 
+import adios2
 import basix
 import basix.ufl
 import dolfinx
 import numpy as np
 import pytest
+import ufl
 
 import adios4dolfinx
 import adios4dolfinx.adios2_helpers
+
+adios2 = adios4dolfinx.adios2_helpers.resolve_adios_scope(adios2)
 
 dtypes = [np.float64, np.float32]  # Mesh geometry dtypes
 write_comm = [MPI.COMM_SELF, MPI.COMM_WORLD]  # Communicators for creating mesh
@@ -302,18 +302,8 @@ def test_write_submesh():
     dim = mesh.topology.dim
     cells = dolfinx.mesh.locate_entities(mesh, dim, locate_cells)
 
-    submesh, cell_map, _, node_map = dolfinx.mesh.create_submesh(mesh, dim, cells)
+    submesh, _, _, node_map = dolfinx.mesh.create_submesh(mesh, dim, cells)
 
-    local_range = submesh.topology.index_map(submesh.topology.dim).local_range
-    num_subcells_local = submesh.topology.index_map(submesh.topology.dim).size_local
-    ft = dolfinx.mesh.meshtags(
-        submesh,
-        submesh.topology.dim,
-        np.arange(num_subcells_local, dtype=np.int32),
-        np.arange(local_range[0], local_range[1], dtype=np.int32),
-    )
-
-    adios2 = adios4dolfinx.adios2_helpers.resolve_adios_scope(adios2)
     outfile = Path("submesh.bp")
     adios4dolfinx.write_mesh(outfile, mesh, name="mesh")
 
@@ -330,25 +320,25 @@ def test_write_submesh():
     del submesh, u_sub, mesh
 
     comm.Barrier()
-    if MPI.COMM_WORLD.rank == 0:
-        new_mesh = adios4dolfinx.read_mesh(outfile, MPI.COMM_SELF, name="mesh")
-        new_submesh, cell_map, _, _, input_indices = adios4dolfinx.checkpointing.read_submesh(
-            outfile, new_mesh, "submesh"
-        )
+    new_mesh = adios4dolfinx.read_mesh(outfile, MPI.COMM_SELF, name="mesh")
+    new_submesh, _, _, _, input_indices = adios4dolfinx.checkpointing.read_submesh(
+        outfile, new_mesh, "submesh"
+    )
 
-        V_new = dolfinx.fem.functionspace(new_submesh, ("N1curl", 2))
-        u_sub_new = dolfinx.fem.Function(V_new, name="u_sub_new")
-        adios4dolfinx.read_function(
-            outfile, u_sub_new, time=0, name="u_sub", original_cell_index=input_indices
-        )
+    V_new = dolfinx.fem.functionspace(new_submesh, ("N1curl", 2))
+    u_sub_new = dolfinx.fem.Function(V_new, name="u_sub_new")
+    adios4dolfinx.read_function(
+        outfile, u_sub_new, time=0, name="u_sub", original_cell_index=input_indices
+    )
 
-        u_ref = dolfinx.fem.Function(V_new, name="u_ref")
-        u_ref.interpolate(f)
-        import ufl
-        L2_squared = dolfinx.fem.form(ufl.inner(u_sub_new - u_ref, u_sub_new - u_ref) * ufl.dx)
-        L2_local = dolfinx.fem.assemble_scalar(L2_squared)
-        L2_global = np.sqrt(new_submesh.comm.allreduce(L2_local, op=MPI.SUM))
-        tol = 100*np.finfo(dolfinx.default_scalar_type).eps
-        np.testing.assert_allclose(L2_global, 0.0, atol=tol)
-        np.testing.assert_allclose(u_sub_new.x.array - u_ref.x.array, 0, atol=tol)
+    u_ref = dolfinx.fem.Function(V_new, name="u_ref")
+    u_ref.interpolate(f)
 
+    tol = 100 * np.finfo(dolfinx.default_scalar_type).eps
+    np.testing.assert_allclose(u_sub_new.x.array - u_ref.x.array, 0, atol=tol)
+
+    L2_squared = dolfinx.fem.form(ufl.inner(u_sub_new - u_ref, u_sub_new - u_ref) * ufl.dx)
+    L2_local = dolfinx.fem.assemble_scalar(L2_squared)
+    L2_global = np.sqrt(new_submesh.comm.allreduce(L2_local, op=MPI.SUM))
+
+    np.testing.assert_allclose(L2_global, 0.0, atol=tol)
