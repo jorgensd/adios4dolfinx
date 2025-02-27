@@ -175,11 +175,11 @@ def read_adjacency_list(
             adios_file.file.EndStep()
         if dofmap_offsets not in adios_file.io.AvailableVariables().keys():
             raise KeyError(f"Dof offsets not found at '{dofmap_offsets}' in {filename}")
-
         # Get global shape of dofmap-offset, and read in data with an overlap
         d_offsets = adios_file.io.InquireVariable(dofmap_offsets)
         shape = d_offsets.Shape()
         assert len(shape) == 1
+
         # As the offsets are one longer than the number of cells, we need to read in with an overlap
         d_offsets.SetSelection(
             [[local_cell_range[0]], [local_cell_range[1] + 1 - local_cell_range[0]]]
@@ -197,6 +197,7 @@ def read_adjacency_list(
         cell_dofs = adios_file.io.InquireVariable(dofmap)
         cell_dofs.SetSelection([[in_offsets[0]], [in_offsets[-1] - in_offsets[0]]])
         in_dofmap = np.empty(in_offsets[-1] - in_offsets[0], dtype=cell_dofs.Type().strip("_t"))
+
         adios_file.file.Get(cell_dofs, in_dofmap, adios2.Mode.Sync)
         in_offsets -= in_offsets[0]
 
