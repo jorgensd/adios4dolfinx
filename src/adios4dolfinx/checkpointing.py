@@ -474,7 +474,7 @@ def read_function(
         local_input_range = compute_local_range(comm, num_cells_global)
         input_local_cell_index = inc_cells - local_input_range[0]
         input_perms = read_cell_perms(
-            adios, comm, filename, "CellPermutations", num_cells_global, engine
+            adios, comm, filename, f"{name}CellPermutations", num_cells_global, engine
         )
         # Start by sorting data array by cell permutation
         num_dofs_per_cell = input_dofmap.offsets[1:] - input_dofmap.offsets[:-1]
@@ -1038,9 +1038,7 @@ def read_submesh(filename: Path, mesh: dolfinx.mesh.Mesh, name: str, engine="BP5
     mesh.topology.create_connectivity(dim, mesh.topology.dim)
 
     adj = dolfinx.graph.adjacencylist(local_entities)
-
-    local_values = np.array(local_values, dtype=np.int64)
-    mt = dolfinx.mesh.meshtags_from_entities(mesh, int(dim), adj, local_values)
+    mt = dolfinx.mesh.meshtags_from_entities(mesh, int(dim), adj, local_values.astype(np.int64))
 
     # Given the parent mesh entities and their input index, we can create a submesh
     entity_map = mesh.topology.index_map(dim)

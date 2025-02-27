@@ -1,5 +1,10 @@
 import itertools
 
+from pathlib import Path
+
+import adios2
+
+import adios4dolfinx
 from mpi4py import MPI
 
 import basix
@@ -307,15 +312,6 @@ def test_write_submesh():
         np.arange(num_subcells_local, dtype=np.int32),
         np.arange(local_range[0], local_range[1], dtype=np.int32),
     )
-    with dolfinx.io.XDMFFile(comm, "submesh_pre_checkpoint.xdmf", "w") as xdmf:
-        xdmf.write_mesh(submesh)
-        xdmf.write_meshtags(ft, submesh.geometry)
-
-    from pathlib import Path
-
-    import adios2
-
-    import adios4dolfinx
 
     adios2 = adios4dolfinx.adios2_helpers.resolve_adios_scope(adios2)
     outfile = Path("submesh.bp")
@@ -331,40 +327,28 @@ def test_write_submesh():
     u_sub.interpolate(f)
     adios4dolfinx.write_function(outfile, u_sub, time=0, name="u_sub")
 
-    with dolfinx.io.VTXWriter(comm, "submesh_pre_checkpoint.bp", [u_sub]) as bp:
-        bp.write(0.0)
-
     del submesh, u_sub, mesh
 
     comm.Barrier()
-    new_mesh = adios4dolfinx.read_mesh(outfile, comm, name="mesh")
-    new_submesh, cell_map, _, _, input_indices = adios4dolfinx.checkpointing.read_submesh(
-        outfile, new_mesh, "submesh"
-    )
+    if MPI.COMM_WORLD.rank == 0:
+        new_mesh = adios4dolfinx.read_mesh(outfile, MPI.COMM_SELF, name="mesh")
+        new_submesh, cell_map, _, _, input_indices = adios4dolfinx.checkpointing.read_submesh(
+            outfile, new_mesh, "submesh"
+        )
 
-    V_new = dolfinx.fem.functionspace(new_submesh, ("N1curl", 2))
-    u_sub_new = dolfinx.fem.Function(V_new, name="u_sub_new")
-    adios4dolfinx.read_function(
-        outfile, u_sub_new, time=0, name="u_sub", original_cell_index=input_indices
-    )
+        V_new = dolfinx.fem.functionspace(new_submesh, ("N1curl", 2))
+        u_sub_new = dolfinx.fem.Function(V_new, name="u_sub_new")
+        adios4dolfinx.read_function(
+            outfile, u_sub_new, time=0, name="u_sub", original_cell_index=input_indices
+        )
 
-    # num_cells_local = new_submesh.topology.index_map(new_submesh.topology.dim).size_local
-    # sub_tag = dolfinx.mesh.meshtags(
-    #     new_submesh,
-    #     new_submesh.topology.dim,
-    #     np.arange(num_cells_local, dtype=np.int32),
-    #     input_indices[:num_cells_local].astype(np.int32),
-    # )
+        u_ref = dolfinx.fem.Function(V_new, name="u_ref")
+        u_ref.interpolate(f)
+        import ufl
+        L2_squared = dolfinx.fem.form(ufl.inner(u_sub_new - u_ref, u_sub_new - u_ref) * ufl.dx)
+        L2_local = dolfinx.fem.assemble_scalar(L2_squared)
+        L2_global = np.sqrt(new_submesh.comm.allreduce(L2_local, op=MPI.SUM))
+        tol = 100*np.finfo(dolfinx.default_scalar_type).eps
+        np.testing.assert_allclose(L2_global, 0.0, atol=tol)
+        np.testing.assert_allclose(u_sub_new.x.array - u_ref.x.array, 0, atol=tol)
 
-    with dolfinx.io.VTXWriter(comm, "submesh_post_checkpoint.bp", [u_sub_new]) as bp:
-        bp.write(0.0)
-
-        # xdmf.write_meshtags(sub_tag, new_submesh.geometry)
-
-    # print(mesh.topology.index_map(mesh.topology.dim).local_to_global(cell_map))
-    # if MPI.COMM_WORLD.rank == 0:
-    #     comm = MPI.COMM_SELF
-    #     new_submesh = adios4dolfinx.read_mesh(outfile, comm, name="submesh", time=2)
-
-    #     with dolfinx.io.XDMFFile(comm, "new_submesh.xdmf", "w") as xdmf:
-    #         xdmf.write_mesh(new_submesh)

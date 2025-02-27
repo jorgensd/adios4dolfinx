@@ -5,9 +5,10 @@
 # SPDX-License-Identifier:    MIT
 
 
+import typing
 import warnings
 from pathlib import Path
-import typing
+
 from mpi4py import MPI
 
 import adios2
@@ -170,7 +171,7 @@ def write_function(
         adios_file.file.BeginStep()
         # Add mesh permutations
         pvar = adios_file.io.DefineVariable(
-            f"{name}CellPermutations",
+            f"{u.name}CellPermutations",
             u.cell_permutations,
             shape=[u.num_cells_global],
             start=[u.local_cell_range[0]],
