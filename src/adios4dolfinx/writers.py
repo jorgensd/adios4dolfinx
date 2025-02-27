@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Jørgen Schartum Dokken
+# Copyright (C) 2024-2025 Jørgen Schartum Dokken
 #
 # This file is part of adios4dolfinx
 #
@@ -7,7 +7,7 @@
 
 import warnings
 from pathlib import Path
-
+import typing
 from mpi4py import MPI
 
 import adios2
@@ -27,7 +27,7 @@ def write_mesh(
     mode: adios2.Mode = adios2.Mode.Write,
     time: float = 0.0,
     io_name: str = "MeshWriter",
-    name: str = ""
+    name: typing.Optional[str] = None,
 ):
     """
     Write a mesh to file using ADIOS2
@@ -41,9 +41,11 @@ def write_mesh(
         io_name: Internal name used for the ADIOS IO object
         name: Prefix to mesh data structures.
     """
+
+    name = "" if name is None else name
     gdim = mesh.local_geometry.shape[1]
     adios = adios2.ADIOS(comm)
-    
+
     # Check if topology has already been written to file
     topology_exists = False
     if mode == adios2.Mode.Append:
@@ -116,7 +118,8 @@ def write_mesh(
                 adios_file.file.Put(par_offset, mesh.ownership_offset)
                 assert mesh.partition_processes is not None
                 adios_file.io.DefineAttribute(
-                    f"{name}PartitionProcesses", np.array([mesh.partition_processes], dtype=np.int32)
+                    f"{name}PartitionProcesses",
+                    np.array([mesh.partition_processes], dtype=np.int32),
                 )
         if mode == adios2.Mode.Append and mesh.store_partition:
             warnings.warn("Partitioning data is not written in append mode")
@@ -143,7 +146,7 @@ def write_function(
     engine: str = "BP5",
     mode: adios2.Mode = adios2.Mode.Append,
     time: float = 0.0,
-    name: str = None,
+    name: typing.Optional[str] = None,
     io_name: str = "FunctionWriter",
 ):
     """

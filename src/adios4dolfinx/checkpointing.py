@@ -391,20 +391,25 @@ def read_function(
             engine=engine,
             io_name="FunctionReader",
         ) as adios_file:
-            variables = set()
+            variables: set[str] = set()
             for step in range(adios_file.file.Steps()):
                 adios_file.file.BeginStep()
-                variables = variables.union(set(
+                variables = variables.union(
+                    set(
                         sorted(
                             map(
                                 lambda x: x.split("_time")[0],
-                                filter(lambda x: x.endswith("_time"), adios_file.io.AvailableVariables()),
+                                filter(
+                                    lambda x: x.endswith("_time"),
+                                    adios_file.io.AvailableVariables(),
+                                ),
                             )
                         )
-                    ))
+                    )
+                )
                 if name in variables:
                     break
-                adios_file.file.EndStep()        
+                adios_file.file.EndStep()
             if name not in variables:
                 raise KeyError(f"{name} not found in {filename}. Did you mean one of {variables}?")
 
@@ -533,7 +538,7 @@ def read_mesh_data(
     time: float = 0.0,
     legacy: bool = False,
     read_from_partition: bool = False,
-    name: str = None
+    name: typing.Optional[str] = None,
 ) -> tuple[np.ndarray, np.ndarray, ufl.Mesh, typing.Callable]:
     """
     Read an ADIOS2 mesh data for use with DOLFINx.
@@ -551,6 +556,7 @@ def read_mesh_data(
     Returns:
         The mesh topology, geometry, UFL domain and partition function
     """
+    name = "" if name is None else name
     check_file_exists(filename)
     adios = adios2.ADIOS(comm)
 
@@ -563,7 +569,6 @@ def read_mesh_data(
     ) as adios_file:
         adios_file.file.BeginStep()
 
-
         # Read mesh topology for the correct mesh
         top_name = f"{name}Topology"
         for i in range(adios_file.file.Steps()):
@@ -574,18 +579,27 @@ def read_mesh_data(
                 topology = adios_file.io.InquireVariable(f"{name}Topology")
                 shape = topology.Shape()
                 local_range = compute_local_range(comm, shape[0])
-                topology.SetSelection([[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]])
-                mesh_topology = np.empty((local_range[1] - local_range[0], shape[1]), dtype=np.int64)
+                topology.SetSelection(
+                    [[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]]
+                )
+                mesh_topology = np.empty(
+                    (local_range[1] - local_range[0], shape[1]), dtype=np.int64
+                )
                 adios_file.file.Get(topology, mesh_topology, adios2.Mode.Deferred)
 
                 # Check validity of partitioning information
                 if read_from_partition:
-                    if f"{name}PartitionProcesses" not in adios_file.io.AvailableAttributes().keys():
+                    if (
+                        f"{name}PartitionProcesses"
+                        not in adios_file.io.AvailableAttributes().keys()
+                    ):
                         raise KeyError(f"Partitioning information not found in {filename}")
                     par_num_procs = adios_file.io.InquireAttribute(f"{name}PartitionProcesses")
                     num_procs = par_num_procs.Data()[0]
                     if num_procs != comm.size:
-                        raise ValueError(f"Number of processes in file ({num_procs})!=({comm.size=})")
+                        raise ValueError(
+                            f"Number of processes in file ({num_procs})!=({comm.size=})"
+                        )
 
                 # Get mesh cell type
                 if f"{name}CellType" not in adios_file.io.AvailableAttributes().keys():
@@ -600,7 +614,7 @@ def read_mesh_data(
                 if f"{name}Degree" not in adios_file.io.AvailableAttributes().keys():
                     raise KeyError(f"Mesh degree not found in {filename}")
                 degree = adios_file.io.InquireAttribute(f"{name}Degree").Data()[0]
-                break    
+                break
             if i == adios_file.file.Steps() - 1:
                 raise KeyError(f"{top_name} not found in {filename}")
             adios_file.file.EndStep()
@@ -663,7 +677,13 @@ def read_mesh_data(
 
     if read_from_partition:
         partition_graph = read_adjacency_list(
-            adios, comm, filename, f"{name}PartitioningData", f"{name}PartitioningOffset", shape[0], engine
+            adios,
+            comm,
+            filename,
+            f"{name}PartitioningData",
+            f"{name}PartitioningOffset",
+            shape[0],
+            engine,
         )
 
         def partitioner(comm: MPI.Intracomm, n, m, topo):
@@ -686,7 +706,7 @@ def read_mesh(
     time: float = 0.0,
     legacy: bool = False,
     read_from_partition: bool = False,
-    name: str = None
+    name: typing.Optional[str] = None,
 ) -> dolfinx.mesh.Mesh:
     """
     Read an ADIOS2 mesh into DOLFINx.
@@ -716,7 +736,7 @@ def read_mesh(
             time=time,
             legacy=legacy,
             read_from_partition=read_from_partition,
-            name=name
+            name=name,
         ),
     )
 
@@ -728,7 +748,7 @@ def write_mesh(
     mode: adios2.Mode = adios2.Mode.Write,
     time: float = 0.0,
     store_partition_info: bool = False,
-    name: str = None
+    name: typing.Optional[str] = None,
 ):
     """
     Write a mesh to specified ADIOS2 format, see:
@@ -822,7 +842,7 @@ def write_mesh(
         mode=mode,
         time=time,
         io_name="MeshWriter",
-        name=name
+        name=name,
     )
 
 
@@ -900,57 +920,17 @@ def write_function(
     _internal_function_writer(fname, comm, function_data, engine, mode, time, "FunctionWriter")
 
 
-
-def write_submesh_relation(
-    filename: typing.Union[Path, str],
+def write_submesh(
+    filename: Path,
     mesh: dolfinx.mesh.Mesh,
     submesh: dolfinx.mesh.Mesh,
-    mesh_name: str,
-    submesh_name: str,
-    submesh_to_mesh: npt.NDArray[np.int32],
+    name: str,
+    node_map: npt.NDArray[np.int32],
     mode: adios2.Mode = adios2.Mode.Append,
-    engine: str = "BP5"):
-    """Write submesh_to_mesh data to file.
-
-    Args:
-        filename: Path to write to
-        mesh: Parent mesh
-        submesh: Submesh
-        mesh_name: Name of the parent mesh in output file
-        submesh_name: Name of the submesh in output file
-        submesh_to_mesh: Mapping from submesh to parent mesh
-        mode: Write or append.
-        engine: ADIOS2 engine
+    engine="BP5",
+):
     """
-
-    subdim = submesh.topology.dim
-    num_subcells_local = submesh.topology.index_map(subdim).size_local    
-    sub_start = submesh.topology.index_map(subdim).local_range[0]
-    num_subcells_global = submesh.topology.index_map(subdim).size_global
-    entity_map = mesh.topology.index_map(subdim)
-    global_map = entity_map.local_to_global(submesh_to_mesh[:num_subcells_local])
-    io_name = "SubMeshMapWriter"
-    # Write map
-    adios = adios2.ADIOS(submesh.comm)
-    with ADIOSFile(
-        adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name
-    ) as adios_file:
-        adios_file.file.BeginStep()
-
-        map_var = adios_file.io.DefineVariable(
-            f"{submesh_name}_to_{mesh_name}",
-                global_map,
-                shape=[num_subcells_global],
-                start=[sub_start],
-                count=[num_subcells_local]
-            )
-        adios_file.file.Put(map_var, global_map)
-        adios_file.file.PerformPuts()
-
-
-def write_submesh(filename:Path, mesh:dolfinx.mesh.Mesh, submesh:dolfinx.mesh.Mesh, name:str, node_map:npt.NDArray[np.int32],mode:adios2.Mode=adios2.Mode.Append, engine="BP5"):
-    """
-    Write submesh to file as parent mesh original indices    
+    Write submesh to file as parent mesh original indices
     """
 
     # Need to map submesh geometry to parent geometry
@@ -958,8 +938,7 @@ def write_submesh(filename:Path, mesh:dolfinx.mesh.Mesh, submesh:dolfinx.mesh.Me
     parent_geometry_dm = node_map[submesh_geometry_dm]
     global_parent_dm = mesh.geometry.index_map().local_to_global(parent_geometry_dm.flatten())
     global_parent_dm = global_parent_dm.reshape(submesh_geometry_dm.shape)
-    
-    
+
     # Get insert position for submesh "topology" in parent mesh
     sub_cell_dim = submesh.topology.dim
     submesh_cell_map = submesh.topology.index_map(sub_cell_dim)
@@ -977,19 +956,18 @@ def write_submesh(filename:Path, mesh:dolfinx.mesh.Mesh, submesh:dolfinx.mesh.Me
 
         submesh_var = adios_file.io.DefineVariable(
             f"{name}_sub_topology",
-                global_parent_dm,
-                shape=[num_submesh_cells, submesh_geometry_dm.shape[1]],
-                start=[submesh_cell_insert_pos,0],
-                count=[num_local_cells, submesh_geometry_dm.shape[1]]
-            )
+            global_parent_dm,
+            shape=[num_submesh_cells, submesh_geometry_dm.shape[1]],
+            start=[submesh_cell_insert_pos, 0],
+            count=[num_local_cells, submesh_geometry_dm.shape[1]],
+        )
         adios_file.file.Put(submesh_var, global_parent_dm)
         adios_file.io.DefineAttribute(f"{name}_dim", sub_cell_dim)
 
         adios_file.file.PerformPuts()
 
 
-def read_submesh(filename:Path, mesh:dolfinx.mesh.Mesh, name:str,engine="BP5"):
-
+def read_submesh(filename: Path, mesh: dolfinx.mesh.Mesh, name: str, engine="BP5"):
     check_file_exists(filename)
     adios = adios2.ADIOS(mesh.comm)
     with ADIOSFile(
@@ -1039,7 +1017,6 @@ def read_submesh(filename:Path, mesh:dolfinx.mesh.Mesh, name:str,engine="BP5"):
         )
         adios_file.file.Get(topology, mesh_entities, adios2.Mode.Deferred)
 
-
         adios_file.file.PerformGets()
         adios_file.file.EndStep()
 
@@ -1048,12 +1025,14 @@ def read_submesh(filename:Path, mesh:dolfinx.mesh.Mesh, name:str,engine="BP5"):
         # NOTE: Need to expose int64 in dolfixn for this to work.
         local_entities, local_values = dolfinx.io.distribute_entity_data(
             mesh, int(dim), mesh_entities.astype(np.int32), tag_values
-    )
+        )
     except TypeError:
-        assert topology_range[1] < np.iinfo(np.int32).max, "Cannot read this mesh with DOLFINx 0.9.0, please upgrade."
+        assert topology_range[1] < np.iinfo(np.int32).max, (
+            "Cannot read this mesh with DOLFINx 0.9.0, please upgrade."
+        )
         local_entities, local_values = dolfinx.io.distribute_entity_data(
             mesh, int(dim), mesh_entities.astype(np.int32), tag_values.astype(np.int32)
-    )
+        )
 
     mesh.topology.create_connectivity(dim, 0)
     mesh.topology.create_connectivity(dim, mesh.topology.dim)
@@ -1069,9 +1048,7 @@ def read_submesh(filename:Path, mesh:dolfinx.mesh.Mesh, name:str,engine="BP5"):
     vec.array[:] = -1
     vec.array[mt.indices] = mt.values
     vec.scatter_forward()
-    submesh_cells =  np.flatnonzero(vec.array >=0)
+    submesh_cells = np.flatnonzero(vec.array >= 0)
     submesh, cell_map, vertex_map, node_map = dolfinx.mesh.create_submesh(mesh, dim, submesh_cells)
     submesh_input_indices = vec.array[cell_map]
     return submesh, cell_map, vertex_map, node_map, submesh_input_indices
-
-
