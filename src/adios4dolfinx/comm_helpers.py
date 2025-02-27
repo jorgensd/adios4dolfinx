@@ -98,7 +98,6 @@ def send_dofmap_and_recv_values(
     r_msg = [inc_pos, recv_size, MPI.INT32_T]
     mesh_to_data_comm.Neighbor_alltoallv(s_msg, r_msg)
     mesh_to_data_comm.Free()
-
     local_input_range = compute_local_range(comm, num_cells_global)
     values_to_distribute = np.zeros_like(inc_pos, dtype=values.dtype)
 

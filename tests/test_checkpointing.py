@@ -293,7 +293,7 @@ def test_write_submesh():
 
     def locate_cells(x):
         return (x[0]-0.2)**2 + (x[1]-0.2)**2 < 0.2
-    dim = mesh.topology.dim-1
+    dim = mesh.topology.dim
     cells = dolfinx.mesh.locate_entities(mesh, dim, locate_cells)
 
     submesh, cell_map, _, node_map= dolfinx.mesh.create_submesh(mesh,dim, cells)
@@ -313,15 +313,34 @@ def test_write_submesh():
     adios4dolfinx.write_mesh(outfile, mesh, name="mesh")
 
     adios4dolfinx.checkpointing.write_submesh(outfile, mesh, submesh, "submesh", node_map)
+    V_sub = dolfinx.fem.functionspace(submesh, ("Lagrange", 2, (2, )))
+    u_sub = dolfinx.fem.Function(V_sub, name="u_sub")
+    u_sub.interpolate(lambda x: (np.sin(1.57 * x[0]+0.2), x[1]))
+    adios4dolfinx.write_function(outfile, u_sub, time=0, name="u_sub")
 
-    mesh.comm.Barrier()
+    with dolfinx.io.VTXWriter(comm, "submesh_pre_checkpoint.bp",[u_sub]) as bp:
+        bp.write(0.0)
+
+    del submesh, u_sub, mesh
+
+    comm.Barrier()
     new_mesh = adios4dolfinx.read_mesh(outfile, comm, name="mesh")
     new_submesh, cell_map, _,_, input_indices = adios4dolfinx.checkpointing.read_submesh(outfile, new_mesh, "submesh")
+  
+   
+    V_new = dolfinx.fem.functionspace(new_submesh, ("Lagrange", 2, (2, )))
+    u_sub_new = dolfinx.fem.Function(V_new, name="u_sub_new")
+    adios4dolfinx.read_function(outfile, u_sub_new, time=0, name="u_sub", original_cell_index=input_indices)
+
+
     num_cells_local = new_submesh.topology.index_map(new_submesh.topology.dim).size_local
     sub_tag = dolfinx.mesh.meshtags(new_submesh,new_submesh.topology.dim, np.arange(num_cells_local, dtype=np.int32), input_indices[:num_cells_local].astype(np.int32))
-    with dolfinx.io.XDMFFile(comm, "submesh_after_checkpoint.xdmf", "w") as xdmf:
-        xdmf.write_mesh(new_submesh)
-        xdmf.write_meshtags(sub_tag, new_submesh.geometry)
+  
+    with dolfinx.io.VTXWriter(comm, "submesh_post_checkpoint.bp",[u_sub_new]) as bp:
+        bp.write(0.0)
+        
+        #xdmf.write_meshtags(sub_tag, new_submesh.geometry)
+    
     # print(mesh.topology.index_map(mesh.topology.dim).local_to_global(cell_map))
     # if MPI.COMM_WORLD.rank == 0:
     #     comm = MPI.COMM_SELF

@@ -361,6 +361,7 @@ def read_function(
     time: float = 0.0,
     legacy: bool = False,
     name: typing.Optional[str] = None,
+    original_cell_index: typing.Optional[npt.NDArray[np.int64]] = None,
 ):
     """
     Read checkpoint from file and fill it into `u`.
@@ -372,6 +373,7 @@ def read_function(
         time: Time-stamp associated with checkpoint
         legacy: If checkpoint is from prior to time-dependent writing set to True
         name: If not provided, `u.name` is used to search through the input file for the function
+        original_cell_index: Original cell index of the mesh. Used for reading in data on sub-meshes.
     """
     check_file_exists(filename)
     mesh = u.function_space.mesh
@@ -389,21 +391,30 @@ def read_function(
             engine=engine,
             io_name="FunctionReader",
         ) as adios_file:
-            variables = set(
-                sorted(
-                    map(
-                        lambda x: x.split("_time")[0],
-                        filter(lambda x: x.endswith("_time"), adios_file.io.AvailableVariables()),
-                    )
-                )
-            )
+            variables = set()
+            for step in range(adios_file.file.Steps()):
+                adios_file.file.BeginStep()
+                variables = variables.union(set(
+                        sorted(
+                            map(
+                                lambda x: x.split("_time")[0],
+                                filter(lambda x: x.endswith("_time"), adios_file.io.AvailableVariables()),
+                            )
+                        )
+                    ))
+                if name in variables:
+                    break
+                adios_file.file.EndStep()        
             if name not in variables:
                 raise KeyError(f"{name} not found in {filename}. Did you mean one of {variables}?")
 
     # ----------------------Step 1---------------------------------
     # Compute index of input cells and get cell permutation
     num_owned_cells = mesh.topology.index_map(mesh.topology.dim).size_local
-    input_cells = mesh.topology.original_cell_index[:num_owned_cells]
+    if original_cell_index is None:
+        original_cell_index = mesh.topology.original_cell_index
+    input_cells = original_cell_index[:num_owned_cells]
+
     mesh.topology.create_entity_permutations()
     cell_perm = mesh.topology.get_cell_permutation_info()[:num_owned_cells]
 
@@ -485,7 +496,10 @@ def read_function(
     # For each dof owned by a process, find the local position in the dofmap.
     V = u.function_space
     local_cells, dof_pos = compute_dofmap_pos(V)
-    input_cells = V.mesh.topology.original_cell_index[local_cells]
+    if len(local_cells) == 0:
+        input_cells = np.empty(0, dtype=np.int64)
+    else:
+        input_cells = original_cell_index[local_cells]
     num_cells_global = V.mesh.topology.index_map(V.mesh.topology.dim).size_global
     owners = index_owner(V.mesh.comm, input_cells, num_cells_global)
     unique_owners, owner_count = np.unique(owners, return_counts=True)
@@ -495,7 +509,6 @@ def read_function(
     )
     source, dest, _ = sub_comm.Get_dist_neighbors()
     sub_comm.Free()
-
     owned_values = send_dofmap_and_recv_values(
         comm,
         np.asarray(source, dtype=np.int32),
@@ -1030,19 +1043,24 @@ def read_submesh(filename:Path, mesh:dolfinx.mesh.Mesh, name:str,engine="BP5"):
         adios_file.file.PerformGets()
         adios_file.file.EndStep()
 
-    tag_values = np.arange(topology_range[0], topology_range[1], dtype=np.int32)
-    # NOTE: Need to expose int64 in dolfixn for this to work.
-    local_entities, local_values = dolfinx.io.distribute_entity_data(
-        mesh, int(dim), mesh_entities.astype(np.int32), tag_values
+    try:
+        tag_values = np.arange(topology_range[0], topology_range[1], dtype=np.int64)
+        # NOTE: Need to expose int64 in dolfixn for this to work.
+        local_entities, local_values = dolfinx.io.distribute_entity_data(
+            mesh, int(dim), mesh_entities.astype(np.int32), tag_values
     )
-
+    except TypeError:
+        assert topology_range[1] < np.iinfo(np.int32).max, "Cannot read this mesh with DOLFINx 0.9.0, please upgrade."
+        local_entities, local_values = dolfinx.io.distribute_entity_data(
+            mesh, int(dim), mesh_entities.astype(np.int32), tag_values.astype(np.int32)
+    )
 
     mesh.topology.create_connectivity(dim, 0)
     mesh.topology.create_connectivity(dim, mesh.topology.dim)
 
     adj = dolfinx.graph.adjacencylist(local_entities)
 
-    local_values = np.array(local_values, dtype=np.int32)
+    local_values = np.array(local_values, dtype=np.int64)
     mt = dolfinx.mesh.meshtags_from_entities(mesh, int(dim), adj, local_values)
 
     # Given the parent mesh entities and their input index, we can create a submesh
