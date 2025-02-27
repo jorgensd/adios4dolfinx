@@ -373,7 +373,8 @@ def read_function(
         time: Time-stamp associated with checkpoint
         legacy: If checkpoint is from prior to time-dependent writing set to True
         name: If not provided, `u.name` is used to search through the input file for the function
-        original_cell_index: Original cell index of the mesh. Used for reading in data on sub-meshes.
+        original_cell_index: Original cell index of the mesh. Used for reading
+            in data on sub-meshes.
     """
     check_file_exists(filename)
     mesh = u.function_space.mesh
@@ -619,7 +620,8 @@ def read_mesh_data(
                 raise KeyError(f"{top_name} not found in {filename}")
             adios_file.file.EndStep()
 
-        # REad geometry for correct time (assumed to be added at the same time or after the topology)
+        # Read geometry for correct time (assumed to be added at the
+        #                                 same time or after the topology)
         if not legacy:
             time_name = f"{name}MeshTime"
 
