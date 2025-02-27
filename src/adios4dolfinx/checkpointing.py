@@ -69,7 +69,7 @@ def write_attributes(
     comm: MPI.Intracomm,
     name: str,
     attributes: dict[str, np.ndarray],
-    engine: str = "BP5",
+    engine: str = "BP4",
 ):
     """Write attributes to file using ADIOS2.
 
@@ -102,7 +102,7 @@ def read_attributes(
     filename: typing.Union[Path, str],
     comm: MPI.Intracomm,
     name: str,
-    engine: str = "BP5",
+    engine: str = "BP4",
 ) -> dict[str, np.ndarray]:
     """Read attributes from file using ADIOS2.
 
@@ -134,7 +134,7 @@ def read_attributes(
 
 
 def read_timestamps(
-    filename: typing.Union[Path, str], comm: MPI.Intracomm, function_name: str, engine="BP5"
+    filename: typing.Union[Path, str], comm: MPI.Intracomm, function_name: str, engine="BP4"
 ) -> npt.NDArray[np.float64]:
     """
     Read time-stamps from a checkpoint file.
@@ -181,7 +181,7 @@ def write_meshtags(
     filename: typing.Union[Path, str],
     mesh: dolfinx.mesh.Mesh,
     meshtags: dolfinx.mesh.MeshTags,
-    engine: str = "BP5",
+    engine: str = "BP4",
     meshtag_name: typing.Optional[str] = None,
 ):
     """
@@ -260,7 +260,7 @@ def read_meshtags(
     filename: typing.Union[Path, str],
     mesh: dolfinx.mesh.Mesh,
     meshtag_name: str,
-    engine: str = "BP5",
+    engine: str = "BP4",
 ) -> dolfinx.mesh.MeshTags:
     """
     Read meshtags from file and return a :class:`dolfinx.mesh.MeshTags` object.
@@ -357,7 +357,7 @@ def read_meshtags(
 def read_function(
     filename: typing.Union[Path, str],
     u: dolfinx.fem.Function,
-    engine: str = "BP5",
+    engine: str = "BP4",
     time: float = 0.0,
     legacy: bool = False,
     name: typing.Optional[str] = None,
@@ -533,7 +533,7 @@ def read_function(
 def read_mesh_data(
     filename: typing.Union[Path, str],
     comm: MPI.Intracomm,
-    engine: str = "BP5",
+    engine: str = "BP4",
     ghost_mode: dolfinx.mesh.GhostMode = dolfinx.mesh.GhostMode.shared_facet,
     time: float = 0.0,
     legacy: bool = False,
@@ -546,7 +546,7 @@ def read_mesh_data(
     Args:
         filename: Path to input file
         comm: The MPI communciator to distribute the mesh over
-        engine: ADIOS engine to use for reading (BP4, BP5 or HDF5)
+        engine: ADIOS engine to use for reading (BP4, BP4 or HDF5)
         ghost_mode: Ghost mode to use for mesh. If `read_from_partition`
             is set to `True` this option is ignored.
         time: Time stamp associated with mesh
@@ -701,7 +701,7 @@ def read_mesh_data(
 def read_mesh(
     filename: typing.Union[Path, str],
     comm: MPI.Intracomm,
-    engine: str = "BP5",
+    engine: str = "BP4",
     ghost_mode: dolfinx.mesh.GhostMode = dolfinx.mesh.GhostMode.shared_facet,
     time: float = 0.0,
     legacy: bool = False,
@@ -714,7 +714,7 @@ def read_mesh(
     Args:
         filename: Path to input file
         comm: The MPI communciator to distribute the mesh over
-        engine: ADIOS engine to use for reading (BP4, BP5 or HDF5)
+        engine: ADIOS engine to use for reading (BP4, BP4 or HDF5)
         ghost_mode: Ghost mode to use for mesh. If `read_from_partition`
             is set to `True` this option is ignored.
         time: Time stamp associated with mesh
@@ -744,7 +744,7 @@ def read_mesh(
 def write_mesh(
     filename: Path,
     mesh: dolfinx.mesh.Mesh,
-    engine: str = "BP5",
+    engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Write,
     time: float = 0.0,
     store_partition_info: bool = False,
@@ -849,7 +849,7 @@ def write_mesh(
 def write_function(
     filename: typing.Union[Path, str],
     u: dolfinx.fem.Function,
-    engine: str = "BP5",
+    engine: str = "BP4",
     mode: adios2.Mode = adios2.Mode.Append,
     time: float = 0.0,
     name: typing.Optional[str] = None,
@@ -927,7 +927,7 @@ def write_submesh(
     name: str,
     node_map: npt.NDArray[np.int32],
     mode: adios2.Mode = adios2.Mode.Append,
-    engine="BP5",
+    engine="BP4",
 ):
     """
     Write submesh to file as parent mesh original indices
@@ -967,7 +967,7 @@ def write_submesh(
         adios_file.file.PerformPuts()
 
 
-def read_submesh(filename: Path, mesh: dolfinx.mesh.Mesh, name: str, engine="BP5"):
+def read_submesh(filename: Path, mesh: dolfinx.mesh.Mesh, name: str, engine="BP4"):
     check_file_exists(filename)
     adios = adios2.ADIOS(mesh.comm)
     with ADIOSFile(

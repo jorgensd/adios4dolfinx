@@ -37,7 +37,7 @@ def snapshot_checkpoint(uh: dolfinx.fem.Function, file: Path, mode: adios2.Mode)
         filename=file,
         mode=mode,
         io_name="SnapshotCheckPoint",
-        engine="BP5",
+        engine="BP4",
     ) as adios_file:
         if mode == adios2.Mode.Write:
             dofmap = uh.function_space.dofmap
