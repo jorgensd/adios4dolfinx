@@ -55,6 +55,7 @@ __all__ = [
     "write_meshtags",
     "read_attributes",
     "write_attributes",
+    "read_timestamps"
 ]
 
 
