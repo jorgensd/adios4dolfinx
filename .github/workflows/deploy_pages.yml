@@ -34,6 +34,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Download docs artifact

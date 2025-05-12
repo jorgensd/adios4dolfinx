@@ -38,7 +38,7 @@ jobs:
 
     strategy:
       matrix:
-        adios2: ["default", "v2.9.2", "v2.10.1"]
+        adios2: ["default", "v2.10.2"]
     steps:
       - uses: actions/checkout@v4
 
@@ -46,7 +46,7 @@ jobs:
         run: python3 -m pip install --break-system-packages --upgrade pip setuptools
 
       - name: Install DOLFINx
-        uses: jorgensd/actions/install-dolfinx@v0.3
+        uses: jorgensd/actions/install-dolfinx@v0.4
         with:
           adios2: ${{ matrix.adios2 }}
           petsc_arch: ${{ env.PETSC_ARCH }}
