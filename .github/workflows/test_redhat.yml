@@ -60,7 +60,7 @@ jobs:
       - name: Install DOLFINx
         uses: jorgensd/actions/install-dolfinx@v0.4
         with:
-          adios2: main
+          adios2: master
           petsc_arch: ${{ env.PETSC_ARCH }}
           petsc_dir: ${{ env.PETSC_DIR }}
           dolfinx: main
