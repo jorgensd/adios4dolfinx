@@ -34,6 +34,7 @@ jobs:
       PETSC_DIR: "/usr/local/"
       PYTHONPATH: "/usr/local/lib/:${PYTHONPATH}"
       working-directory: ./src
+      CMAKE_PYTHON_OUTPUT_DIRECTORY: "/usr/local/lib"
 
     strategy:
       matrix:
