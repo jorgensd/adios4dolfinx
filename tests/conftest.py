@@ -93,7 +93,7 @@ def get_dtype():
 
 @pytest.fixture(scope="function")
 def write_function_time_dep(tmp_path):
-    def _write_function_time_dep(mesh, el, f0, f1, t0, t1, dtype) -> str:
+    def _write_function_time_dep(mesh, el, f0, f1, t0, t1, dtype, sparse) -> str:
         V = dolfinx.fem.functionspace(mesh, el)
         uh = dolfinx.fem.Function(V, dtype=dtype)
         uh.interpolate(f0)
@@ -114,14 +114,14 @@ def write_function_time_dep(tmp_path):
             adios4dolfinx.write_mesh(filename, mesh)
             adios4dolfinx.write_function(filename, uh, time=t0)
             uh.interpolate(f1)
-            adios4dolfinx.write_function(filename, uh, time=t1)
+            adios4dolfinx.write_function(filename, uh, time=t1, sparse=sparse)
 
         else:
             if MPI.COMM_WORLD.rank == 0:
                 adios4dolfinx.write_mesh(filename, mesh)
                 adios4dolfinx.write_function(filename, uh, time=t0)
                 uh.interpolate(f1)
-                adios4dolfinx.write_function(filename, uh, time=t1)
+                adios4dolfinx.write_function(filename, uh, time=t1, sparse=sparse)
 
         return filename
 

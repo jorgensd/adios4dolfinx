@@ -800,6 +800,7 @@ def write_function(
     mode: adios2.Mode = adios2.Mode.Append,
     time: float = 0.0,
     name: typing.Optional[str] = None,
+    sparse: bool = False,
 ):
     """
     Write function checkpoint to file.
@@ -811,6 +812,7 @@ def write_function(
         mode: Write or append.
         time: Time-stamp for simulation
         name: Name of function to write. If None, the name of the function is used.
+        sparse: If True, only write the values of the function, not the permutations or dofmap
     """
     dofmap = u.function_space.dofmap
     values = u.x.array
@@ -864,4 +866,6 @@ def write_function(
     )
     # Write to file
     fname = Path(filename)
-    _internal_function_writer(fname, comm, function_data, engine, mode, time, "FunctionWriter")
+    _internal_function_writer(
+        fname, comm, function_data, engine, mode, time, "FunctionWriter", sparse=sparse
+    )
