@@ -13,7 +13,7 @@ from mpi4py import MPI
 import adios2
 import numpy as np
 
-from .adios2_helpers import ADIOSFile, resolve_adios_scope
+from .adios2_helpers import ADIOSFile, check_variable_exists, resolve_adios_scope
 from .structures import FunctionData, MeshData
 
 adios2 = resolve_adios_scope(adios2)
@@ -128,7 +128,6 @@ def write_function(
     mode: adios2.Mode = adios2.Mode.Append,
     time: float = 0.0,
     io_name: str = "FunctionWriter",
-    sparse: bool = False,
 ):
     """
     Write a function to file using ADIOS2
@@ -141,16 +140,22 @@ def write_function(
         mode: ADIOS2 mode to use (write or append)
         time: Time stamp associated with function
         io_name: Internal name used for the ADIOS IO object
-        sparse: If True, only write the values of the function, not the permutations or dofmap
     """
     adios = adios2.ADIOS(comm)
+
+    cell_permutations_exists = check_variable_exists(
+        adios, filename, "CellPermutations", engine=engine
+    )
+    dofmap_exists = check_variable_exists(adios, filename, f"{u.name}_dofmap", engine=engine)
+    XDofmap_exists = check_variable_exists(adios, filename, f"{u.name}_XDofmap", engine=engine)
 
     with ADIOSFile(
         adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name
     ) as adios_file:
         adios_file.file.BeginStep()
-        # Add mesh permutations
-        if not sparse:
+
+        if not cell_permutations_exists:
+            # Add mesh permutations
             pvar = adios_file.io.DefineVariable(
                 "CellPermutations",
                 u.cell_permutations,
@@ -159,6 +164,9 @@ def write_function(
                 count=[u.local_cell_range[1] - u.local_cell_range[0]],
             )
             adios_file.file.Put(pvar, u.cell_permutations)
+
+        if not dofmap_exists:
+            # Add dofmap
             dofmap_var = adios_file.io.DefineVariable(
                 f"{u.name}_dofmap",
                 u.dofmap_array,
@@ -168,6 +176,8 @@ def write_function(
             )
             adios_file.file.Put(dofmap_var, u.dofmap_array)
 
+        if not XDofmap_exists:
+            # Add XDofmap
             xdofmap_var = adios_file.io.DefineVariable(
                 f"{u.name}_XDofmap",
                 u.dofmap_offsets,

@@ -112,7 +112,6 @@ def test_read_write_P_3D(
 @pytest.mark.parametrize("family", ["Lagrange", "DG"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-@pytest.mark.parametrize("sparse", [True, False])
 def test_read_write_P_2D_time(
     read_comm,
     family,
@@ -122,7 +121,6 @@ def test_read_write_P_2D_time(
     get_dtype,
     write_function_time_dep,
     read_function_time_dep,
-    sparse,
 ):
     mesh = mesh_2D
     f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
@@ -156,7 +154,7 @@ def test_read_write_P_2D_time(
 
     t0 = 0.8
     t1 = 0.6
-    hash = write_function_time_dep(mesh, el, f0, f1, t0, t1, f_dtype, sparse)
+    hash = write_function_time_dep(mesh, el, f0, f1, t0, t1, f_dtype)
     MPI.COMM_WORLD.Barrier()
     read_function_time_dep(read_comm, el, f0, f1, t0, t1, hash, f_dtype)
 
@@ -165,7 +163,6 @@ def test_read_write_P_2D_time(
 @pytest.mark.parametrize("family", ["Lagrange", "DG"])
 @pytest.mark.parametrize("degree", [1, 4])
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-@pytest.mark.parametrize("sparse", [True, False])
 def test_read_write_P_3D_time(
     read_comm,
     family,
@@ -175,7 +172,6 @@ def test_read_write_P_3D_time(
     get_dtype,
     write_function_time_dep,
     read_function_time_dep,
-    sparse,
 ):
     mesh = mesh_3D
     f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
@@ -211,7 +207,7 @@ def test_read_write_P_3D_time(
 
     t0 = 0.1
     t1 = 1.3
-    hash = write_function_time_dep(mesh, el, g, f, t0, t1, f_dtype, sparse)
+    hash = write_function_time_dep(mesh, el, g, f, t0, t1, f_dtype)
     MPI.COMM_WORLD.Barrier()
     read_function_time_dep(read_comm, el, g, f, t0, t1, hash, f_dtype)
 
