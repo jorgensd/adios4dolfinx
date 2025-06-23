@@ -62,6 +62,39 @@ def ADIOSFile(
         adios.RemoveIO(io_name)
 
 
+def check_variable_exists(
+    adios: adios2.ADIOS,
+    filename: Union[Path, str],
+    variable: str,
+    engine: str,
+) -> bool:
+    io_name = f"{variable}_reader"
+
+    if not Path(filename).exists():
+        return False
+
+    variable_found = False
+    with ADIOSFile(
+        adios=adios,
+        engine=engine,
+        filename=filename,
+        mode=adios2.Mode.Read,
+        io_name=io_name,
+    ) as adios_file:
+        # Find step that has cell permutation
+        for _ in range(adios_file.file.Steps()):
+            adios_file.file.BeginStep()
+            if variable in adios_file.io.AvailableVariables().keys():
+                variable_found = True
+                break
+            adios_file.file.EndStep()
+
+        # Not sure if this is needed, but just in case
+        if variable in adios_file.io.AvailableVariables().keys():
+            variable_found = True
+    return variable_found
+
+
 def read_cell_perms(
     adios: adios2.ADIOS,
     comm: MPI.Intracomm,

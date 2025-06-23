@@ -13,7 +13,7 @@ from mpi4py import MPI
 import adios2
 import numpy as np
 
-from .adios2_helpers import ADIOSFile, resolve_adios_scope
+from .adios2_helpers import ADIOSFile, check_variable_exists, resolve_adios_scope
 from .structures import FunctionData, MeshData
 
 adios2 = resolve_adios_scope(adios2)
@@ -143,36 +143,49 @@ def write_function(
     """
     adios = adios2.ADIOS(comm)
 
+    cell_permutations_exists = check_variable_exists(
+        adios, filename, "CellPermutations", engine=engine
+    )
+    dofmap_exists = check_variable_exists(adios, filename, f"{u.name}_dofmap", engine=engine)
+    XDofmap_exists = check_variable_exists(adios, filename, f"{u.name}_XDofmap", engine=engine)
+
     with ADIOSFile(
         adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name
     ) as adios_file:
         adios_file.file.BeginStep()
-        # Add mesh permutations
-        pvar = adios_file.io.DefineVariable(
-            "CellPermutations",
-            u.cell_permutations,
-            shape=[u.num_cells_global],
-            start=[u.local_cell_range[0]],
-            count=[u.local_cell_range[1] - u.local_cell_range[0]],
-        )
-        adios_file.file.Put(pvar, u.cell_permutations)
-        dofmap_var = adios_file.io.DefineVariable(
-            f"{u.name}_dofmap",
-            u.dofmap_array,
-            shape=[u.global_dofs_in_dofmap],
-            start=[u.dofmap_range[0]],
-            count=[u.dofmap_range[1] - u.dofmap_range[0]],
-        )
-        adios_file.file.Put(dofmap_var, u.dofmap_array)
 
-        xdofmap_var = adios_file.io.DefineVariable(
-            f"{u.name}_XDofmap",
-            u.dofmap_offsets,
-            shape=[u.num_cells_global + 1],
-            start=[u.local_cell_range[0]],
-            count=[u.local_cell_range[1] - u.local_cell_range[0] + 1],
-        )
-        adios_file.file.Put(xdofmap_var, u.dofmap_offsets)
+        if not cell_permutations_exists:
+            # Add mesh permutations
+            pvar = adios_file.io.DefineVariable(
+                "CellPermutations",
+                u.cell_permutations,
+                shape=[u.num_cells_global],
+                start=[u.local_cell_range[0]],
+                count=[u.local_cell_range[1] - u.local_cell_range[0]],
+            )
+            adios_file.file.Put(pvar, u.cell_permutations)
+
+        if not dofmap_exists:
+            # Add dofmap
+            dofmap_var = adios_file.io.DefineVariable(
+                f"{u.name}_dofmap",
+                u.dofmap_array,
+                shape=[u.global_dofs_in_dofmap],
+                start=[u.dofmap_range[0]],
+                count=[u.dofmap_range[1] - u.dofmap_range[0]],
+            )
+            adios_file.file.Put(dofmap_var, u.dofmap_array)
+
+        if not XDofmap_exists:
+            # Add XDofmap
+            xdofmap_var = adios_file.io.DefineVariable(
+                f"{u.name}_XDofmap",
+                u.dofmap_offsets,
+                shape=[u.num_cells_global + 1],
+                start=[u.local_cell_range[0]],
+                count=[u.local_cell_range[1] - u.local_cell_range[0] + 1],
+            )
+            adios_file.file.Put(xdofmap_var, u.dofmap_offsets)
 
         val_var = adios_file.io.DefineVariable(
             f"{u.name}_values",
