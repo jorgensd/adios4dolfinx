@@ -5,6 +5,7 @@
 # SPDX-License-Identifier:    MIT
 
 
+import inspect
 import pathlib
 
 from mpi4py import MPI
@@ -84,7 +85,13 @@ def test_legacy_function():
     L = ufl.inner(f, v) * ufl.dx
 
     uh = dolfinx.fem.Function(V)
-    problem = LinearProblem(a, L, [], uh, petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
+    if "petsc_options_prefix" in inspect.signature(LinearProblem.__init__).parameters.keys():
+        extra_options = {"petsc_options_prefix": "legacy_test"}
+    else:
+        extra_options = {}
+    problem = LinearProblem(
+        a, L, bcs=[], u=uh, petsc_options={"ksp_type": "preonly", "pc_type": "lu"}, **extra_options
+    )
     problem.solve()
 
     u_in = dolfinx.fem.Function(V)
@@ -117,7 +124,13 @@ def test_read_legacy_function_from_checkpoint():
     L = ufl.inner(f, v) * ufl.dx
 
     uh = dolfinx.fem.Function(V)
-    problem = LinearProblem(a, L, [], uh, petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
+    if "petsc_options_prefix" in inspect.signature(LinearProblem.__init__).parameters.keys():
+        extra_options = {"petsc_options_prefix": "legacy_checkpoint_test"}
+    else:
+        extra_options = {}
+    problem = LinearProblem(
+        a, L, bcs=[], u=uh, petsc_options={"ksp_type": "preonly", "pc_type": "lu"}, **extra_options
+    )
     problem.solve()
 
     u_in = dolfinx.fem.Function(V)
