@@ -15,6 +15,7 @@ import adios2
 import basix
 import dolfinx
 import numpy as np
+import numpy.typing as npt
 import ufl
 
 from .adios2_helpers import (
