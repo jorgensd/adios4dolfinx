@@ -322,7 +322,10 @@ def read_mesh_from_legacy_h5(
         shape=(mesh_geometry.shape[1],),
     )
     domain = ufl.Mesh(element)
-    return dolfinx.mesh.create_mesh(MPI.COMM_WORLD, mesh_topology, mesh_geometry, domain)
+
+    return dolfinx.mesh.create_mesh(
+        comm=MPI.COMM_WORLD, cells=mesh_topology, x=mesh_geometry, e=domain
+    )
 
 
 def read_function_from_legacy_h5(
