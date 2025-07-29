@@ -512,6 +512,17 @@ def read_function(
     u.x.scatter_forward()
 
 
+class ReadMeshData(typing.TypedDict):
+    cells: npt.NDArray[np.int64]
+    e: typing.Union[
+        ufl.Mesh,
+        basix.finite_element.FiniteElement,
+        basix.ufl._BasixElement,
+    ]
+    x: npt.NDArray[np.floating]
+    partitioner: typing.Optional[typing.Callable]
+
+
 def read_mesh_data(
     filename: typing.Union[Path, str],
     comm: MPI.Intracomm,
@@ -520,7 +531,7 @@ def read_mesh_data(
     time: float = 0.0,
     legacy: bool = False,
     read_from_partition: bool = False,
-) -> tuple[np.ndarray, np.ndarray, ufl.Mesh, typing.Callable]:
+) -> ReadMeshData:
     """
     Read an ADIOS2 mesh data for use with DOLFINx.
 
@@ -649,10 +660,12 @@ def read_mesh_data(
     else:
         partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)
 
-    if Version(dolfinx.__version__) > Version("0.9.0"):
-        return mesh_topology, domain, mesh_geometry, partitioner
-    else:
-        return mesh_topology, mesh_geometry, domain, partitioner
+    return ReadMeshData(
+        cells=mesh_topology,
+        x=mesh_geometry,
+        e=domain,
+        partitioner=partitioner,
+    )
 
 
 def read_mesh(
@@ -680,10 +693,9 @@ def read_mesh(
         The distributed mesh
     """
     check_file_exists(filename)
-
     return dolfinx.mesh.create_mesh(
         comm,
-        *read_mesh_data(
+        **read_mesh_data(
             filename,
             comm,
             engine=engine,
