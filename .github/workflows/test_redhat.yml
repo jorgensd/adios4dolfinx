@@ -1,17 +1,17 @@
 name: Test package with redhat
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+  # push:
+  #   branches:
+  #     - main
+  # pull_request:
+  #   branches:
+  #     - main
 
   workflow_call:
   workflow_dispatch:
-  schedule:
-    - cron: "0 8 * * *"
+  # schedule:
+  #   - cron: "0 8 * * *"
 
 jobs:
   create-datasets:
