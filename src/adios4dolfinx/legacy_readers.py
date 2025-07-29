@@ -17,7 +17,6 @@ import dolfinx
 import numpy as np
 import numpy.typing as npt
 import ufl
-from packaging.version import Version
 
 from .adios2_helpers import (
     ADIOSFile,
