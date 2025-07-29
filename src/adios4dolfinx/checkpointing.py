@@ -649,7 +649,10 @@ def read_mesh_data(
     else:
         partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)
 
-    return mesh_topology, mesh_geometry, domain, partitioner
+    if Version(dolfinx.__version__) > Version("0.9.0"):
+        return mesh_topology, domain, mesh_geometry, partitioner
+    else:
+        return mesh_topology, mesh_geometry, domain, partitioner
 
 
 def read_mesh(
@@ -677,6 +680,7 @@ def read_mesh(
         The distributed mesh
     """
     check_file_exists(filename)
+
     return dolfinx.mesh.create_mesh(
         comm,
         *read_mesh_data(
