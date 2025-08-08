@@ -42,7 +42,7 @@ def element_signature(V):
 def compute_insert_position(
     data_owner: npt.NDArray[np.int32],
     destination_ranks: npt.NDArray[np.int32],
-    out_size: npt.NDArray[np.int32],
+    out_size: npt.NDArray[np.int32 | np.int64],
 ) -> npt.NDArray[np.int32]:
     """
     Giving a list of ranks, compute the local insert position for each rank in a list

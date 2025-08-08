@@ -174,7 +174,7 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     recv_nodes = recv_coordinates.reshape(-1, 3)
     geometry = np.empty_like(recv_nodes)
     geometry[recv_indices, :] = recv_nodes
-    geometry = geometry[:, :gdim].copy()
+    geometry[:] = geometry[:, :gdim].copy()
     assert local_node_range[1] - local_node_range[0] == geometry.shape[0]
     cmap = mesh.geometry.cmap
 
@@ -301,7 +301,6 @@ def create_function_data_on_original_mesh(
     ).copy()
     final_dofmap = np.empty_like(shaped_dofmap)
     final_dofmap[local_cell_index] = shaped_dofmap
-    final_dofmap = final_dofmap.reshape(-1)
 
     # Get offsets of dofmap
     num_cells_local = local_cell_range[1] - local_cell_range[0]
@@ -320,7 +319,7 @@ def create_function_data_on_original_mesh(
         cell_permutations=cell_permutation_info,
         local_cell_range=local_cell_range,
         num_cells_global=num_cells_global,
-        dofmap_array=final_dofmap,
+        dofmap_array=final_dofmap.reshape(-1),
         dofmap_offsets=local_dofmap_offsets,
         values=u.x.array[:num_dofs_local].copy(),
         dof_range=local_range,
