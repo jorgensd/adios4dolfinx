@@ -174,8 +174,8 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     recv_nodes = recv_coordinates.reshape(-1, 3)
     geometry = np.empty_like(recv_nodes)
     geometry[recv_indices, :] = recv_nodes
-    geometry[:] = geometry[:, :gdim].copy()
-    assert local_node_range[1] - local_node_range[0] == geometry.shape[0]
+    geometry_stripped = geometry[:, :gdim].copy()
+    assert local_node_range[1] - local_node_range[0] == geometry_stripped.shape[0]
     cmap = mesh.geometry.cmap
 
     cell_to_output_comm.Free()
@@ -184,7 +184,7 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     # NOTE: Could in theory store partitioning information, but would not work nicely
     # as one would need to read this data rather than the xdmffile.
     return MeshData(
-        local_geometry=geometry,
+        local_geometry=geometry_stripped,
         local_geometry_pos=local_node_range,
         num_nodes_global=num_nodes_global,
         local_topology=sorted_recv_dofmap,
