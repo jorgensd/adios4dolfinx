@@ -171,7 +171,7 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
 
     # Sort geometry based on input index and strip to gdim
     gdim = mesh.geometry.dim
-    recv_nodes = recv_coordinates.reshape(-1, 3)
+    recv_nodes = recv_coordinates.reshape(-1, 3).astype(np.float64)
     geometry = np.empty_like(recv_nodes)
     geometry[recv_indices, :] = recv_nodes
     geometry_stripped = geometry[:, :gdim].copy()
