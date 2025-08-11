@@ -181,7 +181,6 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     geometry = _geometry[:, :gdim].copy()
     del _geometry, recv_nodes
 
-    # assert issubclass(geometry.dtype.type, np.floating)
     assert local_node_range[1] - local_node_range[0] == geometry.shape[0]
     cmap = mesh.geometry.cmap
 
