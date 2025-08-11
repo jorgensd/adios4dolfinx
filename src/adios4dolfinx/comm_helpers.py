@@ -140,15 +140,16 @@ def send_and_recv_cell_perm(
         cell_owners: The rank to send the i-th entry of cells and perms to
         comm: Rank of comm to generate neighbourhood communicator from
     """
-    dest_ranks, dest_size = np.unique(cell_owners, return_counts=True)
-    dest_size = dest_size.astype(np.int32)
+    dest_ranks, _dest_size = np.unique(cell_owners, return_counts=True)
+    dest_size = _dest_size.astype(np.int32)
+    del _dest_size
 
     mesh_to_data = comm.Create_dist_graph(
         [comm.rank], [len(dest_ranks)], dest_ranks.tolist(), reorder=False
     )
     source, dest, _ = mesh_to_data.Get_dist_neighbors()
     assert np.allclose(dest, dest_ranks)
-    insert_position = compute_insert_position(cell_owners, dest_ranks, dest_size)
+    insert_position = compute_insert_position(cell_owners, dest_ranks.astype(np.int32), dest_size)
 
     # Pack cells and permutations for sending
     out_cells = np.zeros_like(cells, dtype=np.int64)
@@ -199,8 +200,9 @@ def send_dofs_and_recv_values(
         input_array: Values for dofs
         array_start: The global starting index of `input_array`.
     """
-    dest_ranks, dest_size = np.unique(dofmap_owners, return_counts=True)
-    dest_size = dest_size.astype(np.int32)
+    dest_ranks, _dest_size = np.unique(dofmap_owners, return_counts=True)
+    dest_size = _dest_size.astype(np.int32)
+    del _dest_size
 
     dofmap_to_values = comm.Create_dist_graph(
         [comm.rank], [len(dest_ranks)], dest_ranks.tolist(), reorder=False
