@@ -189,8 +189,10 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
 
     # NOTE: Could in theory store partitioning information, but would not work nicely
     # as one would need to read this data rather than the xdmffile.
+    # NOTE: Local geometry type hint skip is only required on DOLFINX<0.10 where
+    # proper `dolfinx.mesh.Geometry` wrapper doesn't exist
     return MeshData(
-        local_geometry=geometry,
+        local_geometry=geometry,  # type: ignore[arg-type]
         local_geometry_pos=local_node_range,
         num_nodes_global=num_nodes_global,
         local_topology=sorted_recv_dofmap,
