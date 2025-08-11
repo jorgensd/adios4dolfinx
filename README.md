@@ -35,6 +35,22 @@ Therefore `ADIOS2` should not be install through PYPI/pip, but has to be install
 > ADIOS2<2.10.2 does not work properly with `numpy>=2.0.0`. Everyone is adviced to use the newest version of ADIOS2.
 > This is for instance available through `conda` or the `ghcr.io/fenics/dolfinx/dolfinx:nightly` Docker-image.
 
+### Spack
+ADIOS4DOLFINx is a [spack package](https://packages.spack.io/package.html?name=py-adios4dolfinx)
+which can be installed with
+
+```bash
+spack add py-adios4dolfinx ^py-fenics-dolfinx+petsc4py+slepc4py
+spack concretize
+spack install
+```
+once you have downloaded spack and set up a new environment, as described in [Spack: Installation notes](https://github.com/spack/spack?tab=readme-ov-file#installation)
+Due to an issue with the spack package of ADIOS2 ([ADIOS2 Issue 4485](https://github.com/ornladios/ADIOS2/issues/4485)) one currently has to call 
+```bash
+export PYTHONPATH=$(find $SPACK_ENV/.spack-env -type d -name 'site-packages' | grep venv):$PYTHONPATH
+```
+after installing `py-adios4dolfinx`, and at the startup of an existing spack environment.
+This will be resolved once [Spack-packages PR 880](https://github.com/spack/spack-packages/pull/880) is merged.
 ### Docker
 
 An MPI build of ADIOS2 is installed in the official DOLFINx containers, and thus there are no additional dependencies required to install `adios4dolfinx`
