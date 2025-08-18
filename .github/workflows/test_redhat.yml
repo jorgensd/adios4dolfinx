@@ -39,7 +39,7 @@ jobs:
       matrix:
         adios2: ["master"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Get pip flags based on version
         id: python-version
