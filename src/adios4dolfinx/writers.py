@@ -144,11 +144,16 @@ def write_function(
     adios = adios2.ADIOS(comm)
 
     in_append_mode = mode == adios2.Mode.Append
-    cell_permutations_exists = check_variable_exists(
-        adios, filename, "CellPermutations", engine=engine
-    ) and in_append_mode
-    dofmap_exists = check_variable_exists(adios, filename, f"{u.name}_dofmap", engine=engine) and in_append_mode
-    XDofmap_exists = check_variable_exists(adios, filename, f"{u.name}_XDofmap", engine=engine) and in_append_mode
+    cell_permutations_exists = (
+        check_variable_exists(adios, filename, "CellPermutations", engine=engine) and in_append_mode
+    )
+    dofmap_exists = (
+        check_variable_exists(adios, filename, f"{u.name}_dofmap", engine=engine) and in_append_mode
+    )
+    XDofmap_exists = (
+        check_variable_exists(adios, filename, f"{u.name}_XDofmap", engine=engine)
+        and in_append_mode
+    )
 
     with ADIOSFile(
         adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name
