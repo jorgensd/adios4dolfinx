@@ -147,7 +147,9 @@ def write_function(
     dofmap_exists = False
     XDofmap_exists = False
     if mode == adios2.Mode.Append:
-        cell_permutations_exists = check_variable_exists(adios, filename, "CellPermutations", engine=engine)
+        cell_permutations_exists = check_variable_exists(
+            adios, filename, "CellPermutations", engine=engine
+        )
         dofmap_exists = check_variable_exists(adios, filename, f"{u.name}_dofmap", engine=engine)
         XDofmap_exists = check_variable_exists(adios, filename, f"{u.name}_XDofmap", engine=engine)
 
