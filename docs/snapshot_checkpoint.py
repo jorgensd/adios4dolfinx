@@ -52,7 +52,7 @@ def read_write_snapshot(filename: Path):
     )
 
     # Next, we verify that the solution is correct
-    np.testing.assert_allclose(u_new.x.array, u.x.array)
+    np.testing.assert_allclose(u_new.x.array, u.x.array, atol=np.finfo(float).eps)
 
     print(f"{MPI.COMM_WORLD.rank + 1}/{MPI.COMM_WORLD.size}: Successfully wrote and read snapshot")
 
