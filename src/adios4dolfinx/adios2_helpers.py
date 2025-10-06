@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from contextlib import contextmanager
 from pathlib import Path
 from typing import NamedTuple, Union
@@ -54,6 +55,15 @@ def ADIOSFile(
 ):
     io = adios.DeclareIO(io_name)
     io.SetEngine(engine)
+    # ADIOS2 sometimes struggles with existing files/folders it should overwrite
+    if mode == adios2.Mode.Write:
+        filename = Path(filename)
+        if filename.exists():
+            if filename.is_dir():
+                shutil.rmtree(filename)
+            else:
+                filename.unlink()
+
     file = io.Open(str(filename), mode)
     try:
         yield AdiosFile(io=io, file=file)
