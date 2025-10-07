@@ -52,17 +52,20 @@ def ADIOSFile(
     engine: str,
     mode: adios2.Mode,
     io_name: str,
+    comm: MPI.Intracomm | None = None,
 ):
     io = adios.DeclareIO(io_name)
     io.SetEngine(engine)
     # ADIOS2 sometimes struggles with existing files/folders it should overwrite
     if mode == adios2.Mode.Write:
         filename = Path(filename)
-        if filename.exists():
+        if filename.exists() and comm is not None and comm.rank == 0:
             if filename.is_dir():
                 shutil.rmtree(filename)
             else:
                 filename.unlink()
+        if comm is not None:
+            comm.Barrier()
 
     file = io.Open(str(filename), mode)
     try:
@@ -316,7 +319,8 @@ def read_array(
 
         arr = adios_file.io.InquireVariable(array_name)
         arr_shape = arr.Shape()
-        assert len(arr_shape) >= 1  # TODO: Should we always pick the first element?
+        # TODO: Should we always pick the first element?
+        assert len(arr_shape) >= 1
         arr_range = compute_local_range(comm, arr_shape[0])
 
         if len(arr_shape) == 1:

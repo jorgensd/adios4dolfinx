@@ -43,7 +43,7 @@ def write_mesh(
     gdim = mesh.local_geometry.shape[1]
     adios = adios2.ADIOS(comm)
     with ADIOSFile(
-        adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name
+        adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name, comm=comm
     ) as adios_file:
         adios_file.file.BeginStep()
         # Write geometry
@@ -154,7 +154,7 @@ def write_function(
         XDofmap_exists = check_variable_exists(adios, filename, f"{u.name}_XDofmap", engine=engine)
 
     with ADIOSFile(
-        adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name
+        adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name, comm=comm
     ) as adios_file:
         adios_file.file.BeginStep()
 
