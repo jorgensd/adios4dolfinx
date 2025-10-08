@@ -22,7 +22,7 @@ The `adios4dolfinx` library extends the [DOLFINx](https://github.com/FEniCS/dolf
 
 Compatibility with DOLFINx:
 
-- ADIOS4DOLFINx v0.9.5 is compatible with DOLFINx v0.9.x
+- ADIOS4DOLFINx v0.9.6 is compatible with DOLFINx v0.9.x
 - ADIOS4DOLFINx v0.8.1 is compatible with DOLFINx v0.8.x
 - ADIOS4DOLFINx v0.7.3 is compatible with DOLFINx v0.7.x
 
