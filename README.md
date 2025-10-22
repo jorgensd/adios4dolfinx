@@ -32,7 +32,7 @@ The library depends on the Python-interface of [DOLFINx](https://github.com/) an
 Therefore `ADIOS2` should not be install through PYPI/pip, but has to be installed through Conda, Spack or from source.
 
 > [!IMPORTANT]  
-> ADIOS2<2.10.2 does not work properly with `numpy>=2.0.0`. Everyone is adviced to use the newest version of ADIOS2.
+> ADIOS2<2.10.2 does not work properly with `numpy>=2.0.0`. Everyone is advised to use the newest version of ADIOS2.
 > This is for instance available through `conda` or the `ghcr.io/fenics/dolfinx/dolfinx:nightly` Docker-image.
 
 ### Spack
@@ -142,7 +142,7 @@ The repository contains many documented examples of usage, in the `docs`-folder,
 ### Backwards compatibility
 
 > [!WARNING]
-> If you are using v0.7.2, you are adviced to upgrade to v0.7.3, as it contains som crucial fixes for openmpi.
+> If you are using v0.7.2, you are advised to upgrade to v0.7.3, as it contains som crucial fixes for openmpi.
 
 ### Legacy DOLFIN
 
