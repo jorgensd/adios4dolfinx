@@ -1,10 +1,12 @@
 # # Writing a function checkpoint
 # In the previous sections, we have gone in to quite some detail as to how
 # to store meshes with adios4dolfinx.
-# This section will explain how to store functions, and how to read them back in.
+# This section will explain how to store {py:class}`functions<dolfinx.fem.Function>`,
+# and how to read them back in.
 
-# We start by creating a mesh and an appropriate function
+# We start by creating a {py:class}`mesh<dolfinx.mesh.Mesh>`
 
+# +
 import logging
 from pathlib import Path
 
@@ -20,9 +22,11 @@ assert MPI.COMM_WORLD.size == 1, "This example should only be run with 1 MPI pro
 mesh = dolfinx.mesh.create_unit_square(
     MPI.COMM_WORLD, nx=10, ny=10, cell_type=dolfinx.cpp.mesh.CellType.quadrilateral
 )
+# -
 
 # Next, we create a function, and interpolate a polynomial function into the function space
 
+# +
 el = "N1curl"
 degree = 3
 V = dolfinx.fem.functionspace(mesh, (el, degree))
@@ -34,6 +38,7 @@ def f(x):
 
 u = dolfinx.fem.Function(V)
 u.interpolate(f)
+# -
 
 # For the checkpointing, we start by storing the mesh to file
 
@@ -42,12 +47,24 @@ adios4dolfinx.write_mesh(filename, mesh)
 
 # Next, we store the function to file, and associate it with a name.
 # Note that we can also associate a time stamp with it, as done for meshes in
-# [Writing time-dependent mesh checkpoint](./time_dependent_mesh)
+# [Writing time-dependent mesh checkpoint](./time_dependent_mesh).
+# We use {py:func}`adios4dolfinx.write_function` for this.
 
 adios4dolfinx.write_function(filename, u, time=0.3, name="my_curl_function")
 
 # Next, we want to read the function back in (using multiple MPI processes)
 # and check that the function is correct.
+# We use {py:func}`adios4dolfinx.read_function` for this.
+#
+# ```{admonition} What mesh to use?
+# Note that we have read in the mesh with {py:func}`adios4dolfinx.read_mesh`
+# before reading in the function.
+# We **cannot** use {py:func}`adios4dolfinx.read_function` to read function data to the
+# original `mesh` object.
+# To do this, we need to use {py:func}`adios4dolfinx.write_function_on_input_mesh`, see
+# [Writing function on input mesh checkpoint](./original_checkpoint).
+# for more details.
+# ```
 
 
 def read_function(filename: Path, timestamp: float):

@@ -32,6 +32,8 @@ sphinx:
   - 'sphinx.ext.autodoc'
   - 'sphinx.ext.napoleon'
   - 'sphinx.ext.viewcode'
+  - "sphinx.ext.intersphinx"
+  - "sphinx_codeautolink"
 
   config:
     html_last_updated_fmt: "%b %d, %Y"
@@ -39,5 +41,19 @@ sphinx:
       .py:
         - jupytext.reads
         - fmt: py
+
+    codeautolink_concat_default: True
+    intersphinx_mapping:
+      basix: ["https://docs.fenicsproject.org/basix/v0.10.0/python", null]
+      ffcx: ["https://docs.fenicsproject.org/ffcx/v0.10.0", null]
+      ufl: ["https://docs.fenicsproject.org/ufl/2025.1.0", null]
+      dolfinx: ["https://docs.fenicsproject.org/dolfinx/v0.10.0/python", null]
+      petsc4py: ["https://petsc.org/release/petsc4py", null]
+      mpi4py: ["https://mpi4py.readthedocs.io/en/stable", null]
+      numpy: ["https://numpy.org/doc/stable/", null]
+      pyvista: ["https://docs.pyvista.org/", null]
+      packaging: ["https://packaging.pypa.io/en/stable/", null]
+      matplotlib: ["https://matplotlib.org/stable/", null]
+      ipyparallel: ["https://ipyparallel.readthedocs.io/en/stable/", null]
 
 exclude_patterns: [".pytest_cache/*"]

@@ -11,10 +11,13 @@
 # An example use-case is when running an iterative solver, and wanting a fall-back mechanism that
 # does not require extra RAM.
 
-# In this example, we will demonstrate how to write a snapshot checkpoint to disk.
+# In this example, we will demonstrate how to write a
+# {py:func}`snapshot checkpoint<adios4dolfinx.snapshot_checkpoint>` to disk.
 
-# First we define a function `f` that we want to represent in the function space
+# First we define a {py:class}`function<dolfinx.fem.Function>` `f` that we want to represent in
+# the {py:class}`function space<dolfinx.fem.FunctionSpace>`.
 
+# +
 import logging
 from pathlib import Path
 
@@ -27,7 +30,13 @@ def f(x):
     return np.sin(x[0]) + 0.1 * x[1]
 
 
-# Next, we create a mesh and an appropriate function space and read and write from file
+# -
+
+# Next, we create a mesh and an appropriate function space and read and write from file.
+# Note that for both these operations, we use {py:func}`adios4dolfinx.snapshot_checkpoint`,
+# with different read and write modes.
+
+
 def read_write_snapshot(filename: Path):
     from mpi4py import MPI
 
@@ -57,6 +66,8 @@ def read_write_snapshot(filename: Path):
     print(f"{MPI.COMM_WORLD.rank + 1}/{MPI.COMM_WORLD.size}: Successfully wrote and read snapshot")
 
 
+# +
+
 mesh_file = Path("snapshot.bp")
 
 with ipp.Cluster(engines="mpi", n=3, log_level=logging.ERROR) as cluster:
@@ -68,3 +79,4 @@ with ipp.Cluster(engines="mpi", n=3, log_level=logging.ERROR) as cluster:
     query.wait()
     assert query.successful(), query.error
     print("".join(query.stdout))
+# -

@@ -18,7 +18,8 @@ docs = [
     "ipyparallel",
     "ipywidgets",
     "jupytext",
-    "ipykernel<7.0.0", # Note: Remove once https://github.com/ipython/ipykernel/issues/1450 is in a release
+    "ipykernel<7.0.0",     # Note: Remove once https://github.com/ipython/ipykernel/issues/1450 is in a release
+    "sphinx-codeautolink",
 ]
 all = ["adios4dolfinx[test,dev,docs]"]
 
