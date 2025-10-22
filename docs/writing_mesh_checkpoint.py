@@ -82,8 +82,8 @@ with ipp.Cluster(engines="mpi", n=3, log_level=logging.ERROR) as cluster:
 # - A geometry: the set of points in R^D that are part of each cell
 # - A two-dimensional connectivity array: A list that indicates which nodes of the geometry
 #    is part of each cell
-# - A {py:func}`reference element<basix.ufl.element>`: Used for push data back and forth from the reference element and
-#    computing Jacobians
+# - A {py:func}`reference element<basix.ufl.element>`: Used for push data back and
+#   forth from the reference element and computing Jacobians
 # We now use {py:mod}`adios4dolfinx` to write a mesh to file.
 
 

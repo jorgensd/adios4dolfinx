@@ -1,6 +1,6 @@
 # # Introduction to IPython parallel
-# The following demos heavily rely on {py:mod}`IPython-parallel<ipyparallel>` to illustrate how checkpointing works when
-# using multiple {py:mod}`MPI<mpi4py>` processes.
+# The following demos heavily rely on {py:mod}`IPython-parallel<ipyparallel>` to illustrate how
+# checkpointing works when using multiple {py:mod}`MPI<mpi4py>` processes.
 # We illustrate what happens in parallel by launching three MPI processes
 # using IPython-parallel's MPI engine support.
 

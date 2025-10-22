@@ -1,7 +1,8 @@
 # # Writing a function checkpoint
 # In the previous sections, we have gone in to quite some detail as to how
 # to store meshes with adios4dolfinx.
-# This section will explain how to store {py:class}`functions<dolfinx.fem.Function>`, and how to read them back in.
+# This section will explain how to store {py:class}`functions<dolfinx.fem.Function>`,
+# and how to read them back in.
 
 # We start by creating a {py:class}`mesh<dolfinx.mesh.Mesh>`
 
@@ -56,8 +57,10 @@ adios4dolfinx.write_function(filename, u, time=0.3, name="my_curl_function")
 # We use {py:func}`adios4dolfinx.read_function` for this.
 #
 # ```{admonition} What mesh to use?
-# Note that we have read in the mesh with {py:func}`adios4dolfinx.read_mesh` before reading in the function.
-# We **cannot** use {py:func}`adios4dolfinx.read_function` to read function data to the original `mesh` object.
+# Note that we have read in the mesh with {py:func}`adios4dolfinx.read_mesh`
+# before reading in the function.
+# We **cannot** use {py:func}`adios4dolfinx.read_function` to read function data to the
+# original `mesh` object.
 # To do this, we need to use {py:func}`adios4dolfinx.write_function_on_input_mesh`, see
 # [Writing function on input mesh checkpoint](./original_checkpoint).
 # for more details.

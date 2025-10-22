@@ -11,7 +11,8 @@
 # An example use-case is when running an iterative solver, and wanting a fall-back mechanism that
 # does not require extra RAM.
 
-# In this example, we will demonstrate how to write a {py:func}`snapshot checkpoint<adios4dolfinx.snapshot_checkpoint>` to disk.
+# In this example, we will demonstrate how to write a
+# {py:func}`snapshot checkpoint<adios4dolfinx.snapshot_checkpoint>` to disk.
 
 # First we define a {py:class}`function<dolfinx.fem.Function>` `f` that we want to represent in
 # the {py:class}`function space<dolfinx.fem.FunctionSpace>`.

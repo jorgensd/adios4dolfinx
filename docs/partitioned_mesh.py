@@ -86,7 +86,8 @@ with ipp.Cluster(engines="mpi", n=n + 1, log_level=logging.ERROR) as cluster:
     print("".join(query.stdout))
 
 # Read mesh from file with different number of processes (not using partitioning information).
-# If we instead turn of `read_from_partition`, we can read the mesh on a different number of processes.
+# If we instead turn of `read_from_partition`, we can read the mesh on a
+# different number of processes.
 
 with ipp.Cluster(engines="mpi", n=n + 1, log_level=logging.ERROR) as cluster:
     query = cluster[:].apply_async(read_partitioned_mesh, mesh_file, False)
