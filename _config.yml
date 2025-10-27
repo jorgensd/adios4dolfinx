@@ -29,11 +29,11 @@ parse:
 
 sphinx:
   extra_extensions:
-  - 'sphinx.ext.autodoc'
-  - 'sphinx.ext.napoleon'
-  - 'sphinx.ext.viewcode'
-  - "sphinx.ext.intersphinx"
-  - "sphinx_codeautolink"
+    - "sphinx.ext.autodoc"
+    - "sphinx.ext.napoleon"
+    - "sphinx.ext.viewcode"
+    - "sphinx.ext.intersphinx"
+    - "sphinx_codeautolink"
 
   config:
     html_last_updated_fmt: "%b %d, %Y"
@@ -44,10 +44,10 @@ sphinx:
 
     codeautolink_concat_default: True
     intersphinx_mapping:
-      basix: ["https://docs.fenicsproject.org/basix/v0.10.0/python", null]
-      ffcx: ["https://docs.fenicsproject.org/ffcx/v0.10.0", null]
-      ufl: ["https://docs.fenicsproject.org/ufl/2025.1.0", null]
-      dolfinx: ["https://docs.fenicsproject.org/dolfinx/v0.10.0/python", null]
+      basix: ["https://docs.fenicsproject.org/basix/main/python", null]
+      ffcx: ["https://docs.fenicsproject.org/ffcx/main", null]
+      ufl: ["https://docs.fenicsproject.org/ufl/main", null]
+      dolfinx: ["https://docs.fenicsproject.org/dolfinx/main/python", null]
       petsc4py: ["https://petsc.org/release/petsc4py", null]
       mpi4py: ["https://mpi4py.readthedocs.io/en/stable", null]
       numpy: ["https://numpy.org/doc/stable/", null]
