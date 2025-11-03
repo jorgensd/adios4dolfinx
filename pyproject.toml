@@ -14,7 +14,7 @@ dependencies = ["fenics-dolfinx>=0.10.0", "packaging"]
 test = ["pytest", "coverage", "ipyparallel"]
 dev = ["pdbpp", "ipython", "mypy", "ruff"]
 docs = [
-    "jupyter-book",
+    "jupyter-book<2.0.0",
     "ipyparallel",
     "ipywidgets",
     "jupytext",
