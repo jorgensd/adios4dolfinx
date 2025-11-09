@@ -64,13 +64,13 @@ jobs:
         run: python3 -m pip install --break-system-packages --upgrade pip setuptools
 
       - name: Download legacy data
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: legacy_mpich
           path: ./legacy
 
       - name: Download legacy data
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: legacy_checkpoint_mpich
           path: ./legacy_checkpoint
