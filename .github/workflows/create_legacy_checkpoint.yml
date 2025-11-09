@@ -25,7 +25,7 @@ jobs:
       - name: Create datasets
         run: python3 ./tests/create_legacy_checkpoint.py --output-dir=$data_dir
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: ${{ inputs.artifact_name }}
           path: ./${{ env.data_dir }}
