@@ -212,7 +212,7 @@ def write_meshtags(
     if hasattr(dof_layout, "num_entity_closure_dofs"):
         num_dofs_per_entity = dof_layout.num_entity_closure_dofs(dim)
     else:
-        num_dofs_per_entity = len(dof_layout.entity_closure_dofs(dim))
+        num_dofs_per_entity = len(dof_layout.entity_closure_dofs(dim, 0))
 
     entities_to_geometry = dolfinx.cpp.mesh.entities_to_geometry(
         mesh._cpp_object, dim, local_tag_entities, False
@@ -745,7 +745,7 @@ def write_mesh(
     if hasattr(geom_layout, "num_entity_closure_dofs"):
         num_dofs_per_cell = geom_layout.num_entity_closure_dofs(mesh.topology.dim)
     else:
-        num_dofs_per_cell = len(geom_layout.entity_closure_dofs(mesh.topology.dim))
+        num_dofs_per_cell = len(geom_layout.entity_closure_dofs(mesh.topology.dim, 0))
     dofs_out = np.zeros((num_cells_local, num_dofs_per_cell), dtype=np.int64)
     assert g_dmap.shape[1] == num_dofs_per_cell
     dofs_out[:, :] = np.asarray(
