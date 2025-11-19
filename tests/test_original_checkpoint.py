@@ -173,7 +173,7 @@ def read_function_original(
         )
     el = basix.ufl.element(
         family,
-        mesh.ufl_cell().cellname(),
+        mesh.basix_cell(),
         degree,
         basix.LagrangeVariant.gll_warped,
         shape=(mesh.geometry.dim,),
@@ -213,7 +213,7 @@ def write_function_vector(
     assert MPI.COMM_WORLD.size > 1
     with dolfinx.io.XDMFFile(MPI.COMM_WORLD, fname, "r") as xdmf:
         mesh = xdmf.read_mesh()
-    el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree, dtype=mesh.geometry.x.dtype)
+    el = basix.ufl.element(family, mesh.basix_cell(), degree, dtype=mesh.geometry.x.dtype)
     V = dolfinx.fem.functionspace(mesh, el)
     uh = dolfinx.fem.Function(V, dtype=dtype)
     uh.interpolate(f)
@@ -257,7 +257,7 @@ def read_function_vector(
         mesh = adios4dolfinx.read_mesh(
             mesh_fname, MPI.COMM_WORLD, "BP4", dolfinx.mesh.GhostMode.shared_facet
         )
-    el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
+    el = basix.ufl.element(family, mesh.basix_cell(), degree)
 
     V = dolfinx.fem.functionspace(mesh, el)
     u = dolfinx.fem.Function(V, name=u_name, dtype=u_dtype)
@@ -289,7 +289,7 @@ def test_read_write_P_2D(
 
     el = basix.ufl.element(
         family,
-        mesh.ufl_cell().cellname(),
+        mesh.basix_cell(),
         degree,
         basix.LagrangeVariant.gll_warped,
         shape=(mesh.geometry.dim,),
@@ -335,7 +335,7 @@ def test_read_write_P_3D(
     f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
     el = basix.ufl.element(
         family,
-        mesh.ufl_cell().cellname(),
+        mesh.basix_cell(),
         degree,
         basix.LagrangeVariant.gll_warped,
         shape=(mesh.geometry.dim,),

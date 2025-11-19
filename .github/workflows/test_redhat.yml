@@ -1,17 +1,17 @@
 name: Test package with redhat
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+  # push:
+  #   branches:
+  #     - main
+  # pull_request:
+  #   branches:
+  #     - main
 
   workflow_call:
   workflow_dispatch:
-  schedule:
-    - cron: "0 8 * * *"
+  # schedule:
+  #   - cron: "0 8 * * *"
 
 jobs:
   create-datasets:
@@ -37,9 +37,9 @@ jobs:
 
     strategy:
       matrix:
-        adios2: ["v2.10.2"]
+        adios2: ["master"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Get pip flags based on version
         id: python-version
@@ -70,13 +70,13 @@ jobs:
           working-directory: ${{ env.working-directory}}
 
       - name: Download legacy data
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: legacy_ompi
           path: ./legacy
 
       - name: Download legacy data
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: legacy_checkpoint_ompi
           path: ./legacy_checkpoint

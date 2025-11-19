@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from contextlib import contextmanager
 from pathlib import Path
 from typing import NamedTuple, Union
@@ -51,15 +52,60 @@ def ADIOSFile(
     engine: str,
     mode: adios2.Mode,
     io_name: str,
+    comm: MPI.Intracomm | None = None,
 ):
     io = adios.DeclareIO(io_name)
     io.SetEngine(engine)
+    # ADIOS2 sometimes struggles with existing files/folders it should overwrite
+    if mode == adios2.Mode.Write:
+        filename = Path(filename)
+        if filename.exists() and comm is not None and comm.rank == 0:
+            if filename.is_dir():
+                shutil.rmtree(filename)
+            else:
+                filename.unlink()
+        if comm is not None:
+            comm.Barrier()
+
     file = io.Open(str(filename), mode)
     try:
         yield AdiosFile(io=io, file=file)
     finally:
         file.Close()
         adios.RemoveIO(io_name)
+
+
+def check_variable_exists(
+    adios: adios2.ADIOS,
+    filename: Union[Path, str],
+    variable: str,
+    engine: str,
+) -> bool:
+    io_name = f"{variable}_reader"
+
+    if not Path(filename).exists():
+        return False
+
+    variable_found = False
+    with ADIOSFile(
+        adios=adios,
+        engine=engine,
+        filename=filename,
+        mode=adios2.Mode.Read,
+        io_name=io_name,
+    ) as adios_file:
+        # Find step that has cell permutation
+        for _ in range(adios_file.file.Steps()):
+            adios_file.file.BeginStep()
+            if variable in adios_file.io.AvailableVariables().keys():
+                variable_found = True
+                break
+            adios_file.file.EndStep()
+
+        # Not sure if this is needed, but just in case
+        if variable in adios_file.io.AvailableVariables().keys():
+            variable_found = True
+    return variable_found
 
 
 def read_cell_perms(
@@ -273,7 +319,8 @@ def read_array(
 
         arr = adios_file.io.InquireVariable(array_name)
         arr_shape = arr.Shape()
-        assert len(arr_shape) >= 1  # TODO: Should we always pick the first element?
+        # TODO: Should we always pick the first element?
+        assert len(arr_shape) >= 1
         arr_range = compute_local_range(comm, arr_shape[0])
 
         if len(arr_shape) == 1:

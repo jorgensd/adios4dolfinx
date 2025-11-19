@@ -17,7 +17,7 @@ jobs:
     container: ghcr.io/fenics/dolfinx/dolfinx:v0.7.3
   
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install legacy version of adios4dolfinx
         run: python3 -m pip install --break-system-packages adios4dolfinx==${adios4dolfinx_version}
@@ -25,7 +25,7 @@ jobs:
       - name: Create datasets
         run: python3 ./tests/create_legacy_checkpoint.py --output-dir=$data_dir
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: ${{ inputs.artifact_name }}
           path: ./${{ env.data_dir }}

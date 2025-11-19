@@ -4,8 +4,10 @@
 # connectivity arrays are re-ordered.
 # If we want to avoid to re-partition the mesh every time you run a simulation
 # (on a fixed number of processes), one can store the partitioning of the mesh
-# in the checkpoint.
+# in the checkpoint. This is done by setting the flag `store_partition_info=True`
+# when calling {py:func}`adios4dolfinx.write_mesh`.
 
+# +
 import logging
 from pathlib import Path
 
@@ -38,8 +40,11 @@ def write_partitioned_mesh(filename: Path):
         print(output.stdout.decode("utf-8"))
 
 
+# -
+
 # We inspect the partitioned mesh
 
+# +
 mesh_file = Path("partitioned_mesh.bp")
 n = 3
 
@@ -48,10 +53,14 @@ with ipp.Cluster(engines="mpi", n=n, log_level=logging.ERROR) as cluster:
     query.wait()
     assert query.successful(), query.error
     print("".join(query.stdout))
+# -
 
 # # Reading a partitioned mesh
 
-# If we try to read the mesh in on a different number of processes, we will get an error
+# If we try to read the mesh in on a different number of processes, we will get an error.
+# We illustrate this below, by first trying to read the mesh using partitioning information,
+# which is done by setting the flag `read_from_partition=True` when calling
+# {py:func}`adios4dolfinx.read_mesh`.
 
 
 def read_partitioned_mesh(filename: Path, read_from_partition: bool = True):
@@ -77,6 +86,8 @@ with ipp.Cluster(engines="mpi", n=n + 1, log_level=logging.ERROR) as cluster:
     print("".join(query.stdout))
 
 # Read mesh from file with different number of processes (not using partitioning information).
+# If we instead turn of `read_from_partition`, we can read the mesh on a
+# different number of processes.
 
 with ipp.Cluster(engines="mpi", n=n + 1, log_level=logging.ERROR) as cluster:
     query = cluster[:].apply_async(read_partitioned_mesh, mesh_file, False)

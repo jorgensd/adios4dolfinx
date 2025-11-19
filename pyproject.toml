@@ -3,17 +3,24 @@ requires = ["setuptools>=61.0.0", "wheel"]
 
 [project]
 name = "adios4dolfinx"
-version = "0.9.3"
+version = "0.11.0.dev0"
 description = "Checkpointing functionality for DOLFINx meshes/functions with ADIOS2"
 authors = [{ name = "Jørgen S. Dokken", email = "dokken@simula.no" }]
 license = { file = "LICENSE" }
 readme = "README.md"
-dependencies = ["fenics-dolfinx>=0.9.0", "packaging"]
+dependencies = ["fenics-dolfinx>=0.10.0", "packaging"]
 
 [project.optional-dependencies]
 test = ["pytest", "coverage", "ipyparallel"]
 dev = ["pdbpp", "ipython", "mypy", "ruff"]
-docs = ["jupyter-book", "ipyparallel", "ipywidgets", "jupytext"]
+docs = [
+    "jupyter-book<2.0.0",
+    "ipyparallel",
+    "ipywidgets",
+    "jupytext",
+    "ipykernel<7.0.0",     # Note: Remove once https://github.com/ipython/ipykernel/issues/1450 is in a release
+    "sphinx-codeautolink",
+]
 all = ["adios4dolfinx[test,dev,docs]"]
 
 [tool.pytest.ini_options]

@@ -8,6 +8,7 @@
 
 # First, we create a simple function to compute the volume of a mesh
 
+# +
 import logging
 from pathlib import Path
 
@@ -64,7 +65,11 @@ def write_meshes(filename: Path):
     )
 
 
+# -
+
 # We write the sequence of meshes to file
+
+# +
 mesh_file = Path("timedep_mesh.bp")
 n = 3
 
@@ -75,9 +80,11 @@ with ipp.Cluster(engines="mpi", n=n, log_level=logging.ERROR) as cluster:
     query.wait()
     assert query.successful(), query.error
     print("".join(query.stdout))
+# -
 
 # # Reading a time dependent mesh
-# The only thing we need to do to read the mesh is to send in the associated time stamp.
+# The only thing we need to do to read the mesh is to send in the associated time stamp,
+# which we do by adding `time=time_stamp` when calling {py:func}`adios4dolfinx.read_mesh`.
 
 second_mesh = adios4dolfinx.read_mesh(mesh_file, comm=MPI.COMM_WORLD, engine="BP4", time=3.3)
 compute_volume(second_mesh, 3.3)

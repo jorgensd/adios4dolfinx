@@ -40,7 +40,7 @@ jobs:
       matrix:
         adios2: ["default", "v2.10.2"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Update pip
         run: python3 -m pip install --break-system-packages --upgrade pip setuptools
@@ -57,13 +57,13 @@ jobs:
           working-directory: ${{ env.working-directory}}
 
       - name: Download legacy data
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: legacy_ompi
           path: ./legacy
 
       - name: Download legacy data
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: legacy_checkpoint_ompi
           path: ./legacy_checkpoint
