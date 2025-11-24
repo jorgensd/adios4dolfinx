@@ -17,7 +17,7 @@ jobs:
     container: ghcr.io/fenics/dolfinx/dolfinx:v0.7.3
   
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Install legacy version of adios4dolfinx
         run: python3 -m pip install --break-system-packages adios4dolfinx==${adios4dolfinx_version}

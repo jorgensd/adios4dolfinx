@@ -46,7 +46,7 @@ jobs:
 
     steps:
       # This action sets the current path to the root of your github repo
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Update pip
         run: python3 -m pip install --break-system-packages --upgrade pip setuptools
