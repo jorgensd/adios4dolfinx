@@ -305,9 +305,14 @@ def read_array(
                     if times[0] == time:
                         break
                 if i == adios_file.file.Steps() - 1:
-                    raise KeyError(
-                        f"No data associated with {time_name}={time} found in {filename}"
+                    msg = (
+                        f"No data associated with {time_name}={time} found in {filename}. "
+                        "\nThe problem might be due to floating point precision issues. "
+                        "\nSee https://jsdokken.com/adios4dolfinx/docs/debugging.html"
+                        "#checkpoint-time-stamps-and-floating-point-precision-issues "
+                        "for more information."
                     )
+                    raise KeyError(msg)
 
                 adios_file.file.EndStep()
 

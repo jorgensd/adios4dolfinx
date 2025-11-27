@@ -18,6 +18,10 @@ parts:
     - file: "docs/snapshot_checkpoint"
     - file: "docs/original_checkpoint"
 
+  - caption: Debugging
+    chapters:
+    - file: "docs/debugging"
+
   - caption: Python API
     chapters:
     - file: "docs/api"
