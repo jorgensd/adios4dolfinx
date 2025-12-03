@@ -25,7 +25,7 @@ jobs:
       artifact_name: "legacy_checkpoint_ompi"
 
   test-code:
-    runs-on: "ubuntu-22.04"
+    runs-on: "ubuntu-latest"
     needs: [create-datasets, create-legacy-datasets]
     container: docker.io/fenicsproject/test-env:current-redhat
     env:
