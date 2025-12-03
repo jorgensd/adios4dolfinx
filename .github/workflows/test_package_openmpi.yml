@@ -1,4 +1,4 @@
-name: Test package with openmpi
+name: Test package with different mpi compilers
 
 on:
   push:
@@ -27,7 +27,7 @@ jobs:
   test-code:
     runs-on: ubuntu-latest
     needs: [create-datasets, create-legacy-datasets]
-    container: ghcr.io/fenics/test-env:current-openmpi
+    container: ${{ matrix.container }}
     env:
       DEB_PYTHON_INSTALL_LAYOUT: deb_system
       PETSC_ARCH: "linux-gnu-real64-32"
@@ -38,7 +38,10 @@ jobs:
 
     strategy:
       matrix:
-        adios2: ["default", "v2.10.2"]
+        adios2: ["default", "v2.10.2", "v2.11.0"]
+        container:
+          - ghcr.io/fenics/test-env:current-openmpi
+          - ghcr.io/fenics/test-env:current-mpich
     steps:
       - uses: actions/checkout@v6
 
