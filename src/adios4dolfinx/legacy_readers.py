@@ -361,7 +361,6 @@ def read_meshtags_from_legacy_h5(
         io_name="MeshFunction reader",
         engine="HDF5",
     ) as adios_file:
-
         # Get topology
         if f"{mesh_group}/topology" not in adios_file.io.AvailableVariables().keys():
             raise KeyError(f"MeshFunction topology not found at '{mesh_group}/topology'")
@@ -370,8 +369,13 @@ def read_meshtags_from_legacy_h5(
         shape = in_topology.Shape()
         local_cell_range = compute_local_range(mesh.comm, shape[0])
 
-        in_topology.SetSelection([[local_cell_range[0], 0], [local_cell_range[1] - local_cell_range[0], shape[1]]])
-        topology = np.empty((local_cell_range[1] - local_cell_range[0], shape[1]), dtype=in_topology.Type().strip("_t"),)
+        in_topology.SetSelection(
+            [[local_cell_range[0], 0], [local_cell_range[1] - local_cell_range[0], shape[1]]]
+        )
+        topology = np.empty(
+            (local_cell_range[1] - local_cell_range[0], shape[1]),
+            dtype=in_topology.Type().strip("_t"),
+        )
         adios_file.file.Get(in_topology, topology, adios2.Mode.Sync)
 
         # Get values
@@ -379,17 +383,22 @@ def read_meshtags_from_legacy_h5(
             raise KeyError(f"MeshFunction values not found at '{tag_group}/values'")
 
         in_values = adios_file.io.InquireVariable(f"{tag_group}/values")
-        values = np.empty(local_cell_range[1] - local_cell_range[0], dtype=in_values.Type().strip("_t"))
+        values = np.empty(
+            local_cell_range[1] - local_cell_range[0], dtype=in_values.Type().strip("_t")
+        )
         in_values.SetSelection([[local_cell_range[0]], [local_cell_range[1] - local_cell_range[0]]])
         adios_file.file.Get(in_values, values, adios2.Mode.Sync)
         # Convert to int32
         values = values.astype(np.int32)
 
         # Create meshtags
-        local_entities, local_values = dolfinx.io.utils.distribute_entity_data(mesh, dim, topology, values)
-        adj = dolfinx.cpp.graph.AdjacencyList_int32(local_entities)
-
-        mt = dolfinx.mesh.meshtags_from_entities(mesh, dim, adj, local_values.astype(np.int32, copy=False))
+        local_entities, local_values = dolfinx.io.utils.distribute_entity_data(
+            mesh, dim, topology, values
+        )
+        adj = dolfinx.graph.adjacencylist(local_entities)
+        mt = dolfinx.mesh.meshtags_from_entities(
+            mesh, dim, adj, local_values.astype(np.int32, copy=False)
+        )
         return mt
 
 
