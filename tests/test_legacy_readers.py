@@ -21,6 +21,7 @@ from adios4dolfinx import (
     read_function_from_legacy_h5,
     read_mesh,
     read_mesh_from_legacy_h5,
+    read_meshtags_from_legacy_h5,
 )
 
 
@@ -44,7 +45,7 @@ def test_legacy_mesh():
 
     mesh.topology.create_entities(mesh.topology.dim - 1)
     num_facets = mesh.topology.index_map(mesh.topology.dim - 1).size_global
-    assert num_facets == 18
+    assert num_facets == 120
 
 
 def test_read_legacy_mesh_from_checkpoint():
@@ -67,7 +68,7 @@ def test_read_legacy_mesh_from_checkpoint():
 
     mesh.topology.create_entities(mesh.topology.dim - 1)
     num_facets = mesh.topology.index_map(mesh.topology.dim - 1).size_global
-    assert num_facets == 18
+    assert num_facets == 120
 
 
 def test_legacy_function():
@@ -178,3 +179,34 @@ def test_adios4dolfinx_legacy():
     u_ex.interpolate(f)
 
     np.testing.assert_allclose(u.x.array, u_ex.x.array, atol=1e-14)
+
+
+def test_read_legacy_meshtags():
+    comm = MPI.COMM_WORLD
+    path = (pathlib.Path("legacy") / "mesh.h5").absolute()
+    if not path.exists():
+        pytest.skip(f"{path} does not exist")
+    mesh = read_mesh_from_legacy_h5(path, comm, "/mesh")
+
+    legacy_celltags = read_meshtags_from_legacy_h5(
+        filename=path, mesh=mesh, dim=3, tag_group="/cell_function", mesh_group="/cell_function"
+    )
+    cells_1 = dolfinx.mesh.locate_entities(mesh, mesh.topology.dim, lambda x: x[0] <= 0.5 + 1e-12)
+    cells_0 = dolfinx.mesh.locate_entities(mesh, mesh.topology.dim, lambda x: x[0] >= 0.5 - 1e-12)
+    assert np.all(legacy_celltags.values[cells_1] == 1)
+    assert np.all(legacy_celltags.values[cells_0] == 0)
+
+    mesh.topology.create_entities(mesh.topology.dim - 1)
+    legacy_facettags = read_meshtags_from_legacy_h5(
+        filename=path, mesh=mesh, dim=2, tag_group="/facet_function", mesh_group="/facet_function"
+    )
+    facets_2 = dolfinx.mesh.locate_entities_boundary(
+        mesh, mesh.topology.dim - 1, lambda x: x[0] > 0.5 - 1e-12
+    )
+    # Should probably check interior facets as well, but I guess
+    # this is sufficient for now
+    facets_0 = dolfinx.mesh.locate_entities_boundary(
+        mesh, mesh.topology.dim - 1, lambda x: x[0] < 0.5 + 1e-12
+    )
+    assert np.all(legacy_facettags.values[facets_2] == 2)
+    assert np.all(legacy_facettags.values[facets_0] == 0)
