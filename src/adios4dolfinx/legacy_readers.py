@@ -24,7 +24,7 @@ from .adios2_helpers import (
     read_array,
     resolve_adios_scope,
 )
-from .comm_helpers import send_dofs_and_recv_values, compute_local_range
+from .comm_helpers import send_dofs_and_recv_values
 from .utils import (
     compute_dofmap_pos,
     compute_insert_position,
