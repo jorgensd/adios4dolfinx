@@ -14,15 +14,15 @@ jobs:
     env:
       data_dir: "legacy"
   
-    runs-on: "ubuntu-22.04"
+    runs-on: "ubuntu-latest"
     container: ghcr.io/scientificcomputing/fenics:2024-02-19
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
 
     - name: Create datasets
       run: python3 ./tests/create_legacy_data.py --output-dir=$data_dir
 
-    - uses: actions/upload-artifact@v5
+    - uses: actions/upload-artifact@v6
       with:
         name: ${{ inputs.artifact_name }}
         path: ./${{ env.data_dir }}

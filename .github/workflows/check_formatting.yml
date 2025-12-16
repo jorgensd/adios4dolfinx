@@ -37,10 +37,10 @@ jobs:
 
   build:
     needs: get_image_tag
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     container: ghcr.io/fenics/dolfinx/dolfinx:${{ needs.get_image_tag.outputs.image }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Update pip
         run: python3 -m pip install --break-system-packages --upgrade pip setuptools

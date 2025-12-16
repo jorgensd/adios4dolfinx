@@ -58,19 +58,19 @@ jobs:
     container: ghcr.io/fenics/dolfinx/dolfinx:${{ needs.get_image_tag.outputs.image }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Update pip
         run: python3 -m pip install --break-system-packages --upgrade pip setuptools
 
       - name: Download legacy data
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: legacy_mpich
           path: ./legacy
 
       - name: Download legacy data
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: legacy_checkpoint_mpich
           path: ./legacy_checkpoint
@@ -93,7 +93,7 @@ jobs:
           coverage html
 
       - name: Upload coverage report as artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: code-coverage-report
           path: htmlcov
