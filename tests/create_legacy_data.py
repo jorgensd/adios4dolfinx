@@ -25,11 +25,31 @@ def create_reference_data(
     family: str,
     degree: int,
     function_name_vec: str,
+    cellfunction_name: str = "cell_function",
+    facetfunction_name: str = "facet_function",
 ) -> dolfin.Function:
-    mesh = dolfin.UnitCubeMesh(1, 1, 1)
+    mesh = dolfin.UnitCubeMesh(2, 2, 2)
     V = dolfin.FunctionSpace(mesh, family, degree)
     W = dolfin.VectorFunctionSpace(mesh, family, degree)
     x = dolfin.SpatialCoordinate(mesh)
+
+    class LeftCell(dolfin.SubDomain):
+        def inside(self, x, on_boundary):
+            return x[0] <= 0.5 + dolfin.DOLFIN_EPS
+
+    left_cell = LeftCell()
+    cfun = dolfin.MeshFunction("size_t", mesh, 3, mesh.domains())
+    cfun.set_all(0)
+    left_cell.mark(cfun, 1)
+
+    class RightFacet(dolfin.SubDomain):
+        def inside(self, x, on_boundary):
+            return x[0] >= 0.5 - dolfin.DOLFIN_EPS and on_boundary
+
+    ffun = dolfin.MeshFunction("size_t", mesh, 2, mesh.domains())
+    ffun.set_all(0)
+    right_facet = RightFacet()
+    right_facet.mark(ffun, 2)
 
     f0 = ufl.conditional(ufl.gt(x[0], 0.5), x[1], 2 * x[0])
     v0 = dolfin.project(f0, V)
@@ -42,6 +62,8 @@ def create_reference_data(
         hdf.write(mesh, mesh_name)
         hdf.write(v0, function_name)
         hdf.write(w0, function_name_vec)
+        hdf.write(cfun, cellfunction_name)
+        hdf.write(ffun, facetfunction_name)
 
     with dolfin.XDMFFile(mesh.mpi_comm(), str(xdmf_file)) as xdmf:
         xdmf.write(mesh)
@@ -121,6 +143,12 @@ if __name__ == "__main__":
     parser.add_argument("--mesh-name", type=str, default="mesh", dest="name")
     parser.add_argument("--function-name", type=str, default="v", dest="f_name")
     parser.add_argument("--function-name-vec", type=str, default="w", dest="f_name_vec")
+    parser.add_argument(
+        "--cellfunction-name", type=str, default="cell_function", dest="cellfunction_name"
+    )
+    parser.add_argument(
+        "--facetfunction-name", type=str, default="facet_function", dest="facetfunction_name"
+    )
 
     inputs = parser.parse_args()
     path = pathlib.Path(inputs.dir)
@@ -136,6 +164,8 @@ if __name__ == "__main__":
         inputs.family,
         inputs.degree,
         inputs.f_name_vec,
+        inputs.cellfunction_name,
+        inputs.facetfunction_name,
     )
 
     verify_hdf5(
