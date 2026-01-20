@@ -21,6 +21,7 @@ from packaging.version import Version
 
 from .adios2_helpers import (
     ADIOSFile,
+    AdiosFile,
     adios_to_numpy_dtype,
     read_adjacency_list,
     read_array,
@@ -179,6 +180,17 @@ def read_timestamps(
     return np.array(time_stamps)
 
 
+def _get_variable_names(adios_file: AdiosFile) -> set[str]:
+    return set(
+        sorted(
+            map(
+                lambda x: x.split("_time")[0],
+                filter(lambda x: x.endswith("_time"), adios_file.io.AvailableVariables()),
+            )
+        )
+    )
+
+
 def read_names(
     filename: typing.Union[Path, str],
     comm: MPI.Intracomm,
@@ -206,14 +218,7 @@ def read_names(
         engine=engine,
         io_name="FunctionNamesReader",
     ) as adios_file:
-        function_names = set(
-            sorted(
-                map(
-                    lambda x: x.split("_time")[0],
-                    filter(lambda x: x.endswith("_time"), adios_file.io.AvailableVariables()),
-                )
-            )
-        )
+        function_names = _get_variable_names(adios_file)
 
     return list(function_names)
 
@@ -433,14 +438,7 @@ def read_function(
             engine=engine,
             io_name="FunctionReader",
         ) as adios_file:
-            variables = set(
-                sorted(
-                    map(
-                        lambda x: x.split("_time")[0],
-                        filter(lambda x: x.endswith("_time"), adios_file.io.AvailableVariables()),
-                    )
-                )
-            )
+            variables = _get_variable_names(adios_file)
             if name not in variables:
                 raise KeyError(f"{name} not found in {filename}. Did you mean one of {variables}?")
 
