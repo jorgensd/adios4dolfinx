@@ -13,6 +13,7 @@ from .checkpointing import (
     read_function,
     read_mesh,
     read_meshtags,
+    read_names,
     read_timestamps,
     write_attributes,
     write_function,
@@ -45,4 +46,5 @@ __all__ = [
     "write_attributes",
     "read_attributes",
     "read_timestamps",
+    "read_names",
 ]

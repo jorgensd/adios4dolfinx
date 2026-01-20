@@ -282,3 +282,30 @@ def test_read_timestamps(get_dtype, mesh_2D, tmp_path):
 
     assert np.allclose(timestamps_u, t_u)
     assert np.allclose(timestamps_v, t_v)
+
+
+def test_read_names(get_dtype, mesh_2D, tmp_path):
+    mesh = mesh_2D
+    dtype = get_dtype(mesh.geometry.x.dtype, False)
+
+    el = basix.ufl.element(
+        "Lagrange",
+        mesh.basix_cell(),
+        1,
+        shape=(mesh.geometry.dim,),
+        dtype=mesh.geometry.x.dtype,
+    )
+    V = dolfinx.fem.functionspace(mesh, el)
+
+    u = dolfinx.fem.Function(V, dtype=dtype, name="u")
+    v = dolfinx.fem.Function(V, dtype=dtype, name="v")
+
+    f_path = mesh.comm.bcast(tmp_path, root=0)
+    filename = f_path / "list_names.bp"
+
+    adios4dolfinx.write_mesh(filename, mesh)
+    adios4dolfinx.write_function(filename, u, time=0.0)
+    adios4dolfinx.write_function(filename, v, time=0.0)
+
+    names = adios4dolfinx.read_names(comm=mesh.comm, filename=filename)
+    assert set(names) == {"u", "v"}

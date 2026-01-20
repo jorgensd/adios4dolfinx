@@ -55,6 +55,8 @@ __all__ = [
     "write_meshtags",
     "read_attributes",
     "write_attributes",
+    "read_timestamps",
+    "read_names",
 ]
 
 
@@ -175,6 +177,45 @@ def read_timestamps(
             adios_file.file.EndStep()
 
     return np.array(time_stamps)
+
+
+def read_names(
+    filename: typing.Union[Path, str],
+    comm: MPI.Intracomm,
+    engine: str = "BP4",
+) -> list[str]:
+    """
+    Read function names from a checkpoint file.
+
+    Args:
+        filename: Path to file
+        comm: MPI communicator
+        engine: ADIOS2 engine
+
+    Returns:
+        The function names
+    """
+    check_file_exists(filename)
+
+    adios = adios2.ADIOS(comm)
+
+    with ADIOSFile(
+        adios=adios,
+        filename=filename,
+        mode=adios2.Mode.Read,
+        engine=engine,
+        io_name="FunctionNamesReader",
+    ) as adios_file:
+        function_names = set(
+            sorted(
+                map(
+                    lambda x: x.split("_time")[0],
+                    filter(lambda x: x.endswith("_time"), adios_file.io.AvailableVariables()),
+                )
+            )
+        )
+
+    return list(function_names)
 
 
 def write_meshtags(
