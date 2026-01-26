@@ -6,7 +6,6 @@ import pytest
 from packaging.version import parse as _v
 
 import adios4dolfinx
-import adios4dolfinx.backends.h5py.backend
 
 
 @pytest.mark.parametrize("backend", ["h5py", "adios2"])

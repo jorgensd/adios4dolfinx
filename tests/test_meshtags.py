@@ -176,11 +176,12 @@ def test_checkpointing_meshtags_2D(mesh_2D, read_comm, read_mode, tmp_path):
     hash = f"{mesh.comm.size}_{mesh.topology.cell_name()}_{mesh.geometry.x.dtype}"
     fname = MPI.COMM_WORLD.bcast(tmp_path, root=0)
     filename = fname / f"meshtags_1D_{hash}.bp"
+    backend_args = {"engine": "BP4"}
     if mesh.comm.size != 1:
-        adios4dolfinx.write_mesh(filename, mesh, engine="BP4")
+        adios4dolfinx.write_mesh(filename, mesh, backend_args=backend_args)
     else:
         if MPI.COMM_WORLD.rank == root:
-            adios4dolfinx.write_mesh(filename, mesh, engine="BP4")
+            adios4dolfinx.write_mesh(filename, mesh, backend_args=backend_args)
 
     org_maps = []
     for dim in range(mesh.topology.dim + 1):
@@ -231,11 +232,12 @@ def test_checkpointing_meshtags_3D(mesh_3D, read_comm, read_mode, tmp_path):
     hash = f"{mesh.comm.size}_{mesh.topology.cell_name()}_{mesh.geometry.x.dtype}"
     fname = MPI.COMM_WORLD.bcast(tmp_path, root=0)
     filename = fname / f"meshtags_1D_{hash}.bp"
+    backend_args = {"engine": "BP4"}
     if mesh.comm.size != 1:
-        adios4dolfinx.write_mesh(filename, mesh, engine="BP4")
+        adios4dolfinx.write_mesh(filename, mesh, backend_args=backend_args)
     else:
         if MPI.COMM_WORLD.rank == root:
-            adios4dolfinx.write_mesh(filename, mesh, engine="BP4")
+            adios4dolfinx.write_mesh(filename, mesh, backend_args=backend_args)
 
     org_maps = []
     for dim in range(mesh.topology.dim + 1):

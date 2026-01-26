@@ -19,7 +19,7 @@ import numpy.typing as npt
 import ufl
 from packaging.version import Version
 
-from adios4dolfinx.backends.adios2.backend import ADIOS2Interface
+from .backends.adios2 import backend as ADIOS2Interface
 
 from .backends.adios2.helpers import (
     ADIOSFile,
@@ -34,7 +34,7 @@ from .comm_helpers import (
     send_dofmap_and_recv_values,
     send_dofs_and_recv_values,
 )
-from .interface import FileMode, get_backend
+from .backends import FileMode, get_backend
 from .structures import FunctionData
 from .utils import (
     check_file_exists,
@@ -79,9 +79,9 @@ def write_attributes(
         backend_args: Arguments for backend, for instance file type.
         backend: What backend to use for writing.
     """
-    backend = get_backend(backend)
-    backend_args = backend.get_default_backend_args(backend_args)
-    backend.write_attributes(filename, comm, name, attributes, backend_args)
+    backend_cls = get_backend(backend)
+    backend_args = backend_cls.get_default_backend_args(backend_args)
+    backend_cls.write_attributes(filename, comm, name, attributes, backend_args)
 
 
 def read_attributes(
@@ -102,9 +102,9 @@ def read_attributes(
     Returns:
         The attributes
     """
-    backend = get_backend(backend)
-    backend_args = backend.get_default_backend_args(backend_args)
-    return backend.read_attributes(filename, comm, name, backend_args)
+    backend_cls = get_backend(backend)
+    backend_args = backend_cls.get_default_backend_args(backend_args)
+    return backend_cls.read_attributes(filename, comm, name, backend_args)
 
 
 def read_timestamps(
@@ -127,9 +127,9 @@ def read_timestamps(
         The time-stamps
     """
     check_file_exists(filename)
-    backend = get_backend(backend)
-    backend_args = backend.get_default_backend_args(backend_args)
-    return backend.read_timestamps(filename, comm, function_name, backend_args)
+    backend_cls = get_backend(backend)
+    backend_args = backend_cls.get_default_backend_args(backend_args)
+    return backend_cls.read_timestamps(filename, comm, function_name, backend_args)
 
 
 def write_meshtags(

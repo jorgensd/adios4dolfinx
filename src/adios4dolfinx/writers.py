@@ -14,7 +14,7 @@ import dolfinx
 import numpy as np
 from packaging.version import Version
 
-from adios4dolfinx.interface import FileMode, get_backend
+from .backends import FileMode, get_backend
 
 from .backends.adios2.helpers import ADIOSFile, check_variable_exists, resolve_adios_scope
 from .structures import FunctionData, MeshData
@@ -130,10 +130,10 @@ def write_mesh(
         mode: ADIOS2 mode to use (write or append)
         io_name: Internal name used for the ADIOS IO object
     """
-    backend = get_backend(backend)
-    backend_args = backend.get_default_backend_args(backend_args)
-    backend.write_mesh(
-        filename, comm, mesh_data, backend_args, backend.convert_file_mode(mode), time
+    backend_cls = get_backend(backend)
+    backend_args = backend_cls.get_default_backend_args(backend_args)
+    backend_cls.write_mesh(
+        filename, comm, mesh_data, backend_args, backend_cls.convert_file_mode(mode), time
     )
 
 
