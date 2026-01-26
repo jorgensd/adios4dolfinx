@@ -18,15 +18,12 @@ class FileMode(Enum):
     read = 30
 
 
+# See https://peps.python.org/pep-0544/#modules-as-implementations-of-protocols
 class IOBackend(Protocol):
-    @staticmethod
-    def get_default_backend_args(arguments: dict[str, Any] | None) -> dict[str, Any] | None: ...
+    def get_default_backend_args(self, arguments: dict[str, Any] | None) -> dict[str, Any]: ...
 
-    @staticmethod
-    def convert_file_mode(mode: FileMode) -> Any: ...
-
-    @staticmethod
     def write_attributes(
+        self,
         filename: Union[Path, str],
         comm: MPI.Intracomm,
         name: str,
@@ -34,25 +31,25 @@ class IOBackend(Protocol):
         backend_args: dict[str, Any] | None,
     ): ...
 
-    @staticmethod
     def read_attributes(
+        self,
         filename: Union[Path, str],
         comm: MPI.Intracomm,
-        name: str | None,
+        name: str,
         backend_args: dict[str, Any] | None,
     ) -> dict[str, Any]: ...
 
-    @staticmethod
     def read_timestamps(
+        self,
         filename: Union[Path, str],
         comm: MPI.Intracomm,
         function_name: str,
         backend_args: dict[str, Any] | None,
     ) -> npt.NDArray[np.float64]: ...
 
-    @staticmethod
     def write_mesh(
-        filename: Path,
+        self,
+        filename: Union[Path, str],
         comm: MPI.Intracomm,
         mesh: MeshData,
         backend_args: dict[str, Any] | None = None,

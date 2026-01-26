@@ -16,14 +16,14 @@ from .helpers import ADIOSFile, adios_to_numpy_dtype, resolve_adios_scope
 adios2 = resolve_adios_scope(adios2)
 
 
-def get_default_backend_args(arguments: dict[str, Any] | None) -> dict[str, Any] | None:
+def get_default_backend_args(arguments: dict[str, Any] | None) -> dict[str, Any]:
     args = arguments or {}
     if "engine" not in args.keys():
         args["engine"] = "BP4"
     return args
 
 
-def convert_file_mode(mode: FileMode) -> adios2.Mode:
+def convert_file_mode(mode: FileMode) -> adios2.Mode:  # type: ignore[override]
     match mode:
         case FileMode.append:
             return adios2.Mode.Append
@@ -53,6 +53,8 @@ def write_attributes(
     """
 
     adios = adios2.ADIOS(comm)
+    backend_args = get_default_backend_args(backend_args)
+
     with ADIOSFile(
         adios=adios,
         filename=filename,
@@ -87,6 +89,7 @@ def read_attributes(
     """
     check_file_exists(filename)
     adios = adios2.ADIOS(comm)
+    backend_args = get_default_backend_args(backend_args)
     with ADIOSFile(
         adios=adios,
         filename=filename,
@@ -125,7 +128,7 @@ def read_timestamps(
     check_file_exists(filename)
 
     adios = adios2.ADIOS(comm)
-
+    backend_args = get_default_backend_args(backend_args)
     with ADIOSFile(
         adios=adios,
         filename=filename,
@@ -153,7 +156,7 @@ def read_timestamps(
 
 
 def write_mesh(
-    filename: Path,
+    filename: Union[Path, str],
     comm: MPI.Intracomm,
     mesh: MeshData,
     backend_args: dict[str, Any] | None = None,
@@ -171,16 +174,18 @@ def write_mesh(
         mode: Mode to use (write or append)
         time: Time stamp
     """
+    backend_args = get_default_backend_args(backend_args)
     if "io_name" not in backend_args.keys():
-        io_name = "MeshWriter"
-    else:
-        io_name = backend_args["io_name"]
-    engine = backend_args["engine"]
+        backend_args["io_name"] = "MeshWriter"
 
     gdim = mesh.local_geometry.shape[1]
     adios = adios2.ADIOS(comm)
     with ADIOSFile(
-        adios=adios, filename=filename, mode=mode, engine=engine, io_name=io_name, comm=comm
+        adios=adios,
+        filename=filename,
+        mode=convert_file_mode(mode),
+        comm=comm,
+        **backend_args,
     ) as adios_file:
         adios_file.file.BeginStep()
         # Write geometry

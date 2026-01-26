@@ -49,7 +49,7 @@ def h5pyfile(h5name, filemode="r", force_serial: bool = False, comm=None):
     h5file.close()
 
 
-def get_default_backend_args(arguments: dict[str, Any] | None) -> dict[str, Any] | None:
+def get_default_backend_args(arguments: dict[str, Any] | None) -> dict[str, Any]:
     args = arguments or {}
 
     if arguments:
@@ -103,7 +103,7 @@ def read_attributes(
     comm: MPI.Intracomm,
     name: str,
     backend_args: dict[str, Any] | None = None,
-):
+) -> dict[str, Any]:
     """Read attributes from file using H5PY.
 
     Args:
@@ -144,7 +144,7 @@ def read_timestamps(
 
 
 def write_mesh(
-    file: Union[Path, str],
+    filename: Union[Path, str],
     comm: MPI.Intracomm,
     mesh: MeshData,
     backend_args: dict[str, Any] | None = None,

@@ -131,9 +131,7 @@ def write_mesh(
     """
     backend_cls = get_backend(backend)
     backend_args = backend_cls.get_default_backend_args(backend_args)
-    backend_cls.write_mesh(
-        filename, comm, mesh_data, backend_args, backend_cls.convert_file_mode(mode), time
-    )
+    backend_cls.write_mesh(filename, comm, mesh_data, backend_args, mode, time)
 
 
 def write_function(
