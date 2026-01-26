@@ -178,12 +178,13 @@ def write_mesh(
     if "io_name" not in backend_args.keys():
         backend_args["io_name"] = "MeshWriter"
 
+    mode = convert_file_mode(mode)
     gdim = mesh.local_geometry.shape[1]
     adios = adios2.ADIOS(comm)
     with ADIOSFile(
         adios=adios,
         filename=filename,
-        mode=convert_file_mode(mode),
+        mode=mode,
         comm=comm,
         **backend_args,
     ) as adios_file:
