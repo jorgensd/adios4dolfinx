@@ -9,13 +9,13 @@ from __future__ import annotations
 import typing
 from pathlib import Path
 
-from adios4dolfinx.backends import h5py
 from mpi4py import MPI
 
 import adios2
 import dolfinx
 import numpy as np
 
+from .backends import FileMode
 from .backends.adios2.helpers import resolve_adios_scope
 from .comm_helpers import numpy_to_mpi
 from .structures import FunctionData, MeshData
@@ -27,7 +27,6 @@ from .utils import (
     unroll_insert_position,
 )
 from .writers import write_function, write_mesh
-from .backends import FileMode
 
 adios2 = resolve_adios_scope(adios2)
 

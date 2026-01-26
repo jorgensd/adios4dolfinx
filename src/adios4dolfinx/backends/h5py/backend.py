@@ -15,9 +15,9 @@ from mpi4py import MPI
 import numpy as np
 import numpy.typing as npt
 
-from .. import FileMode
 from ...structures import MeshData
 from ...utils import check_file_exists
+from .. import FileMode
 
 
 @contextlib.contextmanager

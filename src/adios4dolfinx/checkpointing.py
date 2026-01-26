@@ -19,8 +19,8 @@ import numpy.typing as npt
 import ufl
 from packaging.version import Version
 
+from .backends import FileMode, get_backend
 from .backends.adios2 import backend as ADIOS2Interface
-
 from .backends.adios2.helpers import (
     ADIOSFile,
     adios_to_numpy_dtype,
@@ -34,7 +34,6 @@ from .comm_helpers import (
     send_dofmap_and_recv_values,
     send_dofs_and_recv_values,
 )
-from .backends import FileMode, get_backend
 from .structures import FunctionData
 from .utils import (
     check_file_exists,

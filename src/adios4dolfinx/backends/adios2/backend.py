@@ -8,10 +8,9 @@ import adios2
 import numpy as np
 import numpy.typing as npt
 
-from .. import FileMode
 from ...structures import MeshData
 from ...utils import check_file_exists
-
+from .. import FileMode
 from .helpers import ADIOSFile, adios_to_numpy_dtype, resolve_adios_scope
 
 adios2 = resolve_adios_scope(adios2)

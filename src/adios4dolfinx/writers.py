@@ -15,7 +15,6 @@ import numpy as np
 from packaging.version import Version
 
 from .backends import FileMode, get_backend
-
 from .backends.adios2.helpers import ADIOSFile, check_variable_exists, resolve_adios_scope
 from .structures import FunctionData, MeshData
 
