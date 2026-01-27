@@ -7,7 +7,7 @@ from mpi4py import MPI
 import numpy as np
 import numpy.typing as npt
 
-from ..structures import MeshData
+from ..structures import MeshData, ReadMeshData
 
 __all__ = ["FileMode", "IOBackend", "get_backend"]
 
@@ -67,6 +67,15 @@ class IOBackend(Protocol):
             mode: File-mode to store the mesh
         """
         ...
+
+    def read_mesh_data(
+        self,
+        filename: Union[Path, str],
+        comm: MPI.Intracomm,
+        time: float = 0.0,
+        read_from_partition: bool = False,
+        backend_args: dict[str, Any] | None = None,
+    ) -> ReadMeshData: ...
 
     # read_function
     # read_mesh

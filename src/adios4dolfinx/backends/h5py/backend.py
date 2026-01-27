@@ -241,8 +241,6 @@ def read_mesh_data(
     Args:
         filename: Path to input file
         comm: The MPI communciator to distribute the mesh over
-        ghost_mode: Ghost mode to use for mesh. If `read_from_partition`
-            is set to `True` this option is ignored.
         time: Time stamp associated with mesh
         read_from_partition: Read mesh with partition from file
     Returns:

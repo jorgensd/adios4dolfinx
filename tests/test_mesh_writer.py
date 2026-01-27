@@ -162,9 +162,10 @@ def test_timedep_mesh(encoder, suffix, ghost_mode, tmp_path, store_partition):
 
     mesh_first = read_mesh(
         file.with_suffix(suffix),
-        MPI.COMM_WORLD,
-        encoder,
-        ghost_mode,
+        comm=MPI.COMM_WORLD,
+        backend="adios2",
+        backend_args={"engine": encoder},
+        ghost_mode=ghost_mode,
         time=0.0,
         read_from_partition=store_partition,
     )
@@ -185,9 +186,10 @@ def test_timedep_mesh(encoder, suffix, ghost_mode, tmp_path, store_partition):
     mesh.geometry.x[:] += delta_x
     mesh_second = read_mesh(
         file.with_suffix(suffix),
-        MPI.COMM_WORLD,
-        encoder,
-        ghost_mode,
+        comm=MPI.COMM_WORLD,
+        backend="adios2",
+        backend_args={"engine": encoder},
+        ghost_mode=ghost_mode,
         time=3.0,
         read_from_partition=store_partition,
     )

@@ -56,7 +56,13 @@ def write_function(tmp_path):
 def read_function():
     def _read_function(comm, el, f, path, dtype, name="uh"):
         engine = "BP4"
-        mesh = adios4dolfinx.read_mesh(path, comm, engine, dolfinx.mesh.GhostMode.shared_facet)
+        mesh = adios4dolfinx.read_mesh(
+            filename=path,
+            comm=comm,
+            backend="adios2",
+            backend_args={"engine": engine},
+            ghost_mode=dolfinx.mesh.GhostMode.shared_facet,
+        )
         V = dolfinx.fem.functionspace(mesh, el)
         v = dolfinx.fem.Function(V, dtype=dtype)
         v.name = name
@@ -132,7 +138,13 @@ def write_function_time_dep(tmp_path):
 def read_function_time_dep():
     def _read_function_time_dep(comm, el, f0, f1, t0, t1, path, dtype):
         engine = "BP4"
-        mesh = adios4dolfinx.read_mesh(path, comm, engine, dolfinx.mesh.GhostMode.shared_facet)
+        mesh = adios4dolfinx.read_mesh(
+            filename=path,
+            comm=comm,
+            backend="adios2",
+            backend_args={"engine": engine},
+            ghost_mode=dolfinx.mesh.GhostMode.shared_facet,
+        )
         V = dolfinx.fem.functionspace(mesh, el)
         v = dolfinx.fem.Function(V, dtype=dtype)
 

@@ -277,8 +277,6 @@ def read_mesh_data(
         filename: Path to input file
         comm: The MPI communciator to distribute the mesh over
         engine: ADIOS engine to use for reading (BP4, BP5 or HDF5)
-        ghost_mode: Ghost mode to use for mesh. If `read_from_partition`
-            is set to `True` this option is ignored.
         time: Time stamp associated with mesh
         legacy: If checkpoint was made prior to time-dependent mesh-writer set to True
         read_from_partition: Read mesh with partition from file

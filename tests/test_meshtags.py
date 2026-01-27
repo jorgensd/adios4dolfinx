@@ -142,7 +142,9 @@ def test_checkpointing_meshtags_1D(mesh_1D, read_comm, read_mode, tmp_path):
 
     MPI.COMM_WORLD.Barrier()
     # Read mesh on testing communicator
-    new_mesh = adios4dolfinx.read_mesh(filename, read_comm, engine="BP4", ghost_mode=read_mode)
+    new_mesh = adios4dolfinx.read_mesh(
+        filename, comm=read_comm, backend="adios2", backend_args=backend_args, ghost_mode=read_mode
+    )
     for dim in range(new_mesh.topology.dim + 1):
         # Read meshtags on all processes if testing communicator has multiple ranks
         # else read on root 0
@@ -203,7 +205,9 @@ def test_checkpointing_meshtags_2D(mesh_2D, read_comm, read_mode, tmp_path):
         del ft
     del mesh
     MPI.COMM_WORLD.Barrier()
-    new_mesh = adios4dolfinx.read_mesh(filename, read_comm, engine="BP4", ghost_mode=read_mode)
+    new_mesh = adios4dolfinx.read_mesh(
+        filename, comm=read_comm, backend="adios2", backend_args=backend_args, ghost_mode=read_mode
+    )
     for dim in range(new_mesh.topology.dim + 1):
         if read_comm.size != 1:
             new_ft = adios4dolfinx.read_meshtags(
@@ -261,7 +265,9 @@ def test_checkpointing_meshtags_3D(mesh_3D, read_comm, read_mode, tmp_path):
     del mesh
 
     MPI.COMM_WORLD.Barrier()
-    new_mesh = adios4dolfinx.read_mesh(filename, read_comm, engine="BP4", ghost_mode=read_mode)
+    new_mesh = adios4dolfinx.read_mesh(
+        filename, comm=read_comm, backend="adios2", backend_args=backend_args, ghost_mode=read_mode
+    )
     for dim in range(new_mesh.topology.dim + 1):
         if read_comm.size != 1:
             new_ft = adios4dolfinx.read_meshtags(

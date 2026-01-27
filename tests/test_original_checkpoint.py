@@ -169,7 +169,11 @@ def read_function_original(
             mesh = xdmf.read_mesh()
     elif mesh_fname.suffix == ".bp":
         mesh = adios4dolfinx.read_mesh(
-            mesh_fname, MPI.COMM_WORLD, "BP4", dolfinx.mesh.GhostMode.shared_facet
+            mesh_fname,
+            comm=MPI.COMM_WORLD,
+            backend="adios2",
+            backend_args={"engine": "BP4"},
+            ghost_mode=dolfinx.mesh.GhostMode.shared_facet,
         )
     el = basix.ufl.element(
         family,
@@ -255,7 +259,11 @@ def read_function_vector(
             mesh = xdmf.read_mesh()
     elif mesh_fname.suffix == ".bp":
         mesh = adios4dolfinx.read_mesh(
-            mesh_fname, MPI.COMM_WORLD, "BP4", dolfinx.mesh.GhostMode.shared_facet
+            mesh_fname,
+            comm=MPI.COMM_WORLD,
+            backend="adios2",
+            backend_args={"engine": "BP4"},
+            ghost_mode=dolfinx.mesh.GhostMode.shared_facet,
         )
     el = basix.ufl.element(family, mesh.basix_cell(), degree)
 
