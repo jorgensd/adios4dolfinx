@@ -130,6 +130,15 @@ def read_mesh_data(
         raise RuntimeError("Cannot read partition data with Pyvista")
     if comm.rank == 0:
         grid = pyvista.read(filename)
+        if isinstance(grid, pyvista.UnstructuredGrid):
+            pass
+        elif isinstance(grid, pyvista.core.composite.MultiBlock):
+            # To handle multiblock like pvd
+            pyvista._VTK_SNAKE_CASE_STATE = "allow"
+            number_of_blocks = grid.number_of_blocks
+            assert number_of_blocks == 1
+            grid = grid.get_block(0)
+
         geom = grid.points
         num_cells_global = grid.number_of_cells
         cells = grid.cells.reshape(num_cells_global, -1)
@@ -163,6 +172,14 @@ def read_point_data(
 ) -> dolfinx.fem.Function:
     if MPI.COMM_WORLD.rank == 0:
         grid = pyvista.read(filename)
+        if isinstance(grid, pyvista.UnstructuredGrid):
+            pass
+        elif isinstance(grid, pyvista.core.composite.MultiBlock):
+            # To handle multiblock like pvd
+            pyvista._VTK_SNAKE_CASE_STATE = "allow"
+            number_of_blocks = grid.number_of_blocks
+            assert number_of_blocks == 1
+            grid = grid.get_block(0)
         dataset = grid.point_data[name]
         if len(dataset.shape) == 1:
             num_components = 1
