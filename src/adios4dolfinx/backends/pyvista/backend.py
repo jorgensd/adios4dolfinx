@@ -243,6 +243,3 @@ def read_point_data(
         uh.x.array[dof_pos] = arr_i
 
     return uh
-
-
-infile = Path("idealized_LV_ref_0.h5")

@@ -379,7 +379,7 @@ def read_mesh(
     time: float = 0.0,
     read_from_partition: bool = False,
     backend_args: dict[str, Any] | None = None,
-    backend: typing.Literal["adios2", "h5py"] = "adios2",
+    backend: str = "adios2",
 ) -> dolfinx.mesh.Mesh:
     """
     Read an ADIOS2 mesh into DOLFINx.

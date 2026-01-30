@@ -347,5 +347,9 @@ def get_backend(backend: str) -> IOBackend:
         from .pyvista import backend as PYVISTAInterface
 
         return PYVISTAInterface
+    elif backend == "xdmf":
+        from .xdmf import backend as XDMFInterface
+
+        return XDMFInterface
     else:
         return import_module(backend)
