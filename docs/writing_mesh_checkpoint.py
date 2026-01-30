@@ -102,7 +102,7 @@ def write_mesh(filename: Path):
     )
 
     # Write mesh checkpoint
-    adios4dolfinx.write_mesh(filename, mesh, engine="BP4")
+    adios4dolfinx.write_mesh(filename, mesh, backend="adios2", backend_args={"engine": "BP4"})
 
     # Inspect checkpoint on rank 0 with `bpls`
     if mesh.comm.rank == 0:
@@ -133,7 +133,11 @@ def read_mesh(filename: Path):
     import adios4dolfinx
 
     mesh = adios4dolfinx.read_mesh(
-        filename, comm=MPI.COMM_WORLD, engine="BP4", ghost_mode=dolfinx.mesh.GhostMode.none
+        filename,
+        comm=MPI.COMM_WORLD,
+        backend="adios2",
+        backend_args={"engine": "BP4"},
+        ghost_mode=dolfinx.mesh.GhostMode.none,
     )
     print_mesh_info(mesh)
 

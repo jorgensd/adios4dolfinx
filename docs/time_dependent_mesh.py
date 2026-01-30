@@ -84,10 +84,14 @@ with ipp.Cluster(engines="mpi", n=n, log_level=logging.ERROR) as cluster:
 # The only thing we need to do to read the mesh is to send in the associated time stamp,
 # which we do by adding `time=time_stamp` when calling {py:func}`adios4dolfinx.read_mesh`.
 
-second_mesh = adios4dolfinx.read_mesh(mesh_file, comm=MPI.COMM_WORLD, engine="BP4", time=3.3)
+second_mesh = adios4dolfinx.read_mesh(
+    mesh_file, comm=MPI.COMM_WORLD, backend="adios2", backend_args={"engine": "BP4"}, time=3.3
+)
 compute_volume(second_mesh, 3.3)
 
-first_mesh = adios4dolfinx.read_mesh(mesh_file, comm=MPI.COMM_WORLD, engine="BP4", time=1.5)
+first_mesh = adios4dolfinx.read_mesh(
+    mesh_file, comm=MPI.COMM_WORLD, backend="adios2", backend_args={"engine": "BP4"}, time=1.5
+)
 compute_volume(first_mesh, 1.5)
 
 # We observe that the volume of the mesh has changed, as we have perturbed the mesh

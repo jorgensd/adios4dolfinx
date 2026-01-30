@@ -2,6 +2,11 @@ format: jb-book
 root: README
 
 parts:
+  - caption: How to guides
+    chapters:
+    - file: "docs/adding_backend"
+    - file: "docs/migration_guide"
+    
   - caption: Introduction to IPyParallel
     chapters:
     - file: "docs/ipyparallel_intro"
