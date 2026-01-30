@@ -319,5 +319,9 @@ def get_backend(backend: str) -> IOBackend:
         from .adios2 import backend as ADIOS2Interface
 
         return ADIOS2Interface
+    elif backend == "pyvista":
+        from .pyvista import backend as PYVISTAInterface
+
+        return PYVISTAInterface
     else:
         return import_module(backend)
