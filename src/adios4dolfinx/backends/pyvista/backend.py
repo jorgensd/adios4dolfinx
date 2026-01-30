@@ -138,7 +138,8 @@ def read_mesh_data(
             number_of_blocks = grid.number_of_blocks
             assert number_of_blocks == 1
             grid = grid.get_block(0)
-
+        else:
+            raise RuntimeError(f"Unknown data type {type(grid)}")
         geom = grid.points
         num_cells_global = grid.number_of_cells
         cells = grid.cells.reshape(num_cells_global, -1)

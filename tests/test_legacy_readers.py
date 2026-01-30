@@ -1,4 +1,4 @@
-# Copyright (C) 2023 Jørgen Schartum Dokken
+# Copyright (C) 2023-2026 Jørgen Schartum Dokken
 #
 # This file is part of adios4dolfinx
 #
@@ -183,3 +183,45 @@ def test_adios4dolfinx_legacy():
     u_ex.interpolate(f)
 
     np.testing.assert_allclose(u.x.array, u_ex.x.array, atol=1e-14)
+
+
+def test_legacy_vtu_mesh():
+    comm = MPI.COMM_WORLD
+    path = (pathlib.Path("legacy") / "mesh_P1000000.vtu").absolute()
+    if not path.exists():
+        pytest.skip(f"{path} does not exist")
+
+    mesh = read_mesh(path, comm, backend="pyvista")
+
+    num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
+    assert num_cells_global == 12 * 13 * 2
+
+    area = mesh.comm.allreduce(
+        dolfinx.fem.assemble_scalar(dolfinx.fem.form(1 * ufl.dx(domain=mesh))), op=MPI.SUM
+    )
+    assert np.isclose(area, 1.9 * 2.8)
+
+
+def test_legacy_pvd():
+    comm = MPI.COMM_WORLD
+    path = (pathlib.Path("legacy") / "mesh_P1_func.pvd").absolute()
+    if not path.exists():
+        pytest.skip(f"{path} does not exist")
+
+    mesh = read_mesh(path, comm, backend="pyvista")
+
+    num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
+    assert num_cells_global == 12 * 13 * 2
+
+    area = mesh.comm.allreduce(
+        dolfinx.fem.assemble_scalar(dolfinx.fem.form(1 * ufl.dx(domain=mesh))), op=MPI.SUM
+    )
+    assert np.isclose(area, 1.9 * 2.8)
+
+    from adios4dolfinx.backends.pyvista.backend import read_point_data
+
+    u = read_point_data(path, "w", mesh)
+    u_ref = dolfinx.fem.Function(u.function_space)
+    u_ref.interpolate(lambda x: (x[0], x[1] - x[0], np.zeros_like(x[0])))
+
+    np.testing.assert_allclose(u.x.array, u_ref.x.array)

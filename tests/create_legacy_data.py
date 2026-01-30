@@ -113,6 +113,17 @@ def verify_xdmf(
     assert np.allclose(w1.vector().get_local(), w1_ref.vector().get_local())
 
 
+def create_reference_P1_data(filename: pathlib.Path, mesh_name: str, function_name: str):
+    mesh = dolfin.RectangleMesh(dolfin.Point(0.1, 0.2), dolfin.Point(2, 3), 12, 13)
+    mesh.rename(mesh_name, mesh_name)
+    W = dolfin.VectorFunctionSpace(mesh, "Lagrange", 1)
+    w = dolfin.Function(W, name=function_name)
+    w.interpolate(dolfin.Expression(("x[0]", "x[1]-x[0]"), degree=1))
+
+    dolfin.VTKFile(str(filename.with_suffix(".vtu")), "ascii").write(mesh)
+    dolfin.File(str(filename.with_name(filename.name + "_func").with_suffix(".pvd"))) << w
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--family", type=str, default="DG")
@@ -127,6 +138,7 @@ if __name__ == "__main__":
     path.mkdir(exist_ok=True, parents=True)
     h5_filename = path / f"{inputs.name}.h5"
     xdmf_filename = path / f"{inputs.name}_checkpoint.xdmf"
+    p1_filename = path / f"{inputs.name}_P1"
 
     v0_ref, w0_ref, v1_ref, w1_ref = create_reference_data(
         h5_filename,
@@ -159,4 +171,8 @@ if __name__ == "__main__":
         inputs.family,
         inputs.degree,
         inputs.f_name_vec,
+    )
+
+    P1_ref = create_reference_P1_data(
+        filename=p1_filename, mesh_name=inputs.name, function_name=inputs.f_name_vec
     )
