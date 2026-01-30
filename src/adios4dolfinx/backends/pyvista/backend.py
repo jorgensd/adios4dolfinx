@@ -18,6 +18,8 @@ import basix
 import dolfinx
 
 from adios4dolfinx.structures import ReadMeshData
+from adios4dolfinx.utils import check_file_exists, index_owner
+from adios4dolfinx.comm_helpers import send_dofs_and_recv_values
 
 # Cell types can be found at
 # https://vtk.org/doc/nightly/html/vtkCellType_8h_source.html
@@ -118,6 +120,7 @@ def read_mesh_data(
     Returns:
         Internal data structure for the mesh data read from file
     """
+    check_file_exists(filename)
     if read_from_partition:
         raise RuntimeError("Cannot read partition data with Pyvista")
     if comm.rank == 0:
@@ -148,3 +151,69 @@ def read_mesh_data(
         cells = np.zeros((0, nodes_per_cell), dtype=np.int64)
 
     return ReadMeshData(cells=cells, cell_type=cell_type, x=geom, lvar=lvar, degree=order)
+
+
+def read_point_data(
+    filename: Path | str, name: str, mesh: dolfinx.mesh.Mesh
+) -> dolfinx.fem.Function:
+    if MPI.COMM_WORLD.rank == 0:
+        grid = pyvista.read(filename)
+        dataset = grid.point_data[name]
+        if len(dataset.shape) == 1:
+            num_components = 1
+            dataset = dataset.reshape(-1, num_components)
+        else:
+            num_components = dataset.shape[1]
+        num_components, gtype = mesh.comm.bcast((num_components, dataset.dtype), root=0)
+        local_range_start = 0
+    else:
+        num_components, gtype = mesh.comm.bcast(None, root=0)
+        dataset = np.zeros((0, num_components), dtype=gtype)
+        local_range_start = 0
+
+    # NOTE: THe below should be moved out of backend.
+
+    # Create appropriate function space (based on coordinate map)
+    if num_components == 1:
+        shape = ()
+    else:
+        shape = (num_components,)
+    element = basix.ufl.element(
+        basix.ElementFamily.P,
+        mesh.topology.cell_name(),
+        mesh.geometry.cmap.degree,
+        mesh.geometry.cmap.variant,
+        shape=shape,
+        dtype=mesh.geometry.x.dtype,
+    )
+
+    # Assumption: Same doflayout for geometry and function space, cannot test in python
+    V = dolfinx.fem.functionspace(mesh, element)
+    uh = dolfinx.fem.Function(V, name=name, dtype=dataset.dtype)
+    # Assume that mesh is first order for now
+    x_dofmap = mesh.geometry.dofmap
+    igi = np.array(mesh.geometry.input_global_indices, dtype=np.int64)
+
+    # This is dependent on how the data is read in. If distributed equally this is correct
+    global_geom_input = igi[x_dofmap]
+
+    # num_nodes_global = mesh.geometry.index_map().size_global
+    # global_geom_owner = index_owner(mesh.comm, global_geom_input.reshape(-1), num_nodes_global)
+
+    # This is correct if everything is read in on rank 0
+    global_geom_owner = np.zeros(len(global_geom_input.flatten()), dtype=np.int32)
+    for i in range(num_components):
+        arr_i = send_dofs_and_recv_values(
+            global_geom_input.reshape(-1),
+            global_geom_owner,
+            mesh.comm,
+            dataset[:, i],
+            local_range_start,
+        )
+        dof_pos = x_dofmap.reshape(-1) * num_components + i
+        uh.x.array[dof_pos] = arr_i
+
+    return uh
+
+
+infile = Path("idealized_LV_ref_0.h5")

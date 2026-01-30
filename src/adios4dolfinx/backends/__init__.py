@@ -301,6 +301,10 @@ class IOBackend(Protocol):
                   Process 0 has [0, M), process 1 [M, N), process 2 [N, O) etc.
         """
 
+    def read_point_data(
+        filename: Path | str, name: str, mesh: dolfinx.mesh.Mesh
+    ) -> dolfinx.fem.Function: ...
+
 
 def get_backend(backend: str) -> IOBackend:
     """Get backend class from backend name.

@@ -22,6 +22,8 @@ numpy_to_mpi = {
     np.float32: MPI.FLOAT,
     np.complex64: MPI.COMPLEX,
     np.complex128: MPI.DOUBLE_COMPLEX,
+    np.int64: MPI.INT64_T,
+    np.int32: MPI.INT32_T,
 }
 
 
@@ -236,7 +238,10 @@ def send_dofs_and_recv_values(
     dofmap_to_values.Free()
 
     # Send back appropriate input values
-    sending_values = input_array[inc_dofs - array_start]
+    if len(input_array) > 0:
+        sending_values = input_array[inc_dofs - array_start]
+    else:
+        sending_values = np.zeros(0, dtype=input_array.dtype)
 
     values_to_dofmap = comm.Create_dist_graph_adjacent(dest, source, reorder=False)
     inc_values = np.zeros_like(out_dofs, dtype=input_array.dtype)
