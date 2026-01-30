@@ -19,7 +19,9 @@ from dolfinx.graph import adjacencylist
 
 from ...structures import FunctionData, MeshData, MeshTagsData, ReadMeshData
 from ...utils import check_file_exists, compute_local_range
-from .. import FileMode
+from .. import FileMode, ReadMode
+
+read_mode = ReadMode.parallel
 
 
 @contextlib.contextmanager

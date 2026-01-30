@@ -19,7 +19,7 @@ import numpy.typing as npt
 import ufl
 from packaging.version import Version
 
-from .backends import FileMode, get_backend
+from .backends import FileMode, ReadMode, get_backend
 from .comm_helpers import (
     send_and_recv_cell_perm,
     send_dofmap_and_recv_values,
@@ -262,9 +262,14 @@ def read_function(
 
     # Compute mesh->input communicator
     # 1.1 Compute mesh->input communicator
-    num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
-    owners = index_owner(mesh.comm, input_cells, num_cells_global)
-
+    backend_cls = get_backend(backend)
+    if backend_cls.read_mode == ReadMode.serial:
+        owners = np.zeros(input_cells, dtype=np.int32)
+    elif backend_cls.read_mode == ReadMode.parallel:
+        num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
+        owners = index_owner(mesh.comm, input_cells, num_cells_global)
+    else:
+        raise NotImplementedError(f"{backend_cls.read_mode} not implemented")
     # -------------------Step 2------------------------------------
     # Send and receive global cell index and cell perm
     inc_cells, inc_perms = send_and_recv_cell_perm(input_cells, cell_perm, owners, mesh.comm)
@@ -278,10 +283,15 @@ def read_function(
     input_dofmap = backend_cls.read_dofmap(filename, comm, name, backend_args)
 
     # Compute owner of dofs in dofmap
-    num_dofs_global = (
-        u.function_space.dofmap.index_map.size_global * u.function_space.dofmap.index_map_bs
-    )
-    dof_owner = index_owner(comm, input_dofmap.array.astype(np.int64), num_dofs_global)
+    if backend_cls.read_mode == ReadMode.serial:
+        dof_owner = np.zeros(len(input_dofmap.array), dtype=np.int32)
+    elif backend_cls.read_mode == ReadMode.parallel:
+        num_dofs_global = (
+            u.function_space.dofmap.index_map.size_global * u.function_space.dofmap.index_map_bs
+        )
+        dof_owner = index_owner(comm, input_dofmap.array.astype(np.int64), num_dofs_global)
+    else:
+        raise NotImplementedError(f"{backend_cls.read_mode} not implemented")
 
     # --------------------Step 4-----------------------------------
     # Read array from file and communicate them to input dofmap process
@@ -330,7 +340,14 @@ def read_function(
     local_cells, dof_pos = compute_dofmap_pos(V)
     input_cells = V.mesh.topology.original_cell_index[local_cells]
     num_cells_global = V.mesh.topology.index_map(V.mesh.topology.dim).size_global
-    owners = index_owner(V.mesh.comm, input_cells, num_cells_global)
+
+    if backend_cls.read_mode == ReadMode.serial:
+        owners = np.zeros(len(input_cells), dtype=np.int32)
+    elif backend_cls.read_mode == ReadMode.parallel:
+        owners = index_owner(V.mesh.comm, input_cells, num_cells_global)
+    else:
+        raise NotImplementedError(f"{backend_cls.read_mode} not implemented")
+
     unique_owners, owner_count = np.unique(owners, return_counts=True)
     # FIXME: In C++ use NBX to find neighbourhood
     sub_comm = V.mesh.comm.Create_dist_graph(

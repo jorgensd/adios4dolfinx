@@ -17,9 +17,11 @@ from mpi4py import MPI
 import basix
 import dolfinx
 
+from adios4dolfinx.comm_helpers import send_dofs_and_recv_values
 from adios4dolfinx.structures import ReadMeshData
 from adios4dolfinx.utils import check_file_exists, index_owner
-from adios4dolfinx.comm_helpers import send_dofs_and_recv_values
+
+from .. import ReadMode
 
 # Cell types can be found at
 # https://vtk.org/doc/nightly/html/vtkCellType_8h_source.html
@@ -42,7 +44,10 @@ _arbitrary_lagrange_vtk = {
 }
 
 
-def cell_degree(ct: str, num_nodes: int):
+read_mode = ReadMode.serial
+
+
+def _cell_degree(ct: str, num_nodes: int):
     if ct == "point":
         return 1
     elif ct == "interval":
@@ -138,7 +143,7 @@ def read_mesh_data(
             order = 1
         elif cell_type in _arbitrary_lagrange_vtk.keys():
             cell_type = _arbitrary_lagrange_vtk[cell_type]
-            order = cell_degree(cell_type, cells.shape[1])
+            order = _cell_degree(cell_type, cells.shape[1])
         perm = dolfinx.cpp.io.perm_vtk(dolfinx.mesh.to_type(cell_type), cells.shape[1])
         cells = cells[:, perm]
         lvar = int(basix.LagrangeVariant.equispaced)
@@ -196,12 +201,18 @@ def read_point_data(
 
     # This is dependent on how the data is read in. If distributed equally this is correct
     global_geom_input = igi[x_dofmap]
+    from adios4dolfinx.backends import get_backend
 
-    # num_nodes_global = mesh.geometry.index_map().size_global
-    # global_geom_owner = index_owner(mesh.comm, global_geom_input.reshape(-1), num_nodes_global)
+    backend_cls = get_backend("pyvista")
+    if backend_cls.read_mode == ReadMode.parallel:
+        num_nodes_global = mesh.geometry.index_map().size_global
+        global_geom_owner = index_owner(mesh.comm, global_geom_input.reshape(-1), num_nodes_global)
+    elif backend_cls.read_mode == ReadMode.serial:
+        # This is correct if everything is read in on rank 0
+        global_geom_owner = np.zeros(len(global_geom_input.flatten()), dtype=np.int32)
+    else:
+        raise NotImplementedError(f"{backend_cls.read_mode} not implemented")
 
-    # This is correct if everything is read in on rank 0
-    global_geom_owner = np.zeros(len(global_geom_input.flatten()), dtype=np.int32)
     for i in range(num_components):
         arr_i = send_dofs_and_recv_values(
             global_geom_input.reshape(-1),

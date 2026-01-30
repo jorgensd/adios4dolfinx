@@ -17,7 +17,7 @@ import numpy as np
 import numpy.typing as npt
 import ufl
 
-from .backends import get_backend
+from .backends import ReadMode, get_backend
 from .comm_helpers import send_dofs_and_recv_values
 from .utils import (
     check_file_exists,
@@ -223,7 +223,14 @@ def read_function_from_legacy_h5(
     # Compute mesh->input communicator
     # 1.1 Compute mesh->input communicator
     num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
-    owners = index_owner(mesh.comm, input_cells, num_cells_global)
+    backend_cls = get_backend(backend)
+    if backend_cls.read_mode == ReadMode.serial:
+        owners = np.zeros(len(input_cells), dtype=np.int32)
+    elif backend_cls.read_mode == ReadMode.parallel:
+        owners = index_owner(V.mesh.comm, input_cells, num_cells_global)
+    else:
+        raise NotImplementedError(f"{backend_cls.read_mode} not implemented")
+
     unique_owners, owner_count = np.unique(owners, return_counts=True)
     # FIXME: In C++ use NBX to find neighbourhood
     _tmp_comm = mesh.comm.Create_dist_graph(
@@ -260,14 +267,20 @@ def read_function_from_legacy_h5(
     )
 
     # ----------------------Step 3---------------------------------
-    # Compute owner of global dof on distributed mesh
-    num_dof_global = V.dofmap.index_map_bs * V.dofmap.index_map.size_global
-    dof_owner = index_owner(comm=mesh.comm, indices=dofmap_indices, N=num_dof_global)
+
+    if backend_cls.read_mode == ReadMode.serial:
+        dof_owner = np.zeros(len(dofmap_indices), dtype=np.int32)
+    elif backend_cls.read_mode == ReadMode.parallel:
+        # Compute owner of global dof on distributed input data
+        num_dof_global = V.dofmap.index_map_bs * V.dofmap.index_map.size_global
+        dof_owner = index_owner(comm=mesh.comm, indices=dofmap_indices, N=num_dof_global)
+    else:
+        raise NotImplementedError(f"{backend_cls.read_mode} not implemented")
+
     # Create MPI neigh comm to owner.
     # NOTE: USE NBX in C++
 
     # Read input data
-    backend_cls = get_backend(backend)
     local_array, starting_pos = backend_cls.read_hdf5_array(
         comm, filename, f"/{group}/{vector_group}", backend_args=None
     )

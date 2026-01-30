@@ -14,6 +14,24 @@ from ..structures import FunctionData, MeshData, MeshTagsData, ReadMeshData
 __all__ = ["FileMode", "IOBackend", "get_backend"]
 
 
+class ReadMode(Enum):
+    serial = 10  # This means that all data is read in on root rank
+
+    # Total number of data P, num processes = i + 1.
+    # All processes reads at least `P // (i+1)` items
+    # The first j=P%(i+1) processes reads `P // (i+1) + 1` items
+    # ```python
+    # def compute_partitioning(P, J):
+    #     min_num = P // J
+    #     num_per_proc = np.full(J, min_num)
+    #     rem = P % J
+    #     num_per_proc[:int(rem)] += 1
+    #     assert(sum(num_per_proc)) == P
+    #     return num_per_proc
+    # ```
+    parallel = 20
+
+
 class FileMode(Enum):
     append = 10
     write = 20
@@ -22,6 +40,8 @@ class FileMode(Enum):
 
 # See https://peps.python.org/pep-0544/#modules-as-implementations-of-protocols
 class IOBackend(Protocol):
+    read_mode: ReadMode
+
     def get_default_backend_args(self, arguments: dict[str, Any] | None) -> dict[str, Any]:
         """Get default backend arguments given a set of input arguments.
 

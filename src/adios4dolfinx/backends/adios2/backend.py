@@ -11,7 +11,7 @@ import numpy.typing as npt
 
 from ...structures import FunctionData, MeshData, MeshTagsData, ReadMeshData
 from ...utils import check_file_exists, compute_local_range
-from .. import FileMode
+from .. import FileMode, ReadMode
 from .helpers import (
     ADIOSFile,
     adios_to_numpy_dtype,
@@ -22,6 +22,8 @@ from .helpers import (
 )
 
 adios2 = resolve_adios_scope(adios2)
+
+read_mode = ReadMode.parallel
 
 
 def get_default_backend_args(arguments: dict[str, Any] | None) -> dict[str, Any]:
