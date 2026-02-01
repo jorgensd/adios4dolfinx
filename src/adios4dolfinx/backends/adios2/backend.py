@@ -830,3 +830,20 @@ def snapshot_checkpoint(
             u.x.scatter_forward()
         else:
             raise NotImplementedError(f"Mode {mode} is not implemented for snapshot checkpoint")
+
+
+def read_point_data(
+    filename: Path | str, name: str, mesh: dolfinx.mesh.Mesh
+) -> dolfinx.fem.Function:
+    """Read data from te nodes of a mesh.
+
+    Parameters:
+        filename: Path to file
+        name: Name of point data
+        mesh: The corresponding :py:class:`dolfinx.mesh.Mesh`.
+
+    Returns:
+        A function in the space equivalent to the mesh
+        coordinate element (up to shape).
+    """
+    raise NotImplementedError("The ADIOS2 backend cannot read point data.")
