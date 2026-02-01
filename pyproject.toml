@@ -22,6 +22,7 @@ docs = [
     "ipykernel<7.0.0",     # Note: Remove once https://github.com/ipython/ipykernel/issues/1450 is in a release
     "sphinx-codeautolink",
     "adios4dolfinx[h5py]",
+    "sphinx_external_toc<1.1.0",
 ]
 all = ["adios4dolfinx[test,dev,docs]"]
 

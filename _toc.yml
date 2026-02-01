@@ -2,6 +2,11 @@ format: jb-book
 root: README
 
 parts:
+  - caption: How to guides
+    chapters:
+    - file: "docs/adding_backend"
+    - file: "docs/migration_guide"
+    
   - caption: Introduction to IPyParallel
     chapters:
     - file: "docs/ipyparallel_intro"
@@ -21,3 +26,6 @@ parts:
   - caption: Python API
     chapters:
     - file: "docs/api"
+    - file: "docs/backend"
+    - file: "docs/adios2"
+    - file: "docs/h5py"

@@ -42,6 +42,8 @@ sphinx:
         - jupytext.reads
         - fmt: py
 
+    autodoc_typehints: signature
+    autodoc_typehints_format: short
     codeautolink_concat_default: True
     intersphinx_mapping:
       basix: ["https://docs.fenicsproject.org/basix/main/python", null]
@@ -55,5 +57,8 @@ sphinx:
       packaging: ["https://packaging.pypa.io/en/stable/", null]
       matplotlib: ["https://matplotlib.org/stable/", null]
       ipyparallel: ["https://ipyparallel.readthedocs.io/en/stable/", null]
+      python: ["https://docs.python.org/3", null]
+      h5py: ["https://docs.h5py.org/en/stable/", null]
+      adios2: ["https://adios2.readthedocs.io/en/latest", null]
 
 exclude_patterns: [".pytest_cache/*"]

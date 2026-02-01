@@ -33,9 +33,11 @@ class ReadMode(Enum):
 
 
 class FileMode(Enum):
-    append = 10
-    write = 20
-    read = 30
+    """Filen mode used for opening files."""
+
+    append = 10  #: Append data to file
+    write = 20  #: Write data to file
+    read = 30  #: Read data from file
 
 
 # See https://peps.python.org/pep-0544/#modules-as-implementations-of-protocols

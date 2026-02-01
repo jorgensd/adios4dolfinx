@@ -33,7 +33,9 @@ def write_partitioned_mesh(filename: Path):
     )
 
     # Write mesh checkpoint
-    adios4dolfinx.write_mesh(filename, mesh, engine="BP4", store_partition_info=True)
+    adios4dolfinx.write_mesh(
+        filename, mesh, backend="adios2", backend_args={"engine": "BP4"}, store_partition_info=True
+    )
     # Inspect checkpoint on rank 0 with `bpls`
     if mesh.comm.rank == 0:
         output = subprocess.run(["bpls", "-a", "-l", filename], capture_output=True)
@@ -71,7 +73,11 @@ def read_partitioned_mesh(filename: Path, read_from_partition: bool = True):
     prefix = f"{MPI.COMM_WORLD.rank + 1}/{MPI.COMM_WORLD.size}: "
     try:
         mesh = adios4dolfinx.read_mesh(
-            filename, comm=MPI.COMM_WORLD, engine="BP4", read_from_partition=read_from_partition
+            filename,
+            comm=MPI.COMM_WORLD,
+            backend="adios2",
+            backend_args={"engine": "BP4"},
+            read_from_partition=read_from_partition,
         )
         print(f"{prefix} Mesh: {mesh.name} read successfully with {read_from_partition=}")
     except ValueError as e:
