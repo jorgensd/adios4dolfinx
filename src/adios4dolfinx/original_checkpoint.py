@@ -343,7 +343,7 @@ def write_function_on_input_mesh(
     name: typing.Optional[str] = None,
     mode: FileMode = FileMode.append,
     backend_args: dict[str, typing.Any] | None = None,
-    backend: typing.Literal["adios2", "h5py"] = "adios2",
+    backend: str = "adios2",
 ):
     """
     Write function checkpoint (to be read with the input mesh).

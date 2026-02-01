@@ -56,7 +56,7 @@ def write_attributes(
     name: str,
     attributes: dict[str, np.ndarray],
     backend_args: dict[str, typing.Any] | None = None,
-    backend: typing.Literal["adios2", "h5py"] = "adios2",
+    backend: str = "adios2",
 ):
     """Write attributes to file.
 
@@ -78,7 +78,7 @@ def read_attributes(
     comm: MPI.Intracomm,
     name: str,
     backend_args: dict[str, typing.Any] | None = None,
-    backend: typing.Literal["adios2", "h5py"] = "adios2",
+    backend: str = "adios2",
 ) -> dict[str, typing.Any]:
     """Read attributes from file.
 
@@ -101,7 +101,7 @@ def read_timestamps(
     comm: MPI.Intracomm,
     function_name: str,
     backend_args: dict[str, typing.Any] | None = None,
-    backend: typing.Literal["adios2", "h5py"] = "adios2",
+    backend: str = "adios2",
 ) -> npt.NDArray[np.float64]:
     """
     Read time-stamps from a checkpoint file.
@@ -127,7 +127,7 @@ def write_meshtags(
     meshtags: dolfinx.mesh.MeshTags,
     meshtag_name: typing.Optional[str] = None,
     backend_args: dict[str, Any] | None = None,
-    backend: typing.Literal["adios2", "h5py"] = "adios2",
+    backend: str = "adios2",
 ):
     """
     Write meshtags associated with input mesh to file.
@@ -196,7 +196,7 @@ def read_meshtags(
     mesh: dolfinx.mesh.Mesh,
     meshtag_name: str,
     backend_args: dict[str, Any] | None = None,
-    backend: typing.Literal["adios2", "h5py"] = "adios2",
+    backend: str = "adios2",
 ) -> dolfinx.mesh.MeshTags:
     """
     Read meshtags from file and return a :class:`dolfinx.mesh.MeshTags` object.
@@ -235,7 +235,7 @@ def read_function(
     time: float = 0.0,
     name: str | None = None,
     backend_args: dict[str, Any] | None = None,
-    backend: typing.Literal["adios2", "h5py"] = "adios2",
+    backend: str = "adios2",
 ):
     """
     Read checkpoint from file and fill it into `u`.
@@ -439,7 +439,7 @@ def write_mesh(
     time: float = 0.0,
     store_partition_info: bool = False,
     backend_args: dict[str, Any] | None = None,
-    backend: typing.Literal["adios2", "h5py"] = "adios2",
+    backend: str = "adios2",
 ):
     """
     Write a mesh to file.
@@ -470,7 +470,7 @@ def write_function(
     mode: FileMode = FileMode.append,
     name: str | None = None,
     backend_args: dict[str, Any] | None = None,
-    backend: typing.Literal["adios2", "h5py"] = "adios2",
+    backend: str = "adios2",
 ):
     """
     Write function checkpoint to file.
