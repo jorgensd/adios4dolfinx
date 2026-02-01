@@ -1,78 +1,81 @@
 # Adding a custom backend
 
-`adios4dolfinx` is designed to be backend-agnostic, meaning you can implement custom readers and writers for different file formats by adhering to a specific protocol.
+{py:mod}`adios4dolfinx` is designed to be backend-agnostic, meaning you can implement custom readers and writers for different file formats by adhering to a specific protocol.
 
 ## The IOBackend Protocol
 
-Any backend must implement the `IOBackend` protocol defined in `src/adios4dolfinx/backends/__init__.py`. This protocol ensures that the backend provides all necessary methods for reading and writing meshes, functions, and attributes.
+Any backend must implement the {py:class}`IOBackend<adios4dolfinx.backends.IOBackend>` protocol defined in {py:mod}`adios4dolfinx.backends`. This protocol ensures that the backend provides all necessary methods for reading and writing meshes, functions, and attributes.
 
-To use a custom backend, you simply pass the python module name (as a string) to the `backend` argument of any `adios4dolfinx` function. The library will attempt to import the module and use it as the backend.
+To use a custom backend, you simply pass the python module name (as a string) to the `backend` argument of any {py:mod}`adios4dolfinx` function.
+The library will attempt to import the module and use it as the backend.
 
 ## Required Data Structures
 
-Your backend will interact with several data classes defined in `src/adios4dolfinx/structures.py`. You should import these to type-hint your implementation correctly:
+Your backend will interact with several data classes defined in {py:mod}`adios4dolfinx.structures`.
+You should import these to type-hint your implementation correctly:
 
-* **`MeshData`**: Contains local geometry, topology, and partitioning information for writing meshes.
-* **`ReadMeshData`**: A container for returning mesh data (cells, geometry, etc.) when reading.
-* **`FunctionData`**: Contains function values, dofmaps, and permutation info for writing functions.
-* **`MeshTagsData`**: Contains indices, values, and metadata for mesh tags.
+* {py:class}`MeshData<adios4dolfinx.structures.MeshData>`: Contains local geometry, topology, and partitioning information for writing {py:class}`meshes<dolfinx.mesh.Mesh>`.
+* {py:class}`ReadMeshData<adios4dolfinx.structures.ReadMeshData>`: A container for returning mesh data (cells, geometry, etc.) when reading.
+* {py:class}`FunctionData<adios4dolfinx.structures.FunctionData>`: Contains function values, dofmaps, and permutation info for writing functions.
+* {py:class}`MeshTagsData<adios4dolfinx.structures.MeshTagsData>`: Contains indices, values, and metadata for mesh tags.
 
 ## Implementation Checklist
 
-Your backend module must implement the functions listed below. Note that `comm` is always an `MPI.Intracomm` and `filename` is a `pathlib.Path` or `str`.
+Your backend module must implement the functions listed below. Note that `comm` is always an {py:class}`MPI.Intracomm<mpi4py.MPI.Intracomm>` and `filename` is a
+{py:class}`pathlib.Path` or {py:class}`str`.
 
 ### General Configuration
 
-* `get_default_backend_args(arguments: dict[str, Any] | None) -> dict[str, Any]`
+* {py:func}`~adios4dolfinx.backends.IOBackend.get_default_backend_args`
     * Returns a dictionary of default arguments (e.g., engine type) for your backend.
 
 ### Attribute IO
 
-* `write_attributes(filename, comm, name, attributes, backend_args)`
+* {py:func}`~adios4dolfinx.backends.IOBackend.write_attributes`
     * Writes a dictionary of attributes (key-value pairs) to the file under the specified `name` (group).
-* `read_attributes(filename, comm, name, backend_args) -> dict`
+* {py:func}`~adios4dolfinx.backends.IOBackend.read_attributes`
     * Reads and returns attributes associated with `name`.
 
 ### Mesh IO
 
-* `write_mesh(filename, comm, mesh: MeshData, backend_args, mode, time)`
+* {py:func}`~adios4dolfinx.backends.IOBackend.write_mesh`
     * Writes mesh geometry, topology, and optionally partitioning data.
-    * Must handle `FileMode.write` (new file) and `FileMode.append`.
-* `read_mesh_data(filename, comm, time, read_from_partition, backend_args) -> ReadMeshData`
+    * Must handle {py:class}`FileMode.write` (new file) and {py:class}`FileMode.append`.
+* {py:func}`~adios4dolfinx.backends.IOBackend.read_mesh_data`
     * Reads mesh geometry and topology at a specific `time`.
     * If `read_from_partition` is True, it should read pre-calculated partitioning data to avoid re-partitioning.
 
 ### MeshTags IO
 
-* `write_meshtags(filename, comm, data: MeshTagsData, backend_args)`
+* {py:func}`~adios4dolfinx.backends.IOBackend.write_meshtags`
     * Writes mesh tag indices and values.
-* `read_meshtags_data(filename, comm, name, backend_args) -> MeshTagsData`
+* {py:func}`~adios4dolfinx.backends.IOBackend.read_meshtags_data`
     * Reads mesh tags identified by `name`.
 
 ### Function IO
 
-* `write_function(filename, comm, u: FunctionData, time, mode, backend_args)`
+* {py:func}`~adios4dolfinx.backends.IOBackend.write_function`
     * Writes function values, global dofmaps, and cell permutations.
-* `read_dofmap(filename, comm, name, backend_args) -> dolfinx.graph.AdjacencyList`
+* {py:func}`~adios4dolfinx.backends.IOBackend.read_dofmap`
     * Reads the dofmap (connectivity) for the function `name`.
-* `read_dofs(filename, comm, name, time, backend_args) -> tuple[np.ndarray, int]`
+* {py:func}`~adios4dolfinx.backends.IOBackend.read_dofs`
     * Reads the local chunk of function values for a specific `time`.
     * Returns the array of values and the global starting index of that chunk.
-* `read_cell_perms(comm, filename, backend_args) -> np.ndarray`
+* {py:func}`~adios4dolfinx.backends.IOBackend.read_cell_perms`
     * Reads cell permutation data used to map input cells to the current mesh.
-* `read_timestamps(filename, comm, function_name, backend_args) -> np.ndarray`
+* {py:func}`~adios4dolfinx.backends.IOBackend.read_timestamps`
     * Returns all available time-steps for a given function.
 
 ### Legacy Support (Optional but defined in protocol)
 
-* `read_legacy_mesh(filename, comm, group) -> tuple`
+* {py:func}`~adios4dolfinx.backends.IOBackend.read_legacy_mesh`
     * Reads mesh data from legacy DOLFIN HDF5/XDMF formats.
-* `read_hdf5_array(comm, filename, group, backend_args) -> tuple`
+* {py:func}`~adios4dolfinx.backends.IOBackend.read_hdf5_array`
     * Reads a raw array from an HDF5-like structure (used for legacy vector reading).
 
 ### Snapshots
 
-* `snapshot_checkpoint(filename, mode, u: dolfinx.fem.Function, backend_args)`
+* {py:func}`~adios4dolfinx.backends.IOBackend.snapshot_checkpoint`
     * Handles lightweight N-to-N checkpointing where data is saved exactly as distributed in memory without global reordering.
 
 ## Example Skeleton

@@ -26,3 +26,6 @@ parts:
   - caption: Python API
     chapters:
     - file: "docs/api"
+    - file: "docs/backend"
+    - file: "docs/adios2"
+    - file: "docs/h5py"
