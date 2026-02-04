@@ -199,7 +199,7 @@ def write_mesh(
         # Write geometry data
         gdim = mesh.local_geometry.shape[1]
         geometry_dataset = geometry_group.create_dataset(
-            "Points", [mesh.num_nodes_global, gdim], dtype=mesh.local_geometry.dtype
+            "Points", [mesh.num_nodes_global, gdim], dtype=mesh.local_geometry.dtype,
         )
         geometry_dataset[slice(*mesh.local_geometry_pos), :] = mesh.local_geometry
 

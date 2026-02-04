@@ -16,7 +16,7 @@ from adios4dolfinx.structures import FunctionData, MeshData, MeshTagsData, ReadM
 from adios4dolfinx.utils import check_file_exists, compute_local_range
 
 from .. import FileMode, ReadMode
-from ..h5py.backend import h5pyfile
+from ..h5py.backend import h5pyfile, convert_file_mode
 from ..pyvista.backend import _arbitrary_lagrange_vtk, _cell_degree, _first_order_vtk
 
 read_mode = ReadMode.parallel
@@ -418,6 +418,32 @@ def write_mesh(
         mode: File-mode to store the mesh
         time: Time stamp associated with the mesh
     """
+    h5_mode = convert_file_mode(mode)
+
+    with h5pyfile(filename, h5_mode,comm=comm) as h5file:
+        hdf = h5file.create_group("/VTKHDF")
+        hdf.attrs["Type"] = "UnstructuredGrid"
+        hdf.attrs["Version"] = np.array([2, 2], dtype=np.int32)
+        # Partition split. We use no partitioning
+        hdf.create_dataset("NumberOfCells", shape=(1, ), dtype=np.int64,
+                           data=np.array([mesh.num_cells_global], dtype=np.int64), chunks=True)
+        hdf.create_dataset("NumberOfPoints", shape=(1, ), dtype=np.int64,
+                           data=np.array([mesh.num_nodes_global], dtype=np.int64), chunks=True)
+        # Single celltype assumption
+        num_dofs_per_cell = mesh.local_topology.shape[1]
+        hdf.create_dataset("NumberOfConnectivityIds", shape=(1, ), dtype=np.int64,
+                           data=np.array([mesh.num_cells_global*num_dofs_per_cell], dtype=np.int64), chunks=True)        
+
+        # Store nodes
+        points = hdf.create_dataset("Points", shape=(mesh.num_nodes_global, mesh.local_geometry.shape[1]), dtype=mesh.local_geometry.dtype,
+                           chunks=True)
+        points[slice(*mesh.local_geometry_pos)] = mesh.local_geometry
+        
+        # Store topology
+        breakpoint()
+    import os
+    os.system(f"h5dump {filename} > test_new.txt")
+    os.system("less test_new.txt")
     raise NotImplementedError("The Pyvista backend cannot write meshes.")
 
 

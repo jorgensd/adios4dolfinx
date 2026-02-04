@@ -28,7 +28,11 @@ def test_write_point_data(dtype, tmp_path, cell_type):
     mesh = create_unit_cube(comm, 5, 5, 5, dtype=dtype, cell_type=cell_type)
     filename = tmp_path / f"point_data_{cell_type.name}.vtkhdf"
     write_mesh(str(filename), mesh)
+    print(filename)
+    print(filename.with_stem("adios"))
 
+    adios4dolfinx.write_mesh(filename.with_stem("adios"), mesh, time=0.3,  backend="vtkhdf")
+    breakpoint()
     t = np.linspace(0.1, 1.2, 25)
     num_nodes_local = mesh.geometry.index_map().size_local
     for ti in t:
