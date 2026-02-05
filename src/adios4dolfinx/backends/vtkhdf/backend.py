@@ -433,7 +433,9 @@ def _create_dataset(
 
 def _create_group(root: h5py.File | h5py.Group, name: str, mode: str) -> h5py.Group:
     if mode == "w" or (mode == "a" and name not in root.keys()):
-        group = root.create_group(name)
+        # Track order has to be on to make multiblock work:
+        # https://docs.vtk.org/en/latest/vtk_file_formats/vtkhdf_file_format/vtkhdf_specifications.html#partitioneddatasetcollection-and-multiblockdataset
+        group = root.create_group(name, track_order=True)
     elif mode == "a":
         group = root[name]
     else:
@@ -468,14 +470,26 @@ def write_mesh(
         time: Time stamp associated with the mesh
     """
     h5_mode = convert_file_mode(mode)
-
+    name = backend_args.get("name", "mesh")
     with h5pyfile(filename, h5_mode, comm=comm) as h5file:
         hdf = _create_group(h5file, "/VTKHDF", h5_mode)
-        hdf.attrs["Type"] = "UnstructuredGrid"
-        hdf.attrs["Version"] = np.array([2, 2], dtype=np.int32)
+        hdf.attrs.create("Type", "MultiBlockDataSet")
+        hdf.attrs["Version"] = np.array([2, 1], dtype=np.int32)
+
+        mesh_group = _create_group(hdf, name, h5_mode)
+        mesh_group.attrs.create("Type", "UnstructuredGrid")
+
+        mesh_group.attrs["Version"] = np.array([2, 1], dtype=np.int32)
+
+        assembly = _create_group(hdf, "Assembly", h5_mode)
+
+        mesh_assembly = _create_group(assembly, name, h5_mode)
+        if name not in mesh_assembly.keys():
+            mesh_assembly[name] = h5py.SoftLink(f"/VTKHDF/{name}")
+
         # Partition split. We use no partitioning
         num_cells = _create_dataset(
-            hdf,
+            mesh_group,
             "NumberOfCells",
             shape=(1,),
             dtype=np.int64,
@@ -487,7 +501,7 @@ def write_mesh(
         num_cells[-1] = mesh.num_cells_global
 
         number_of_points = _create_dataset(
-            hdf,
+            mesh_group,
             "NumberOfPoints",
             shape=(1,),
             dtype=np.int64,
@@ -500,7 +514,7 @@ def write_mesh(
         # Single celltype assumption
         num_dofs_per_cell = mesh.local_topology.shape[1]
         number_of_connectivities = _create_dataset(
-            hdf,
+            mesh_group,
             "NumberOfConnectivityIds",
             shape=(1,),
             dtype=np.int64,
@@ -513,7 +527,7 @@ def write_mesh(
 
         # Store nodes
         points = _create_dataset(
-            hdf,
+            mesh_group,
             "Points",
             shape=(mesh.num_nodes_global, mesh.local_geometry.shape[1]),
             dtype=mesh.local_geometry.dtype,
@@ -528,7 +542,7 @@ def write_mesh(
 
         # Store topology offsets (single celltype assumption)
         offsets = _create_dataset(
-            hdf,
+            mesh_group,
             "Offsets",
             shape=(mesh.num_cells_global + 1,),
             dtype=np.int64,
@@ -553,7 +567,7 @@ def write_mesh(
         top_perm = np.argsort(dolfinx.cpp.io.perm_vtk(dx_ct, num_dofs_per_cell))
         topology_data = mesh.local_topology[:, top_perm].flatten()
         topology = _create_dataset(
-            hdf,
+            mesh_group,
             "Connectivity",
             shape=(mesh.num_cells_global * num_dofs_per_cell,),
             dtype=np.int64,
@@ -577,7 +591,7 @@ def write_mesh(
             dolfinx.cpp.io.get_vtk_cell_type(dx_ct, dolfinx.mesh.cell_dim(dx_ct)),
         )
         types = _create_dataset(
-            hdf,
+            mesh_group,
             "Types",
             shape=(mesh.num_cells_global,),
             dtype=np.uint8,
@@ -592,7 +606,7 @@ def write_mesh(
         types[insert_slice] = cell_types
         del cell_types
 
-        steps = _create_group(hdf, "Steps", mode=h5_mode)
+        steps = _create_group(mesh_group, "Steps", mode=h5_mode)
         # First fetch time-steps to see if we have stored this timestep already
         if h5_mode == "w":
             values = _create_dataset(
@@ -631,14 +645,14 @@ def write_mesh(
                 resize=True,
             )
             values[-1] = time
-        steps.attrs["NSteps"] = len(values)
+        steps.attrs.create("NSteps", np.int64(len(values)), dtype=np.int64)
 
         # Write single partition data
         num_parts = _create_dataset(
             steps,
             "NumberOfParts",
             shape=(1,),
-            dtype=np.int32,
+            dtype=np.int64,
             chunks=True,
             maxshape=(None,),
             mode=h5_mode,
@@ -648,7 +662,7 @@ def write_mesh(
             steps,
             "PartOffsets",
             shape=(1,),
-            dtype=np.int32,
+            dtype=np.int64,
             chunks=True,
             maxshape=(None,),
             mode=h5_mode,
