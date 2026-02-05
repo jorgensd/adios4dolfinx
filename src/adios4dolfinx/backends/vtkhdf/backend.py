@@ -9,6 +9,7 @@ from mpi4py import MPI
 
 import basix
 import dolfinx
+import h5py
 import numpy as np
 import numpy.typing as npt
 
@@ -16,7 +17,7 @@ from adios4dolfinx.structures import FunctionData, MeshData, MeshTagsData, ReadM
 from adios4dolfinx.utils import check_file_exists, compute_local_range
 
 from .. import FileMode, ReadMode
-from ..h5py.backend import h5pyfile, convert_file_mode
+from ..h5py.backend import convert_file_mode, h5pyfile
 from ..pyvista.backend import _arbitrary_lagrange_vtk, _cell_degree, _first_order_vtk
 
 read_mode = ReadMode.parallel
@@ -399,6 +400,52 @@ def read_function_names(
     return list(function_names)
 
 
+def _create_dataset(
+    root: h5py.File | h5py.Group,
+    name: str,
+    shape: tuple[int, ...],
+    dtype: npt.DTypeLike,
+    chunks: bool,
+    maxshape: tuple[int, ...],
+    mode: str,
+    resize: bool = True,
+) -> h5py.Dataset:
+    if mode == "w" or (mode == "a" and name not in root.keys()):
+        dataset = root.create_dataset(
+            name, shape=shape, dtype=dtype, chunks=chunks, maxshape=maxshape
+        )
+    elif mode == "a":
+        dataset = root[name]
+        old_shape = dataset.shape
+        # Only resize for dimension
+        if resize:
+            if len(old_shape) == 1:
+                new_shape = (old_shape[0] + shape[0],)
+            else:
+                new_shape = (old_shape[0] + shape[0], *old_shape[1:])
+            dataset.resize(new_shape)
+    else:
+        raise ValueError(f"Unknown file mode '{mode}' when creating dataset {name} in {root}")
+    return dataset
+
+
+def _create_group(root: h5py.File | h5py.Group, name: str, mode: str) -> h5py.Group:
+    if mode == "w" or (mode == "a" and name not in root.keys()):
+        group = root.create_group(name)
+    elif mode == "a":
+        group = root[name]
+    else:
+        raise ValueError("Unknown file mode '{h5_mode}'")
+    return group
+
+
+def _compute_append_slice(
+    dataset: h5py.Dataset, input_size: int, original_slice: tuple[int, int] | np.ndarray, mode: str
+) -> slice:
+    append_offset = dataset.shape[0] - input_size if mode == "a" else 0
+    return slice(*(np.asarray(original_slice) + append_offset).astype(np.int64))
+
+
 def write_mesh(
     filename: Path | str,
     comm: MPI.Intracomm,
@@ -420,31 +467,224 @@ def write_mesh(
     """
     h5_mode = convert_file_mode(mode)
 
-    with h5pyfile(filename, h5_mode,comm=comm) as h5file:
-        hdf = h5file.create_group("/VTKHDF")
+    with h5pyfile(filename, h5_mode, comm=comm) as h5file:
+        hdf = _create_group(h5file, "/VTKHDF", h5_mode)
         hdf.attrs["Type"] = "UnstructuredGrid"
         hdf.attrs["Version"] = np.array([2, 2], dtype=np.int32)
         # Partition split. We use no partitioning
-        hdf.create_dataset("NumberOfCells", shape=(1, ), dtype=np.int64,
-                           data=np.array([mesh.num_cells_global], dtype=np.int64), chunks=True)
-        hdf.create_dataset("NumberOfPoints", shape=(1, ), dtype=np.int64,
-                           data=np.array([mesh.num_nodes_global], dtype=np.int64), chunks=True)
+        num_cells = _create_dataset(
+            hdf,
+            "NumberOfCells",
+            shape=(1,),
+            dtype=np.int64,
+            chunks=True,
+            maxshape=(None,),
+            mode=h5_mode,
+            resize=False,  # Resize should really be True, see issue below
+        )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
+        num_cells[-1] = mesh.num_cells_global
+
+        number_of_points = _create_dataset(
+            hdf,
+            "NumberOfPoints",
+            shape=(1,),
+            dtype=np.int64,
+            chunks=True,
+            maxshape=(None,),
+            mode=h5_mode,
+        )
+        number_of_points[-1] = mesh.num_nodes_global
+
         # Single celltype assumption
         num_dofs_per_cell = mesh.local_topology.shape[1]
-        hdf.create_dataset("NumberOfConnectivityIds", shape=(1, ), dtype=np.int64,
-                           data=np.array([mesh.num_cells_global*num_dofs_per_cell], dtype=np.int64), chunks=True)        
+        number_of_connectivities = _create_dataset(
+            hdf,
+            "NumberOfConnectivityIds",
+            shape=(1,),
+            dtype=np.int64,
+            chunks=True,
+            maxshape=(None,),
+            mode=h5_mode,
+            resize=False,  # Resize should really be True, see issue below
+        )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
+        number_of_connectivities[-1] = mesh.num_cells_global * num_dofs_per_cell
 
         # Store nodes
-        points = hdf.create_dataset("Points", shape=(mesh.num_nodes_global, mesh.local_geometry.shape[1]), dtype=mesh.local_geometry.dtype,
-                           chunks=True)
-        points[slice(*mesh.local_geometry_pos)] = mesh.local_geometry
-        
-        # Store topology
-        breakpoint()
-    import os
-    os.system(f"h5dump {filename} > test_new.txt")
-    os.system("less test_new.txt")
-    raise NotImplementedError("The Pyvista backend cannot write meshes.")
+        points = _create_dataset(
+            hdf,
+            "Points",
+            shape=(mesh.num_nodes_global, mesh.local_geometry.shape[1]),
+            dtype=mesh.local_geometry.dtype,
+            chunks=True,
+            maxshape=(None, 3),
+            mode=h5_mode,
+        )
+        insert_slice = _compute_append_slice(
+            points, mesh.num_nodes_global, mesh.local_geometry_pos, h5_mode
+        )
+        points[insert_slice] = mesh.local_geometry
+
+        # Store topology offsets (single celltype assumption)
+        offsets = _create_dataset(
+            hdf,
+            "Offsets",
+            shape=(mesh.num_cells_global + 1,),
+            dtype=np.int64,
+            chunks=True,
+            mode=h5_mode,
+            maxshape=(None,),
+            resize=False,  # Resize should really be True, see issue below
+        )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
+        offset_data = np.arange(0, mesh.local_topology.size + 1, mesh.local_topology.shape[1])
+        offset_data += num_dofs_per_cell * mesh.local_topology_pos[0]
+        insert_slice = _compute_append_slice(
+            offsets,
+            mesh.num_cells_global + 1,
+            (mesh.local_topology_pos[0], mesh.local_topology_pos[1] + 1),
+            mode=h5_mode,
+        )
+        offsets[insert_slice] = offset_data
+        del offset_data
+
+        # Permute and store topology data
+        dx_ct = dolfinx.mesh.to_type(mesh.cell_type)
+        top_perm = np.argsort(dolfinx.cpp.io.perm_vtk(dx_ct, num_dofs_per_cell))
+        topology_data = mesh.local_topology[:, top_perm].flatten()
+        topology = _create_dataset(
+            hdf,
+            "Connectivity",
+            shape=(mesh.num_cells_global * num_dofs_per_cell,),
+            dtype=np.int64,
+            chunks=True,
+            maxshape=(None,),
+            mode=h5_mode,
+            resize=False,  # Resize should really be True, see issue below
+        )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
+        insert_slice = _compute_append_slice(
+            topology,
+            mesh.num_cells_global * num_dofs_per_cell,
+            np.array(mesh.local_topology_pos) * num_dofs_per_cell,
+            mode=h5_mode,
+        )
+        topology[insert_slice] = topology_data
+        del topology_data
+
+        # Store celltypes
+        cell_types = np.full(
+            mesh.local_topology.shape[0],
+            dolfinx.cpp.io.get_vtk_cell_type(dx_ct, dolfinx.mesh.cell_dim(dx_ct)),
+        )
+        types = _create_dataset(
+            hdf,
+            "Types",
+            shape=(mesh.num_cells_global,),
+            dtype=np.uint8,
+            maxshape=(None,),
+            chunks=True,
+            mode=h5_mode,
+            resize=False,  # Resize should really be True, see issue below
+        )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
+        insert_slice = _compute_append_slice(
+            types, mesh.num_cells_global, mesh.local_topology_pos, h5_mode
+        )
+        types[insert_slice] = cell_types
+        del cell_types
+
+        steps = _create_group(hdf, "Steps", mode=h5_mode)
+        # First fetch time-steps to see if we have stored this timestep already
+        if h5_mode == "w":
+            values = _create_dataset(
+                steps,
+                "Values",
+                shape=(1,),
+                dtype=np.float64,
+                chunks=True,
+                maxshape=(None,),
+                mode="w",
+                resize=False,
+            )
+            values[0] = time
+        else:
+            values = _create_dataset(
+                steps,
+                "Values",
+                shape=(1,),
+                dtype=np.float64,
+                chunks=True,
+                maxshape=(None,),
+                mode="a",
+                resize=False,
+            )
+            existing_steps = values[:]
+            if len(np.flatnonzero(np.isclose(existing_steps, time))) > 0:
+                raise RuntimeError(f"Mesh already exists at time {time} in {filename}.")
+            values = _create_dataset(
+                steps,
+                "Values",
+                shape=(1,),
+                dtype=np.float64,
+                chunks=True,
+                maxshape=(None,),
+                mode="a",
+                resize=True,
+            )
+            values[-1] = time
+        steps.attrs["NSteps"] = len(values)
+
+        # Write single partition data
+        num_parts = _create_dataset(
+            steps,
+            "NumberOfParts",
+            shape=(1,),
+            dtype=np.int32,
+            chunks=True,
+            maxshape=(None,),
+            mode=h5_mode,
+        )
+        num_parts[-1] = 1
+        part_offset = _create_dataset(
+            steps,
+            "PartOffsets",
+            shape=(1,),
+            dtype=np.int32,
+            chunks=True,
+            maxshape=(None,),
+            mode=h5_mode,
+        )
+        part_offset[-1] = 0
+
+        # Create offsets for data
+        point_offset = _create_dataset(
+            steps,
+            "PointOffsets",
+            shape=(1,),
+            dtype=np.int64,
+            chunks=True,
+            maxshape=(None,),
+            mode=h5_mode,
+        )
+        point_offset[-1] = points.shape[0] - mesh.num_nodes_global
+        cell_offset = _create_dataset(
+            steps,
+            "CellOffsets",
+            shape=(1,),
+            dtype=np.int64,
+            chunks=True,
+            maxshape=(None,),
+            mode=h5_mode,
+        )
+        cell_offset[-1] = types.shape[0] - mesh.num_cells_global
+
+        connectivity_offsets = _create_dataset(
+            steps,
+            "ConnectivityIdOffsets",
+            shape=(1,),
+            dtype=np.int64,
+            chunks=True,
+            maxshape=(None,),
+            mode=h5_mode,
+        )
+        connectivity_offsets[-1] = offsets.shape[0] - (mesh.num_cells_global + 1)
 
 
 def write_meshtags(
