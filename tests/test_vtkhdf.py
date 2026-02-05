@@ -2,7 +2,8 @@ from mpi4py import MPI
 
 import numpy as np
 import pytest
-from dolfinx.fem import Function
+import ufl
+from dolfinx.fem import Function, assemble_scalar, form
 from dolfinx.io.vtkhdf import write_cell_data, write_mesh, write_point_data
 from dolfinx.mesh import CellType, compute_midpoints, create_unit_cube
 
@@ -19,6 +20,65 @@ def g(x, t):
 
 @pytest.mark.parametrize("cell_type", [CellType.hexahedron, CellType.tetrahedron])
 @pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_read_write_timedep_mesh(dtype, tmp_path, cell_type):
+    comm = MPI.COMM_WORLD
+    tmp_path = comm.bcast(tmp_path, root=0)
+    comm.barrier()
+
+    # Write temporal data
+    mesh = create_unit_cube(comm, 5, 5, 5, dtype=dtype, cell_type=cell_type)
+    ref_vol = mesh.comm.allreduce(
+        assemble_scalar(form(1 * ufl.dx(domain=mesh), dtype=dtype)), op=MPI.SUM
+    )
+    ref_surf = mesh.comm.allreduce(
+        assemble_scalar(form(1 * ufl.ds(domain=mesh), dtype=dtype)), op=MPI.SUM
+    )
+
+    # Write temporal data
+    filename = tmp_path / f"timedep_mesh_{cell_type.name}_{dtype}.vtkhdf"
+    adios4dolfinx.write_mesh(filename, mesh, time=0.3, backend="vtkhdf")
+
+    mesh.geometry.x[:, 0] += 0.05 * mesh.geometry.x[:, 0]
+    mesh.geometry.x[:, 1] *= 1.1 + np.sin(mesh.geometry.x[:, 0])
+
+    ref_pert_vol = mesh.comm.allreduce(
+        assemble_scalar(form(1 * ufl.dx(domain=mesh), dtype=dtype)), op=MPI.SUM
+    )
+    ref_pert_surf = mesh.comm.allreduce(
+        assemble_scalar(form(1 * ufl.ds(domain=mesh), dtype=dtype)), op=MPI.SUM
+    )
+
+    adios4dolfinx.write_mesh(
+        filename,
+        mesh,
+        time=0.5,
+        backend="vtkhdf",
+        mode=adios4dolfinx.FileMode.append,
+    )
+
+    in_mesh = adios4dolfinx.read_mesh(filename, comm, time=0.5, backend="vtkhdf")
+    pert_vol = mesh.comm.allreduce(
+        assemble_scalar(form(1 * ufl.dx(domain=in_mesh), dtype=dtype)), op=MPI.SUM
+    )
+    pert_surf = mesh.comm.allreduce(
+        assemble_scalar(form(1 * ufl.ds(domain=in_mesh), dtype=dtype)), op=MPI.SUM
+    )
+    assert np.isclose(pert_vol, ref_pert_vol)
+    assert np.isclose(pert_surf, ref_pert_surf)
+
+    in_mesh = adios4dolfinx.read_mesh(filename, comm, time=0.3, backend="vtkhdf")
+    vol = mesh.comm.allreduce(
+        assemble_scalar(form(1 * ufl.dx(domain=in_mesh), dtype=dtype)), op=MPI.SUM
+    )
+    surf = mesh.comm.allreduce(
+        assemble_scalar(form(1 * ufl.ds(domain=in_mesh), dtype=dtype)), op=MPI.SUM
+    )
+    assert np.isclose(vol, ref_vol)
+    assert np.isclose(surf, ref_surf)
+
+
+@pytest.mark.parametrize("cell_type", [CellType.hexahedron, CellType.tetrahedron])
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
 def test_write_point_data(dtype, tmp_path, cell_type):
     comm = MPI.COMM_WORLD
     tmp_path = comm.bcast(tmp_path, root=0)
@@ -31,8 +91,6 @@ def test_write_point_data(dtype, tmp_path, cell_type):
     print(filename)
     print(filename.with_stem("adios"))
 
-    adios4dolfinx.write_mesh(filename.with_stem("adios"), mesh, time=0.3,  backend="vtkhdf")
-    breakpoint()
     t = np.linspace(0.1, 1.2, 25)
     num_nodes_local = mesh.geometry.index_map().size_local
     for ti in t:

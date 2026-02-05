@@ -173,6 +173,8 @@ def read_mesh_data(
         degree = _cell_degree(ct, num_nodes=number_of_nodes)
     else:
         raise ValueError(f"Unknown VTK cell type {cell_type} in {filename}")
+    perm = dolfinx.cpp.io.perm_vtk(dolfinx.mesh.to_type(ct), number_of_nodes)
+    topology = topology[:, perm]
     lvar = int(basix.LagrangeVariant.equispaced)
     return ReadMeshData(
         cells=topology, cell_type=ct, x=points_local.astype(gtype), lvar=lvar, degree=degree
