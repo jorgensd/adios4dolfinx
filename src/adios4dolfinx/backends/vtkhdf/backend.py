@@ -32,7 +32,7 @@ def get_default_backend_args(arguments: dict[str, Any] | None) -> dict[str, Any]
     Returns:
         Updated backend arguments
     """
-    args = arguments or {}
+    args = arguments or {"name": "mesh"}
     return args
 
 
@@ -87,10 +87,31 @@ def read_mesh_data(
     check_file_exists(filename)
     if read_from_partition:
         raise RuntimeError("Cannot read partition data with VTKHDF")
-
     with h5pyfile(filename, "r", comm=comm) as h5file:
         hdf = h5file["VTKHDF"]
+        # Check for type of VTKHDF file
+        if (file_type := hdf.attrs["Type"]) == "MultiBlockDataSet":
+            # Recursive search of subgroups to find the unstructured grid
+            name = backend_args["name"]
+            ass = hdf["Assembly"]
+            mesh_node = []
+            def visitor(path):
+                if path.split('/')[-1] == name:
+                    # Retrieve the link object to check its type
+                    obj = ass.get(path)
+                    if "Type" in obj.attrs.keys() and obj.attrs["Type"] == "UnstructuredGrid":
+                        mesh_node.append(path)
+                        return 1
+                # Return None to continue searching, or return a value to stop
+                return None 
 
+            ass.visit_links(visitor)
+            assert len(mesh_node) == 1
+            hdf = ass[mesh_node[0]]
+        elif (file_type == "UnstructuredGrid"):
+            pass
+        else:
+            raise RuntimeError("Not supported file type {file_type}")
         if time is None:
             num_cells_global = hdf["Types"].size
             local_cell_range = compute_local_range(comm, num_cells_global)
@@ -470,7 +491,8 @@ def write_mesh(
         time: Time stamp associated with the mesh
     """
     h5_mode = convert_file_mode(mode)
-    name = backend_args.get("name", "mesh")
+    backend_args = get_default_backend_args(backend_args)
+    name = backend_args["name"]
     with h5pyfile(filename, h5_mode, comm=comm) as h5file:
         hdf = _create_group(h5file, "/VTKHDF", h5_mode)
         hdf.attrs.create("Type", "MultiBlockDataSet")

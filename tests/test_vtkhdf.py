@@ -59,7 +59,7 @@ def test_read_write_timedep_mesh(dtype, tmp_path, cell_type):
         backend="vtkhdf",
         mode=adios4dolfinx.FileMode.append,
     )
-    exit()
+
     in_mesh = adios4dolfinx.read_mesh(filename, comm, time=0.5, backend="vtkhdf")
     pert_vol = mesh.comm.allreduce(
         assemble_scalar(form(1 * ufl.dx(domain=in_mesh), dtype=dtype)), op=MPI.SUM
