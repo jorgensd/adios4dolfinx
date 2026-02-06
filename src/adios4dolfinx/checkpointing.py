@@ -378,7 +378,7 @@ def read_mesh(
     filename: Path | str,
     comm: MPI.Intracomm,
     ghost_mode: dolfinx.mesh.GhostMode = dolfinx.mesh.GhostMode.shared_facet,
-    time: float | str | None = None,
+    time: float | str | None = 0.0,
     read_from_partition: bool = False,
     backend_args: dict[str, Any] | None = None,
     backend: str = "adios2",

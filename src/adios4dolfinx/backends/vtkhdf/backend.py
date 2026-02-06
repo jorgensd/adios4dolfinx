@@ -271,6 +271,30 @@ def read_cell_data(
     check_file_exists(filename)
     with h5pyfile(filename, "r", comm=comm) as h5file:
         hdf = h5file["VTKHDF"]
+        if (file_type := hdf.attrs["Type"]) in (b"MultiBlockDataSet", "MultiBlockDataSet"):
+            # Recursive search of subgroups to find the unstructured grid
+            name = backend_args["name"]
+            ass = hdf["Assembly"]
+            mesh_node = []
+
+            def visitor(path):
+                if path.split("/")[-1] == name:
+                    # Retrieve the link object to check its type
+                    obj = ass.get(path)
+                    if "Type" in obj.attrs.keys() and obj.attrs["Type"] == "UnstructuredGrid":
+                        mesh_node.append(path)
+                        return 1
+                # Return None to continue searching, or return a value to stop
+                return None
+
+            ass.visit_links(visitor)
+            assert len(mesh_node) == 1
+            hdf = ass[mesh_node[0]]
+        elif file_type in (b"UnstructuredGrid", "UnstructuredGrid"):
+            pass
+        else:
+            raise RuntimeError(f"Unsupported type {file_type}")
+
         if "CellData" not in hdf.keys():
             raise RuntimeError(f"No cell data found in {filename}.")
         cell_data = hdf["CellData"]
@@ -308,7 +332,9 @@ def read_cell_data(
 
     # NOTE: THis could be optimized by hand-coding some communication in
     # `read_cell_data` on the frontend side
-    md = read_mesh_data(filename, comm, time=time, read_from_partition=False, backend_args=None)
+    md = read_mesh_data(
+        filename, comm, time=time, read_from_partition=False, backend_args=backend_args
+    )
     if len(data.shape) == 1:
         data = data.reshape(-1, 1)
     return md.cells, data
@@ -764,7 +790,6 @@ def write_mesh(
                     for cd in cdo.keys():
                         cdo[cd].resize(cdo[cd].size + 1, axis=0)
                         cdo[cd][-1] = cdo[cd][-2]
-                        breakpoint()
 
 
 def write_meshtags(
@@ -957,7 +982,7 @@ def write_meshtags(
             cell_offset = _create_dataset(
                 steps,
                 "CellOffsets",
-                shape=(1,),
+                shape=parent_mesh_group["Steps"]["CellOffsets"].shape,
                 dtype=np.int64,
                 chunks=True,
                 maxshape=(None,),
@@ -968,7 +993,7 @@ def write_meshtags(
             connectivity_offsets = _create_dataset(
                 steps,
                 "ConnectivityIdOffsets",
-                shape=(1,),
+                shape=parent_mesh_group["Steps"]["ConnectivityIdOffsets"].shape,
                 dtype=np.int64,
                 chunks=True,
                 maxshape=(None,),
@@ -985,13 +1010,13 @@ def write_meshtags(
             cd_data = _create_dataset(
                 cd_off,
                 data.name,
-                shape=(1,),
+                shape=parent_mesh_group["Steps"]["CellOffsets"].shape,
                 dtype=np.int64,
                 chunks=True,
                 maxshape=(None,),
                 mode=h5_mode,
             )
-            cd_data[-1] = cd_data.shape[0] - data.num_entities_global
+            cd_data[-1] = types.shape[0] - data.num_entities_global
 
         else:
             raise ValueError(f"Cannot write meshtags to {filename} with VTK type {file_type}")
@@ -1014,7 +1039,49 @@ def read_meshtags_data(
     Returns:
         Internal data structure for the mesh tags read from file
     """
-    raise NotImplementedError("The Pyvista backend cannot read meshtags.")
+    backend_args = get_default_backend_args(backend_args)
+    backend_args.update({"name": name})
+    # Reuse reading cell-data
+    indices, values = read_cell_data(filename, name, comm, None, backend_args=backend_args)
+    # Read cell-type of grid to get topological dimension
+    with h5pyfile(filename, "r", comm=comm) as h5file:
+        hdf = h5file["VTKHDF"]
+        if (file_type := hdf.attrs["Type"]) in (b"MultiBlockDataSet", "MultiBlockDataSet"):
+            # Recursive search of subgroups to find the unstructured grid
+            name = backend_args["name"]
+            ass = hdf["Assembly"]
+            mesh_node = []
+
+            def visitor(path):
+                if path.split("/")[-1] == name:
+                    # Retrieve the link object to check its type
+                    obj = ass.get(path)
+                    if "Type" in obj.attrs.keys() and obj.attrs["Type"] == "UnstructuredGrid":
+                        mesh_node.append(path)
+                        return 1
+                # Return None to continue searching, or return a value to stop
+                return None
+
+            ass.visit_links(visitor)
+            assert len(mesh_node) == 1
+            hdf = ass[mesh_node[0]]
+        elif file_type in (b"UnstructuredGrid", "UnstructuredGrid"):
+            pass
+        else:
+            raise RuntimeError(f"Unsupported type {file_type}")
+        num_cells_global = hdf["Types"].size
+        local_cell_range = compute_local_range(comm, num_cells_global)
+        cell_types_local = hdf["Types"][slice(*local_cell_range)]
+    unique_cells = find_all_unique_cell_types(comm, cell_types_local, indices.shape[1])
+    if unique_cells.shape[0] > 1:
+        raise NotImplementedError("adios4dolfinx does not support mixed celltype grids")
+    vtk_cell_type = unique_cells[0][0]
+    if vtk_cell_type in _first_order_vtk.keys():
+        ct = _first_order_vtk[vtk_cell_type]
+    elif vtk_cell_type in _arbitrary_lagrange_vtk.keys():
+        ct = _arbitrary_lagrange_vtk[vtk_cell_type]
+    dim = dolfinx.mesh.cell_dim(dolfinx.mesh.to_type(ct))
+    return MeshTagsData(name=name, values=values.flatten(), indices=indices, dim=dim)
 
 
 def read_dofmap(

@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 import itertools
-import typing
-from collections import ChainMap
 
 from mpi4py import MPI
 
 import dolfinx
 import numpy as np
-import numpy.typing as npt
 import pytest
 
 import adios4dolfinx
@@ -63,41 +60,11 @@ def mesh_3D(request):
     return mesh
 
 
-def generate_reference_map(
-    mesh: dolfinx.mesh.Mesh,
-    meshtag: dolfinx.mesh.MeshTags,
-    comm: MPI.Intracomm,
-    root: int,
-) -> typing.Optional[dict[str, tuple[int, npt.NDArray]]]:
-    """
-    Helper function to generate map from meshtag value to its corresponding index and midpoint.
-
-    Args:
-        mesh: The mesh
-        meshtag: The associated meshtag
-        comm: MPI communicator to gather the map from all processes with
-        root (int): Rank to store data on
-    Returns:
-        Root rank returns the map, all other ranks return None
-    """
-    mesh.topology.create_connectivity(meshtag.dim, mesh.topology.dim)
-    midpoints = dolfinx.mesh.compute_midpoints(mesh, meshtag.dim, meshtag.indices)
-    e_map = mesh.topology.index_map(meshtag.dim)
-    value_to_midpoint = {}
-    for index, value in zip(meshtag.indices, meshtag.values):
-        value_to_midpoint[value] = (
-            int(e_map.local_range[0] + index),
-            midpoints[index],
-        )
-    global_map = comm.gather(value_to_midpoint, root=root)
-    if comm.rank == root:
-        return dict(ChainMap(*global_map))  # type: ignore
-    return None
-
-
 @pytest.mark.parametrize("read_mode", read_modes)
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_checkpointing_meshtags_1D(mesh_1D, read_comm, read_mode, tmp_path, backend):
+def test_checkpointing_meshtags_1D(
+    mesh_1D, read_comm, read_mode, tmp_path, backend, generate_reference_map
+):
     mesh = mesh_1D
 
     # Write unique mesh file for each combination of MPI communicator and dtype
@@ -176,7 +143,9 @@ def test_checkpointing_meshtags_1D(mesh_1D, read_comm, read_mode, tmp_path, back
 
 @pytest.mark.parametrize("read_mode", read_modes)
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_checkpointing_meshtags_2D(mesh_2D, read_comm, read_mode, tmp_path, backend):
+def test_checkpointing_meshtags_2D(
+    mesh_2D, read_comm, read_mode, tmp_path, backend, generate_reference_map
+):
     mesh = mesh_2D
     hash = f"{mesh.comm.size}_{mesh.topology.cell_name()}_{mesh.geometry.x.dtype}"
     fname = MPI.COMM_WORLD.bcast(tmp_path, root=0)
@@ -238,7 +207,9 @@ def test_checkpointing_meshtags_2D(mesh_2D, read_comm, read_mode, tmp_path, back
 
 @pytest.mark.parametrize("read_mode", read_modes)
 @pytest.mark.parametrize("read_comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
-def test_checkpointing_meshtags_3D(mesh_3D, read_comm, read_mode, tmp_path, backend):
+def test_checkpointing_meshtags_3D(
+    mesh_3D, read_comm, read_mode, tmp_path, backend, generate_reference_map
+):
     mesh = mesh_3D
     hash = f"{mesh.comm.size}_{mesh.topology.cell_name()}_{mesh.geometry.x.dtype}"
     fname = MPI.COMM_WORLD.bcast(tmp_path, root=0)

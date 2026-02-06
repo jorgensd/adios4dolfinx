@@ -1,5 +1,6 @@
 import sys
 import typing
+from collections import ChainMap
 from unittest.mock import patch
 
 from mpi4py import MPI
@@ -8,6 +9,7 @@ import dolfinx
 import ipyparallel as ipp
 import numpy as np
 import numpy.typing
+import numpy.typing as npt
 import pytest
 
 import adios4dolfinx
@@ -218,3 +220,40 @@ def read_function_time_dep():
         assert np.allclose(v.x.array, v_ex.x.array, atol=10 * res, rtol=10 * res)
 
     return _read_function_time_dep
+
+
+def _generate_reference_map(
+    mesh: dolfinx.mesh.Mesh,
+    meshtag: dolfinx.mesh.MeshTags,
+    comm: MPI.Intracomm,
+    root: int,
+) -> typing.Optional[dict[str, tuple[int, npt.NDArray]]]:
+    """
+    Helper function to generate map from meshtag value to its corresponding index and midpoint.
+
+    Args:
+        mesh: The mesh
+        meshtag: The associated meshtag
+        comm: MPI communicator to gather the map from all processes with
+        root (int): Rank to store data on
+    Returns:
+        Root rank returns the map, all other ranks return None
+    """
+    mesh.topology.create_connectivity(meshtag.dim, mesh.topology.dim)
+    midpoints = dolfinx.mesh.compute_midpoints(mesh, meshtag.dim, meshtag.indices)
+    e_map = mesh.topology.index_map(meshtag.dim)
+    value_to_midpoint = {}
+    for index, value in zip(meshtag.indices, meshtag.values):
+        value_to_midpoint[value] = (
+            int(e_map.local_range[0] + index),
+            midpoints[index],
+        )
+    global_map = comm.gather(value_to_midpoint, root=root)
+    if comm.rank == root:
+        return dict(ChainMap(*global_map))  # type: ignore
+    return None
+
+
+@pytest.fixture
+def generate_reference_map():
+    return _generate_reference_map

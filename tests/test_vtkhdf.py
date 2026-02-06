@@ -5,7 +5,7 @@ import pytest
 import ufl
 from dolfinx.fem import Function, assemble_scalar, form
 from dolfinx.io.vtkhdf import write_cell_data, write_mesh, write_point_data
-from dolfinx.mesh import CellType, compute_midpoints, create_unit_cube, locate_entities, meshtags
+from dolfinx.mesh import CellType, compute_midpoints, create_unit_cube, meshtags
 
 import adios4dolfinx
 
@@ -188,7 +188,7 @@ def test_write_cell_data(dtype, tmp_path, cell_type):
 
 
 @pytest.mark.parametrize("dtype", [np.float32, np.float64])
-def test_write_meshtags(dtype, tmp_path):
+def test_write_meshtags(dtype, tmp_path, generate_reference_map):
     comm = MPI.COMM_WORLD
     tmp_path = comm.bcast(tmp_path, root=0)
     comm.barrier()
@@ -196,9 +196,6 @@ def test_write_meshtags(dtype, tmp_path):
 
     tmp_path = Path("testdata")
     filename = tmp_path / "meshtags.vtkhdf"
-
-    def left_cells(x):
-        return x[0] <= 0.5
 
     mesh = create_unit_cube(comm, 3, 3, 3, dtype=dtype, cell_type=CellType.hexahedron)
     adios4dolfinx.write_mesh(
@@ -211,12 +208,18 @@ def test_write_meshtags(dtype, tmp_path):
     )
     dim = mesh.topology.dim
     mesh.topology.create_connectivity(dim, mesh.topology.dim)
-    cells = locate_entities(mesh, dim, left_cells)
-    ct = meshtags(mesh, dim, cells, cells)
-    mesh.geometry.x[:, 0] *= 1.1 + np.sin(mesh.geometry.x[:, 1])
+    cmap = mesh.topology.index_map(dim)
+    cells = np.arange(cmap.size_local, dtype=np.int32)
+    ct = meshtags(mesh, dim, cells, cells + cmap.local_range[0])
     adios4dolfinx.write_meshtags(
         filename, mesh, ct, "CellTags", backend_args={"name": "hex"}, backend="vtkhdf"
     )
+    root = 0
+
+    org_map = generate_reference_map(mesh, ct, comm, root)
+    # Move mesh
+    mesh.geometry.x[:, 0] *= 1 + 0.2 * np.sin(mesh.geometry.x[:, 1])
+
     adios4dolfinx.write_mesh(
         filename,
         mesh,
@@ -226,11 +229,63 @@ def test_write_meshtags(dtype, tmp_path):
         backend="vtkhdf",
     )
 
+    # Add stationary meshtags (after time loop)
     mesh = create_unit_cube(comm, 7, 3, 5, dtype=dtype, cell_type=CellType.tetrahedron)
-    adios4dolfinx.write_mesh(filename, mesh, mode=adios4dolfinx.FileMode.append, time=1.0, backend_args={"name": "tet"}, backend="vtkhdf")
+    adios4dolfinx.write_mesh(
+        filename,
+        mesh,
+        mode=adios4dolfinx.FileMode.append,
+        time=1.0,
+        backend_args={"name": "tet"},
+        backend="vtkhdf",
+    )
     dim = mesh.topology.dim
-    mesh.topology.create_connectivity(dim, mesh.topology.dim)
-    cells = locate_entities(mesh, dim, left_cells)
-    ct = meshtags(mesh, dim, cells, cells)
-    adios4dolfinx.write_meshtags(filename, mesh,ct, "CellTags", backend_args={"name": "tet"}, backend="vtkhdf")
-    adios4dolfinx.write_mesh(filename, mesh, mode=adios4dolfinx.FileMode.append, time=2.5, backend_args={"name": "tet"}, backend="vtkhdf")
+    org_maps = {}
+    mesh.geometry.x[:, 0] *= 2.0 + mesh.geometry.x[:, 1]
+    adios4dolfinx.write_mesh(
+        filename,
+        mesh,
+        mode=adios4dolfinx.FileMode.append,
+        time=2.5,
+        backend_args={"name": "tet"},
+        backend="vtkhdf",
+    )
+    for dim in range(mesh.topology.dim + 1):
+        mesh.topology.create_connectivity(dim, mesh.topology.dim)
+        entities = np.arange(mesh.topology.index_map(dim).size_local, dtype=np.int32)
+        et = meshtags(mesh, dim, entities, entities + mesh.topology.index_map(dim).local_range[0])
+        adios4dolfinx.write_meshtags(
+            filename, mesh, et, f"{dim}tags", backend_args={"name": "tet"}, backend="vtkhdf"
+        )
+        org_maps[dim] = generate_reference_map(mesh, et, comm, root)
+
+    tol = 10 * np.finfo(dtype).eps
+    # Read in hex grid from second time step
+    hex_mesh = adios4dolfinx.read_mesh(
+        filename, comm, time=1.0, backend_args={"name": "hex"}, backend="vtkhdf"
+    )
+    hex_tag = adios4dolfinx.read_meshtags(
+        filename, hex_mesh, "CellTags", backend_args={"name": "hex"}, backend="vtkhdf"
+    )
+    read_map = generate_reference_map(hex_mesh, hex_tag, comm, root)
+    # On root process, check that midpoints are the same for each value in the meshtag
+    if MPI.COMM_WORLD.rank == root:
+        assert len(org_map) == len(read_map)
+        for value, (_, midpoint) in org_map.items():
+            _, read_midpoint = read_map[value]
+            np.testing.assert_allclose(read_midpoint, midpoint, atol=tol)
+
+    # Read tet grid from second time step
+    tet_mesh = adios4dolfinx.read_mesh(
+        filename, comm, time=2.5, backend_args={"name": "tet"}, backend="vtkhdf"
+    )
+    for dim in range(mesh.topology.dim + 1):
+        tet_tag = adios4dolfinx.read_meshtags(
+            filename, tet_mesh, f"{dim}tags", backend_args={"name": "tet"}, backend="vtkhdf"
+        )
+        read_map = generate_reference_map(tet_mesh, tet_tag, comm, root)
+        if MPI.COMM_WORLD.rank == root:
+            assert len(org_maps[dim]) == len(read_map)
+            for value, (_, midpoint) in org_maps[dim].items():
+                _, read_midpoint = read_map[value]
+                np.testing.assert_allclose(read_midpoint, midpoint, atol=tol)

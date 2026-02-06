@@ -26,6 +26,7 @@ from .. import FileMode, ReadMode
 # Cell types can be found at
 # https://vtk.org/doc/nightly/html/vtkCellType_8h_source.html
 _first_order_vtk = {
+    1: "point",
     3: "interval",
     5: "triangle",
     9: "quadrilateral",
