@@ -5,7 +5,7 @@ import pytest
 import ufl
 from dolfinx.fem import Function, assemble_scalar, form
 from dolfinx.io.vtkhdf import write_cell_data, write_mesh, write_point_data
-from dolfinx.mesh import CellType, compute_midpoints, create_unit_cube
+from dolfinx.mesh import CellType, compute_midpoints, create_unit_cube, locate_entities, meshtags
 
 import adios4dolfinx
 
@@ -185,3 +185,51 @@ def test_write_cell_data(dtype, tmp_path, cell_type):
         atol = 10 * np.finfo(u.x.array.dtype).eps
         v_ref.interpolate(lambda x: g(x, tk))
         np.testing.assert_allclose(u.x.array, v_ref.x.array, atol=atol)
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_write_meshtags(dtype, tmp_path):
+    comm = MPI.COMM_WORLD
+    tmp_path = comm.bcast(tmp_path, root=0)
+    comm.barrier()
+    from pathlib import Path
+
+    tmp_path = Path("testdata")
+    filename = tmp_path / "meshtags.vtkhdf"
+
+    def left_cells(x):
+        return x[0] <= 0.5
+
+    mesh = create_unit_cube(comm, 3, 3, 3, dtype=dtype, cell_type=CellType.hexahedron)
+    adios4dolfinx.write_mesh(
+        filename,
+        mesh,
+        mode=adios4dolfinx.FileMode.write,
+        time=1.0,
+        backend_args={"name": "hex"},
+        backend="vtkhdf",
+    )
+    dim = mesh.topology.dim
+    mesh.topology.create_connectivity(dim, mesh.topology.dim)
+    cells = locate_entities(mesh, dim, left_cells)
+    ct = meshtags(mesh, dim, cells, cells)
+    mesh.geometry.x[:, 0] *= 1.1 + np.sin(mesh.geometry.x[:, 1])
+    adios4dolfinx.write_meshtags(
+        filename, mesh, ct, "CellTags", backend_args={"name": "hex"}, backend="vtkhdf"
+    )
+    adios4dolfinx.write_mesh(
+        filename,
+        mesh,
+        mode=adios4dolfinx.FileMode.append,
+        time=2.5,
+        backend_args={"name": "hex"},
+        backend="vtkhdf",
+    )
+
+    # mesh = create_unit_cube(comm, 7, 3, 5, dtype=dtype, cell_type=CellType.tetrahedron)
+    # adios4dolfinx.write_mesh(filename, mesh, mode=adios4dolfinx.FileMode.append, time=1.0, backend_args={"name": "tet"}, backend="vtkhdf")
+    # dim = mesh.topology.dim
+    # mesh.topology.create_connectivity(dim, mesh.topology.dim)
+    # cells = locate_entities(mesh, dim, left_cells)
+    # ct = meshtags(mesh, dim, cells, cells)
+    # adios4dolfinx.write_meshtags(filename, mesh,ct, "CellTags", backend_args={"name": "tet"}, backend="vtkhdf")
