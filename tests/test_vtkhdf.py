@@ -99,7 +99,7 @@ def test_write_point_data(dtype, tmp_path, cell_type):
         write_point_data(str(filename), mesh, point_data, float(ti))
     comm.barrier()
 
-    grid = adios4dolfinx.read_mesh(filename=filename, comm=comm, backend="vtkhdf")
+    grid = adios4dolfinx.read_mesh(filename=filename, comm=comm, time=None, backend="vtkhdf")
     # Since we shuffle time we need to shuffle in the same way on each process
     np.random.shuffle(t)
     t = comm.bcast(t, root=0)
@@ -154,7 +154,7 @@ def test_write_cell_data(dtype, tmp_path, cell_type):
         write_cell_data(str(filename), mesh, cell_data, float(ti))
     comm.barrier()
 
-    grid = adios4dolfinx.read_mesh(filename=filename, comm=comm, backend="vtkhdf")
+    grid = adios4dolfinx.read_mesh(filename=filename, comm=comm, time=None, backend="vtkhdf")
     # Since we shuffle time we need to shuffle in the same way on each process
     np.random.shuffle(t)
     t = comm.bcast(t, root=0)

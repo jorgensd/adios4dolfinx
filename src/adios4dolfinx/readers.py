@@ -296,6 +296,46 @@ def read_function_from_legacy_h5(
     u.x.scatter_forward()
 
 
+def create_geometry_function_space(mesh: dolfinx.mesh.Mesh, N: int) -> dolfinx.fem.FunctionSpace:
+    """Reconstruct a vector space with the N components using the geometry dofmap to ensure
+    a 1-1 mapping between mesh nodes and DOFs."""
+    geom_imap = mesh.geometry.index_map()
+    geom_dofmap = mesh.geometry.dofmap
+    sub_el = mesh.ufl_domain().ufl_coordinate_element().sub_elements[0]
+    adj_list = dolfinx.cpp.graph.AdjacencyList_int32(geom_dofmap)
+
+    value_shape: tuple[int, ...]
+    if N == 1:
+        ufl_el = sub_el
+        value_shape = ()
+    else:
+        ufl_el = basix.ufl.blocked_element(sub_el, shape=(N,))
+        value_shape = (N,)
+
+    if ufl_el.dtype == np.float32:
+        _fe_constructor = dolfinx.cpp.fem.FiniteElement_float32
+        _fem_constructor = dolfinx.cpp.fem.FunctionSpace_float32
+    elif ufl_el.dtype == np.float64:
+        _fe_constructor = dolfinx.cpp.fem.FiniteElement_float64
+        _fem_constructor = dolfinx.cpp.fem.FunctionSpace_float64
+    else:
+        raise RuntimeError(f"Unsupported type {ufl_el.dtype}")
+    try:
+        cpp_el = _fe_constructor(ufl_el.basix_element._e, block_shape=value_shape, symmetric=False)
+    except TypeError:
+        cpp_el = _fe_constructor(ufl_el.basix_element._e, block_size=N, symmetric=False)
+    dof_layout = dolfinx.cpp.fem.create_element_dof_layout(cpp_el, [])
+    cpp_dofmap = dolfinx.cpp.fem.DofMap(dof_layout, geom_imap, N, adj_list, N)
+
+    # Create function space
+    try:
+        cpp_space = _fem_constructor(mesh._cpp_object, cpp_el, cpp_dofmap)
+    except TypeError:
+        cpp_space = _fem_constructor(mesh._cpp_object, cpp_el, cpp_dofmap, value_shape=value_shape)
+
+    return dolfinx.fem.FunctionSpace(mesh, ufl_el, cpp_space)
+
+
 def read_point_data(
     filename: Path | str,
     name: str,
@@ -328,23 +368,7 @@ def read_point_data(
     num_components = dataset.shape[1]
 
     # Create appropriate function space (based on coordinate map)
-    shape: tuple[int, ...]
-    if num_components == 1:
-        shape = ()
-    else:
-        shape = (num_components,)
-    element = basix.ufl.element(
-        basix.ElementFamily.P,
-        mesh.topology.cell_name(),
-        mesh.geometry.cmap.degree,
-        basix.LagrangeVariant(mesh.geometry.cmap.variant),
-        shape=shape,
-        dtype=mesh.geometry.x.dtype,
-    )
-
-    # Assumption: Same doflayout for geometry and function space, cannot test in python
-    # NOTE: Should probably reuse the geometry dofmap.
-    V = dolfinx.fem.functionspace(mesh, element)
+    V = create_geometry_function_space(mesh, num_components)
     uh = dolfinx.fem.Function(V, name=name, dtype=dataset.dtype)
     # Assume that mesh is first order for now
     x_dofmap = mesh.geometry.dofmap
