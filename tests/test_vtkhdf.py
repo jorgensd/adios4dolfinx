@@ -226,10 +226,11 @@ def test_write_meshtags(dtype, tmp_path):
         backend="vtkhdf",
     )
 
-    # mesh = create_unit_cube(comm, 7, 3, 5, dtype=dtype, cell_type=CellType.tetrahedron)
-    # adios4dolfinx.write_mesh(filename, mesh, mode=adios4dolfinx.FileMode.append, time=1.0, backend_args={"name": "tet"}, backend="vtkhdf")
-    # dim = mesh.topology.dim
-    # mesh.topology.create_connectivity(dim, mesh.topology.dim)
-    # cells = locate_entities(mesh, dim, left_cells)
-    # ct = meshtags(mesh, dim, cells, cells)
-    # adios4dolfinx.write_meshtags(filename, mesh,ct, "CellTags", backend_args={"name": "tet"}, backend="vtkhdf")
+    mesh = create_unit_cube(comm, 7, 3, 5, dtype=dtype, cell_type=CellType.tetrahedron)
+    adios4dolfinx.write_mesh(filename, mesh, mode=adios4dolfinx.FileMode.append, time=1.0, backend_args={"name": "tet"}, backend="vtkhdf")
+    dim = mesh.topology.dim
+    mesh.topology.create_connectivity(dim, mesh.topology.dim)
+    cells = locate_entities(mesh, dim, left_cells)
+    ct = meshtags(mesh, dim, cells, cells)
+    adios4dolfinx.write_meshtags(filename, mesh,ct, "CellTags", backend_args={"name": "tet"}, backend="vtkhdf")
+    adios4dolfinx.write_mesh(filename, mesh, mode=adios4dolfinx.FileMode.append, time=2.5, backend_args={"name": "tet"}, backend="vtkhdf")
