@@ -90,28 +90,29 @@ def read_mesh_data(
     with h5pyfile(filename, "r", comm=comm) as h5file:
         hdf = h5file["VTKHDF"]
         # Check for type of VTKHDF file
-        if (file_type := hdf.attrs["Type"]) == "MultiBlockDataSet":
+        if (file_type := hdf.attrs["Type"]) in (b"MultiBlockDataSet", "MultiBlockDataSet"):
             # Recursive search of subgroups to find the unstructured grid
             name = backend_args["name"]
             ass = hdf["Assembly"]
             mesh_node = []
+
             def visitor(path):
-                if path.split('/')[-1] == name:
+                if path.split("/")[-1] == name:
                     # Retrieve the link object to check its type
                     obj = ass.get(path)
                     if "Type" in obj.attrs.keys() and obj.attrs["Type"] == "UnstructuredGrid":
                         mesh_node.append(path)
                         return 1
                 # Return None to continue searching, or return a value to stop
-                return None 
+                return None
 
             ass.visit_links(visitor)
             assert len(mesh_node) == 1
             hdf = ass[mesh_node[0]]
-        elif (file_type == "UnstructuredGrid"):
+        elif file_type in (b"UnstructuredGrid", "UnstructuredGrid"):
             pass
         else:
-            raise RuntimeError("Not supported file type {file_type}")
+            raise RuntimeError(f"Not supported file type {file_type}")
         if time is None:
             num_cells_global = hdf["Types"].size
             local_cell_range = compute_local_range(comm, num_cells_global)

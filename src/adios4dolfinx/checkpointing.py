@@ -404,12 +404,10 @@ def read_mesh(
 
     # Let each backend handle what should be default behavior when reading mesh
     # with or without time stamp.
-    kwarg = {} if time is None else {"time": time}
-
     dist_in_data = backend_cls.read_mesh_data(
         filename,
         comm,
-        **kwarg,
+        time=time,
         read_from_partition=read_from_partition,
         backend_args=backend_args,
     )
