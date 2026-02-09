@@ -14,7 +14,7 @@ import dolfinx
 import numpy as np
 import numpy.typing as npt
 
-from adios4dolfinx.structures import FunctionData, MeshData, MeshTagsData, ReadMeshData
+from adios4dolfinx.structures import FunctionData, MeshData, MeshTagsData, PointData, ReadMeshData
 from adios4dolfinx.utils import check_file_exists, compute_local_range
 
 from .. import FileMode, ReadMode
@@ -573,3 +573,24 @@ def read_cell_data(
         return top_dofs, vec_dofs
     else:
         raise NotImplementedError("Not implemented yet.")
+
+
+def write_point_data(
+    filename: Path | str,
+    point_data: PointData,
+    comm: MPI.Intracomm,
+    time: str | float | None,
+    mode: FileMode,
+    backend_args: dict[str, Any] | None,
+):
+    """Write function to file by interpolating into geometry nodes.
+
+
+    Args:
+        filename: Path to file
+        point_data: Data to write to file
+        time: Time stamp
+        mode: Append or write
+        backend_args: The backend arguments
+    """
+    raise NotImplementedError("XDMF has not implemented this yet")

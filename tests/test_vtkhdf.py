@@ -3,7 +3,7 @@ from mpi4py import MPI
 import numpy as np
 import pytest
 import ufl
-from dolfinx.fem import Function, assemble_scalar, form
+from dolfinx.fem import Function, assemble_scalar, form, functionspace
 from dolfinx.io.vtkhdf import write_cell_data, write_mesh, write_point_data
 from dolfinx.mesh import CellType, compute_midpoints, create_unit_cube, meshtags
 
@@ -289,3 +289,77 @@ def test_write_meshtags(dtype, tmp_path, generate_reference_map):
             for value, (_, midpoint) in org_maps[dim].items():
                 _, read_midpoint = read_map[value]
                 np.testing.assert_allclose(read_midpoint, midpoint, atol=tol)
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_read_write_pointdata(dtype, tmp_path):
+    tol = 10 * np.finfo(dtype).eps
+
+    comm = MPI.COMM_WORLD
+    tmp_path = comm.bcast(tmp_path, root=0)
+    comm.barrier()
+    from pathlib import Path
+
+    tmp_path = Path("testdata")
+    filename = tmp_path / "point_data.vtkhdf"
+
+    mesh = create_unit_cube(comm, 3, 3, 3, dtype=dtype, cell_type=CellType.hexahedron)
+
+    def f(x, t):
+        return x[0] + np.sin(x[1]) + np.cos(x[0] * t)
+
+    adios4dolfinx.write_mesh(
+        filename,
+        mesh,
+        mode=adios4dolfinx.FileMode.write,
+        time=1.0,
+        backend_args={"name": "hex"},
+        backend="vtkhdf",
+    )
+
+    f_name = "point_data"
+    V = functionspace(mesh, ("Lagrange", 2))
+    u = Function(V, dtype=dtype, name=f_name)
+    u.interpolate(lambda x: f(x, 1.0))
+    adios4dolfinx.write_point_data(
+        filename,
+        u,
+        mode=adios4dolfinx.FileMode.append,
+        time=1.0,
+        backend_args={"name": "hex"},
+        backend="vtkhdf",
+    )
+
+    adios4dolfinx.write_mesh(
+        filename,
+        mesh,
+        mode=adios4dolfinx.FileMode.append,
+        time=2.0,
+        backend_args={"name": "hex"},
+        backend="vtkhdf",
+    )
+    u.interpolate(lambda x: f(x, 2.0))
+    adios4dolfinx.write_point_data(
+        filename,
+        u,
+        mode=adios4dolfinx.FileMode.append,
+        time=2.0,
+        backend_args={"name": "hex"},
+        backend="vtkhdf",
+    )
+
+    # Read in hex grid from second time step
+    hex_mesh = adios4dolfinx.read_mesh(
+        filename, comm, time=2.0, backend_args={"name": "hex"}, backend="vtkhdf"
+    )
+    u_end = adios4dolfinx.read_point_data(
+        filename,
+        mesh=hex_mesh,
+        name=f_name,
+        time=2.0,
+        backend_args={"name": "hex"},
+        backend="vtkhdf",
+    )
+    u_ref = Function(u_end.function_space, dtype=dtype)
+    u_ref.interpolate(lambda x: f(x, 2.0))
+    np.testing.assert_allclose(u_end.x.array, u_ref.x.array, atol=tol)

@@ -17,7 +17,7 @@ import numpy as np
 import numpy.typing as npt
 from dolfinx.graph import adjacencylist
 
-from ...structures import FunctionData, MeshData, MeshTagsData, ReadMeshData
+from ...structures import FunctionData, MeshData, MeshTagsData, PointData, ReadMeshData
 from ...utils import check_file_exists, compute_local_range
 from .. import FileMode, ReadMode
 
@@ -798,3 +798,23 @@ def read_cell_data(
         freedom within that cell.
     """
     raise NotImplementedError("The h5py backend does not support reading cell data.")
+
+
+def write_point_data(
+    filename: Path | str,
+    u: PointData,
+    comm: MPI.Intracomm,
+    time: str | float | None,
+    mode: FileMode,
+    backend_args: dict[str, Any] | None,
+):
+    """Write function to file by interpolating into geometry nodes.
+
+
+    Args:
+        filename: Path to file
+        u: Function to write to file.
+        mode: Append or write
+        backend_args: The backend arguments
+    """
+    raise NotImplementedError("H5PY has not implemented this yet")

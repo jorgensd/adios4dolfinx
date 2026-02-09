@@ -13,7 +13,7 @@ import h5py
 import numpy as np
 import numpy.typing as npt
 
-from adios4dolfinx.structures import FunctionData, MeshData, MeshTagsData, ReadMeshData
+from adios4dolfinx.structures import FunctionData, MeshData, MeshTagsData, PointData, ReadMeshData
 from adios4dolfinx.utils import check_file_exists, compute_local_range
 
 from .. import FileMode, ReadMode
@@ -226,8 +226,29 @@ def read_point_data(
     check_file_exists(filename)
     with h5pyfile(filename, "r", comm=comm) as h5file:
         hdf = h5file["VTKHDF"]
-        if "PointData" not in hdf.keys():
-            raise ValueError(f"No point data found in {filename}.")
+        if (file_type := hdf.attrs["Type"]) in (b"MultiBlockDataSet", "MultiBlockDataSet"):
+            # Recursive search of subgroups to find the unstructured grid
+            mesh_name = backend_args["name"]
+            ass = hdf["Assembly"]
+            mesh_node = []
+
+            def visitor(path):
+                if path.split("/")[-1] == mesh_name:
+                    # Retrieve the link object to check its type
+                    obj = ass.get(path)
+                    if "Type" in obj.attrs.keys() and obj.attrs["Type"] == "UnstructuredGrid":
+                        mesh_node.append(path)
+                        return 1
+                # Return None to continue searching, or return a value to stop
+                return None
+
+            ass.visit_links(visitor)
+            assert len(mesh_node) == 1
+            hdf = ass[mesh_node[0]]
+        elif file_type in (b"UnstructuredGrid", "UnstructuredGrid"):
+            pass
+        else:
+            raise RuntimeError(f"Not supported file type {file_type}")
         point_data = hdf["PointData"]
         assert point_data is not None
         if name not in point_data.keys():
@@ -456,7 +477,7 @@ def _create_dataset(
     shape: tuple[int, ...],
     dtype: npt.DTypeLike,
     chunks: bool,
-    maxshape: tuple[int, ...],
+    maxshape: tuple[int | None, ...],
     mode: str,
     resize: bool = True,
 ) -> h5py.Dataset:
@@ -740,6 +761,13 @@ def write_mesh(
         )
         connectivity_offsets[-1] = offsets.shape[0] - (mesh.num_cells_global + 1)
 
+        # Update cell-data and point-data offsets by copying over data from previous step
+        for key in ["CellDataOffsets", "PointDataOffsets"]:
+            group = _create_group(steps, key, mode=h5_mode)
+            for cd in group.keys():
+                group[cd].resize(steps.attrs["NSteps"], axis=0)
+                group[cd][-1] = group[cd][-2]
+
         # Copy over counters from parent
         # NOTE: At the momement NumberOfCells and NumberOfConnectivityIds are time
         # independent due to the BUG in VTKHDF.
@@ -785,11 +813,11 @@ def write_mesh(
                     else:
                         raise RuntimeError(f"{sub_step.name} should have {key}/")
                 # Append value from previous step for meshtags celldata
-                for key in ["CellDataOffsets"]:
-                    cdo = sub_step[key]
-                    for cd in cdo.keys():
-                        cdo[cd].resize(cdo[cd].size + 1, axis=0)
-                        cdo[cd][-1] = cdo[cd][-2]
+                for key in ["CellDataOffsets", "PointDataOffsets"]:
+                    group = _create_group(sub_step, key, mode=h5_mode)
+                    for cd in group.keys():
+                        group[cd].resize(sub_step.attrs["NSteps"], axis=0)
+                        group[cd][-1] = group[cd][-2]
 
 
 def write_meshtags(
@@ -841,6 +869,7 @@ def write_meshtags(
             mesh_group.attrs["Version"] = np.array([2, 1], dtype=np.int32)
 
             cell_data = _create_group(mesh_group, "CellData", mode=h5_mode)
+            assert data.num_entities_global is not None
             dataset = _create_dataset(
                 cell_data,
                 data.name,
@@ -892,6 +921,7 @@ def write_meshtags(
                 mode=h5_mode,
                 resize=False,  # Resize should really be True, see issue below
             )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
+            assert data.num_entities_global is not None and num_dofs_per_cell is not None
             number_of_connectivities[-1] = data.num_entities_global * num_dofs_per_cell
 
             # Store topology offsets (single celltype assumption)
@@ -906,6 +936,7 @@ def write_meshtags(
                 resize=False,  # Resize should really be True, see issue below
             )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
             offset_data = np.arange(0, data.indices.size + 1, data.indices.shape[1])
+            assert data.local_start is not None
             offset_data += num_dofs_per_cell * data.local_start
             insert_slice = _compute_append_slice(
                 offsets,
@@ -1144,7 +1175,7 @@ def read_cell_perms(
         Contiguous sequence of permutations (with respect to input data)
         Process 0 has [0, M), process 1 [M, N), process 2 [N, O) etc.
     """
-    raise NotImplementedError("The Pyvista backend cannot make checkpoints.")
+    raise NotImplementedError("The VTKHDF backend cannot make checkpoints.")
 
 
 def write_function(
@@ -1166,7 +1197,7 @@ def write_function(
         mode: File-mode to store the function
         backend_args: Arguments to backend
     """
-    raise NotImplementedError("The Pyvista backend cannot make checkpoints.")
+    raise NotImplementedError("The VTKHDF backend cannot make checkpoints.")
 
 
 def read_legacy_mesh(
@@ -1186,7 +1217,7 @@ def read_legacy_mesh(
             - Geometry as a (num_vertices, geometric_dimension) array of vertex coordinates
             - Cell type as a string (e.g. "tetrahedron") or None if not found
     """
-    raise NotImplementedError("The Pyvista backend cannot read legacy DOLFIN meshes.")
+    raise NotImplementedError("The VTKHDF backend cannot read legacy DOLFIN meshes.")
 
 
 def snapshot_checkpoint(
@@ -1203,7 +1234,7 @@ def snapshot_checkpoint(
         u: dolfinx function to create a snapshot checkpoint for
         backend_args: Arguments to backend
     """
-    raise NotImplementedError("The Pyvista backend cannot make checkpoints.")
+    raise NotImplementedError("The VTKHDF backend cannot make checkpoints.")
 
 
 def read_hdf5_array(
@@ -1226,4 +1257,130 @@ def read_hdf5_array(
             - Global starting point on the process.
                 Process 0 has [0, M), process 1 [M, N), process 2 [N, O) etc.
     """
-    raise NotImplementedError("The Pyvista backend cannot read HDF5 arrays")
+    raise NotImplementedError("The VTKHDF backend cannot read HDF5 arrays")
+
+
+def write_point_data(
+    filename: Path | str,
+    point_data: PointData,
+    comm: MPI.Intracomm,
+    time: str | float | None,
+    mode: FileMode,
+    backend_args: dict[str, Any] | None,
+):
+    """Write function to file by interpolating into geometry nodes.
+
+
+    Args:
+        filename: Path to file
+        point_data: Data to write to file
+        time: Time stamp
+        mode: Append or write
+        backend_args: The backend arguments
+    """
+    h5_mode = convert_file_mode(mode)
+    assert h5_mode == "a"
+    backend_args = get_default_backend_args(backend_args)
+    mesh_name = backend_args["name"]
+    with h5pyfile(filename, h5_mode, comm=comm) as h5file:
+        hdf = h5file["VTKHDF"]
+        # Check for type of VTKHDF file
+        if (file_type := hdf.attrs["Type"]) in (b"MultiBlockDataSet", "MultiBlockDataSet"):
+            # Place softlink to data in assembly
+            ass = hdf["Assembly"]
+            mesh_block = []
+
+            def visitor(path):
+                if path.split("/")[-1] == mesh_name:
+                    # Retrieve the link object to check its type
+                    obj = ass.get(path)
+                    if "Type" in obj.attrs.keys() and obj.attrs["Type"] == "UnstructuredGrid":
+                        mesh_block.append(obj)
+                        return 1
+                # Return None to continue searching, or return a value to stop
+                return None
+
+            ass.visit_links(visitor)
+            assert len(mesh_block) == 1
+
+            block = mesh_block[0]
+
+            point_group = _create_group(block, "PointData", mode=h5_mode)
+            dataset = _create_dataset(
+                point_group,
+                point_data.name,
+                shape=point_data.global_shape,
+                dtype=point_data.values.dtype,
+                chunks=True,
+                maxshape=(None, point_data.values.shape[1]),
+                mode=h5_mode,
+            )
+            insert_slice = _compute_append_slice(
+                dataset,
+                point_data.global_shape[0],
+                np.array(
+                    [
+                        point_data.local_range[0],
+                        point_data.local_range[0] + point_data.values.shape[0],
+                    ]
+                ),
+                mode=h5_mode,
+            )
+            dataset[insert_slice] = point_data.values
+
+            steps = _create_group(block, "Steps", mode=h5_mode)
+            pdo = _create_group(steps, "PointDataOffsets", mode=h5_mode)
+
+            # Check if time step is already in time-stepping of mesh
+            timestamps = steps["Values"][:]
+            assert isinstance(timestamps, np.ndarray)
+            assert isinstance(time, float)
+            time_exists = np.flatnonzero(np.isclose(timestamps, time))
+
+            if len(time_exists) == 1:
+                idx = time_exists[0]
+                pdo_u = _create_dataset(
+                    pdo,
+                    point_data.name,
+                    shape=(1,),
+                    dtype=np.int64,
+                    chunks=True,
+                    maxshape=(None,),
+                    mode=h5_mode,
+                    resize=False,
+                )
+                pdo_u[idx] = (
+                    dataset.shape[0] * dataset.shape[1]
+                    - point_data.global_shape[0] * point_data.global_shape[1]
+                )
+            elif len(time_exists) == 0:
+                # No mesh written at step, update mesh offsets
+                steps.attrs.create("NSteps", block["Steps"].attrs["NSteps"] + 1)
+                step_vals = _create_dataset(
+                    steps,
+                    "Values",
+                    shape=(1,),
+                    dtype=np.float64,
+                    chunks=True,
+                    maxshape=(None,),
+                    mode=h5_mode,
+                    resize=True,
+                )
+                step_vals[-1] = time
+                for key in [
+                    "PartOffsets",
+                    "NumberOfParts",
+                    "PointOffsets",
+                    "CellOffsets",
+                    "ConnectivityIdOffsets",
+                    "CellDataOffsets",
+                ]:
+                    if key in steps.keys():
+                        offset = steps[key]
+                        offset.resize(offset.size + 1, axis=0)
+                        offset[-1] = offset[-2]
+            else:
+                raise ValueError(f"Time step found multiple times in {filename}")
+
+        else:
+            raise ValueError(f"Cannot write meshtags to {filename} with VTK type {file_type}")

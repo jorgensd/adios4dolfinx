@@ -301,7 +301,9 @@ def create_geometry_function_space(mesh: dolfinx.mesh.Mesh, N: int) -> dolfinx.f
     a 1-1 mapping between mesh nodes and DOFs."""
     geom_imap = mesh.geometry.index_map()
     geom_dofmap = mesh.geometry.dofmap
-    sub_el = mesh.ufl_domain().ufl_coordinate_element().sub_elements[0]
+    ufl_domain = mesh.ufl_domain()
+    assert ufl_domain is not None
+    sub_el = ufl_domain.ufl_coordinate_element().sub_elements[0]
     adj_list = dolfinx.cpp.graph.AdjacencyList_int32(geom_dofmap)
 
     value_shape: tuple[int, ...]
