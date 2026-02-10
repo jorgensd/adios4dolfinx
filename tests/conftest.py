@@ -30,6 +30,7 @@ def find_backends():
 
         if h5py.get_config().mpi:
             backends.append("h5py")
+            backends.append("xdmf")
             backends.append("vtkhdf")
     except ModuleNotFoundError:
         pass
@@ -37,7 +38,6 @@ def find_backends():
     try:
         import pyvista
 
-        backends.append("xdmf")
         backends.append("pyvista")
     except ModuleNotFoundError:
         pass
