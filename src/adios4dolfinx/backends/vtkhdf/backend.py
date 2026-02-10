@@ -598,7 +598,7 @@ def write_mesh(
         points = _create_dataset(
             mesh_group,
             "Points",
-            shape=(mesh.num_nodes_global, mesh.local_geometry.shape[1]),
+            shape=(mesh.num_nodes_global, 3),
             dtype=mesh.local_geometry.dtype,
             chunks=True,
             maxshape=(None, 3),
@@ -607,7 +607,7 @@ def write_mesh(
         insert_slice = _compute_append_slice(
             points, mesh.num_nodes_global, mesh.local_geometry_pos, h5_mode
         )
-        points[insert_slice] = mesh.local_geometry
+        points[insert_slice, : mesh.local_geometry.shape[1]] = mesh.local_geometry
 
         # Store topology offsets (single celltype assumption)
         offsets = _create_dataset(

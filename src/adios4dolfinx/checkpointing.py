@@ -593,7 +593,6 @@ def write_point_data(
     local_range = V.dofmap.index_map.local_range
     num_dofs_local = V.dofmap.index_map.size_local
     data = v_out.x.array.reshape(-1, V.dofmap.index_map_bs)[:num_dofs_local]
-
     ad = ArrayData(
         name=v_out.name, values=data, global_shape=data_shape, local_range=local_range, type="Point"
     )
