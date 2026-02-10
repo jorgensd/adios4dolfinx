@@ -11,7 +11,14 @@ readme = "README.md"
 dependencies = ["fenics-dolfinx>=0.10.0", "packaging"]
 
 [project.optional-dependencies]
-test = ["pytest", "coverage", "ipyparallel", "adios4dolfinx[h5py]"]
+test = [
+    "pytest", 
+    "coverage", 
+    "ipyparallel", 
+    "adios4dolfinx[h5py]", 
+    "adios4dolfinx[pyvista]", 
+    "adios4dolfinx[xdmf]"
+]
 dev = ["pdbpp", "ipython", "mypy", "ruff"]
 h5py = ["h5py"]
 pyvista = ["pyvista"]
