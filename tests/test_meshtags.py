@@ -98,7 +98,7 @@ def test_checkpointing_meshtags_1D(
             if mesh.comm.size != 1:
                 adios4dolfinx.write_meshtags(filename, mesh, ft, backend=backend)
                 # Create map from mesh tag value to its corresponding index and midpoint
-                org_map = generate_reference_map(mesh, ft, mesh.comm, root)
+                org_map = generate_reference_map(mesh, ft, MPI.COMM_SELF, root)
                 org_maps.append(org_map)
             else:
                 if MPI.COMM_WORLD.rank == root:
