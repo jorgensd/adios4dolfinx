@@ -9,7 +9,7 @@ import dolfinx
 import numpy as np
 import numpy.typing as npt
 
-from ..structures import FunctionData, MeshData, MeshTagsData, PointData, ReadMeshData
+from ..structures import ArrayData, FunctionData, MeshData, MeshTagsData, ReadMeshData
 
 __all__ = ["FileMode", "IOBackend", "get_backend"]
 
@@ -381,16 +381,16 @@ class IOBackend(Protocol):
         """
         ...
 
-    def write_point_data(
+    def write_data(
         self,
         filename: Path | str,
-        point_data: PointData,
+        array_data: ArrayData,
         comm: MPI.Intracomm,
         time: str | float | None,
         mode: FileMode,
         backend_args: dict[str, Any] | None,
     ):
-        """Write function to file by interpolating into geometry nodes.
+        """Write a 2D-array to file.
 
 
         Args:

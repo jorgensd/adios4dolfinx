@@ -26,7 +26,7 @@ from .comm_helpers import (
     send_dofs_and_recv_values,
 )
 from .readers import create_geometry_function_space
-from .structures import FunctionData, MeshTagsData, PointData
+from .structures import ArrayData, FunctionData, MeshTagsData
 from .utils import (
     check_file_exists,
     compute_dofmap_pos,
@@ -594,9 +594,47 @@ def write_point_data(
     num_dofs_local = V.dofmap.index_map.size_local
     data = v_out.x.array.reshape(-1, V.dofmap.index_map_bs)[:num_dofs_local]
 
-    pd = PointData(name=v_out.name, values=data, global_shape=data_shape, local_range=local_range)
+    ad = ArrayData(
+        name=v_out.name, values=data, global_shape=data_shape, local_range=local_range, type="Point"
+    )
+    backend_cls = get_backend(backend)
+    return backend_cls.write_data(
+        filename, comm=comm, mode=mode, time=time, array_data=ad, backend_args=backend_args
+    )
+
+
+def write_cell_data(
+    filename: Path | str,
+    u: dolfinx.fem.Function,
+    time: str | float | None,
+    mode: FileMode,
+    backend_args: dict[str, Any] | None,
+    backend: str = "vtkhdf",
+):
+    """Write function to file by interpolating into cell midpoints.
+
+
+    Args:
+        filename: Path to file
+        point_data: Data to write to file
+        time: Time stamp
+        mode: Append or write
+        backend_args: The backend arguments
+    """
+    V = dolfinx.fem.functionspace(u.function_space.mesh, ("DG", 0, u.ufl_shape))
+    v_out = dolfinx.fem.Function(V, name=u.name, dtype=u.x.array.dtype)
+    v_out.interpolate(u)
+    comm = v_out.function_space.mesh.comm
+    data_shape = (V.dofmap.index_map.size_global, V.dofmap.index_map_bs)
+    local_range = V.dofmap.index_map.local_range
+    num_dofs_local = V.dofmap.index_map.size_local
+    data = v_out.x.array.reshape(-1, V.dofmap.index_map_bs)[:num_dofs_local]
 
     backend_cls = get_backend(backend)
-    return backend_cls.write_point_data(
-        filename, comm=comm, mode=mode, time=time, point_data=pd, backend_args=backend_args
+    ad = ArrayData(
+        name=v_out.name, values=data, global_shape=data_shape, local_range=local_range, type="Cell"
+    )
+    backend_cls = get_backend(backend)
+    return backend_cls.write_data(
+        filename, comm=comm, mode=mode, time=time, array_data=ad, backend_args=backend_args
     )

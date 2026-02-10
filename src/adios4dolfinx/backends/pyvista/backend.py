@@ -18,7 +18,7 @@ from mpi4py import MPI
 import basix
 import dolfinx
 
-from adios4dolfinx.structures import FunctionData, MeshData, MeshTagsData, PointData, ReadMeshData
+from adios4dolfinx.structures import ArrayData, FunctionData, MeshData, MeshTagsData, ReadMeshData
 from adios4dolfinx.utils import check_file_exists
 
 from .. import FileMode, ReadMode
@@ -567,16 +567,15 @@ def read_hdf5_array(
     raise NotImplementedError("The Pyvista backend cannot read HDF5 arrays")
 
 
-def write_point_data(
+def write_data(
     filename: Path | str,
-    point_data: PointData,
+    array_data: ArrayData,
     comm: MPI.Intracomm,
     time: str | float | None,
     mode: FileMode,
     backend_args: dict[str, Any] | None,
 ):
-    """Write function to file by interpolating into geometry nodes.
-
+    """Write a 2D-array to file (distributed across proceses with MPI).
 
     Args:
         filename: Path to file

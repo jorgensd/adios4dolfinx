@@ -14,7 +14,7 @@ import dolfinx
 import numpy as np
 import numpy.typing as npt
 
-from adios4dolfinx.structures import FunctionData, MeshData, MeshTagsData, PointData, ReadMeshData
+from adios4dolfinx.structures import ArrayData, FunctionData, MeshData, MeshTagsData, ReadMeshData
 from adios4dolfinx.utils import check_file_exists, compute_local_range
 
 from .. import FileMode, ReadMode
@@ -575,15 +575,15 @@ def read_cell_data(
         raise NotImplementedError("Not implemented yet.")
 
 
-def write_point_data(
+def write_data(
     filename: Path | str,
-    point_data: PointData,
+    point_data: ArrayData,
     comm: MPI.Intracomm,
     time: str | float | None,
     mode: FileMode,
     backend_args: dict[str, Any] | None,
 ):
-    """Write function to file by interpolating into geometry nodes.
+    """Write a 2D-array to file (distributed across proceses with MPI).
 
 
     Args:

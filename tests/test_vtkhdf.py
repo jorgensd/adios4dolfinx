@@ -306,7 +306,7 @@ def test_read_write_pointdata(dtype, tmp_path):
     mesh = create_unit_cube(comm, 3, 3, 3, dtype=dtype, cell_type=CellType.hexahedron)
 
     def f(x, t):
-        return x[0] + np.sin(x[1]) + np.cos(x[0] * t)
+        return (x[0] + np.sin(x[1]) + np.cos(x[0] * t), x[2] + x[1] - t)
 
     adios4dolfinx.write_mesh(
         filename,
@@ -318,7 +318,7 @@ def test_read_write_pointdata(dtype, tmp_path):
     )
 
     f_name = "point_data"
-    V = functionspace(mesh, ("Lagrange", 2))
+    V = functionspace(mesh, ("Lagrange", 2, (2,)))
     u = Function(V, dtype=dtype, name=f_name)
     u.interpolate(lambda x: f(x, 1.0))
     adios4dolfinx.write_point_data(
@@ -363,3 +363,81 @@ def test_read_write_pointdata(dtype, tmp_path):
     u_ref = Function(u_end.function_space, dtype=dtype)
     u_ref.interpolate(lambda x: f(x, 2.0))
     np.testing.assert_allclose(u_end.x.array, u_ref.x.array, atol=tol)
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_read_write_celldata(dtype, tmp_path):
+    tol = 10 * np.finfo(dtype).eps
+
+    comm = MPI.COMM_WORLD
+    tmp_path = comm.bcast(tmp_path, root=0)
+    comm.barrier()
+    from pathlib import Path
+
+    tmp_path = Path("testdata")
+    filename = tmp_path / "cell_data.vtkhdf"
+
+    mesh = create_unit_cube(comm, 3, 3, 3, dtype=dtype, cell_type=CellType.tetrahedron)
+
+    def f(x, t):
+        return (x[0] + np.sin(x[1]) + np.cos(x[0] * t), x[1] + t, x[0] - t)
+
+    t_0 = 2.2
+    t_1 = 3.0
+
+    backend_args = {"name": "Grid"}
+    adios4dolfinx.write_mesh(
+        filename,
+        mesh,
+        mode=adios4dolfinx.FileMode.write,
+        time=t_0,
+        backend_args=backend_args,
+        backend="vtkhdf",
+    )
+
+    f_name = "Data"
+    V = functionspace(mesh, ("DG", 0, (3,)))
+    u = Function(V, dtype=dtype, name=f_name)
+    u.interpolate(lambda x: f(x, t_0))
+    adios4dolfinx.write_cell_data(
+        filename,
+        u,
+        mode=adios4dolfinx.FileMode.append,
+        time=t_0,
+        backend_args=backend_args,
+        backend="vtkhdf",
+    )
+
+    adios4dolfinx.write_mesh(
+        filename,
+        mesh,
+        mode=adios4dolfinx.FileMode.append,
+        time=t_1,
+        backend_args=backend_args,
+        backend="vtkhdf",
+    )
+    u.interpolate(lambda x: f(x, t_1))
+    adios4dolfinx.write_cell_data(
+        filename,
+        u,
+        mode=adios4dolfinx.FileMode.append,
+        time=t_1,
+        backend_args=backend_args,
+        backend="vtkhdf",
+    )
+
+    for t in [t_1, t_0]:
+        grid = adios4dolfinx.read_mesh(
+            filename, comm, time=t, backend_args=backend_args, backend="vtkhdf"
+        )
+        u_end = adios4dolfinx.read_cell_data(
+            filename,
+            mesh=grid,
+            name=f_name,
+            time=t,
+            backend_args=backend_args,
+            backend="vtkhdf",
+        )
+        u_ref = Function(u_end.function_space, dtype=dtype)
+        u_ref.interpolate(lambda x: f(x, t))
+        np.testing.assert_allclose(u_end.x.array, u_ref.x.array, atol=tol)

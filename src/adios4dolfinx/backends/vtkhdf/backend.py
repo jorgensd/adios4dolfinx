@@ -13,7 +13,7 @@ import h5py
 import numpy as np
 import numpy.typing as npt
 
-from adios4dolfinx.structures import FunctionData, MeshData, MeshTagsData, PointData, ReadMeshData
+from adios4dolfinx.structures import ArrayData, FunctionData, MeshData, MeshTagsData, ReadMeshData
 from adios4dolfinx.utils import check_file_exists, compute_local_range
 
 from .. import FileMode, ReadMode
@@ -294,12 +294,12 @@ def read_cell_data(
         hdf = h5file["VTKHDF"]
         if (file_type := hdf.attrs["Type"]) in (b"MultiBlockDataSet", "MultiBlockDataSet"):
             # Recursive search of subgroups to find the unstructured grid
-            name = backend_args["name"]
+            mesh_name = backend_args["name"]
             ass = hdf["Assembly"]
             mesh_node = []
 
             def visitor(path):
-                if path.split("/")[-1] == name:
+                if path.split("/")[-1] == mesh_name:
                     # Retrieve the link object to check its type
                     obj = ass.get(path)
                     if "Type" in obj.attrs.keys() and obj.attrs["Type"] == "UnstructuredGrid":
@@ -886,7 +886,8 @@ def write_meshtags(
                 mode=h5_mode,
             )
             dataset[insert_slice] = data.values
-            # NOTE: The following is more or less a copy from write_mesh, except that we pull out the point storage and use a softlink
+            # NOTE: The following is more or less a copy from write_mesh,
+            # except that we pull out the point storage and use a softlink
             # Partition split. We use no partitioning
             num_cells = _create_dataset(
                 mesh_group,
@@ -1260,9 +1261,9 @@ def read_hdf5_array(
     raise NotImplementedError("The VTKHDF backend cannot read HDF5 arrays")
 
 
-def write_point_data(
+def write_data(
     filename: Path | str,
-    point_data: PointData,
+    array_data: ArrayData,
     comm: MPI.Intracomm,
     time: str | float | None,
     mode: FileMode,
@@ -1273,7 +1274,7 @@ def write_point_data(
 
     Args:
         filename: Path to file
-        point_data: Data to write to file
+        array_data: Data to write to file
         time: Time stamp
         mode: Append or write
         backend_args: The backend arguments
@@ -1282,6 +1283,7 @@ def write_point_data(
     assert h5_mode == "a"
     backend_args = get_default_backend_args(backend_args)
     mesh_name = backend_args["name"]
+    extension = array_data.type
     with h5pyfile(filename, h5_mode, comm=comm) as h5file:
         hdf = h5file["VTKHDF"]
         # Check for type of VTKHDF file
@@ -1305,31 +1307,31 @@ def write_point_data(
 
             block = mesh_block[0]
 
-            point_group = _create_group(block, "PointData", mode=h5_mode)
+            point_group = _create_group(block, f"{extension}Data", mode=h5_mode)
             dataset = _create_dataset(
                 point_group,
-                point_data.name,
-                shape=point_data.global_shape,
-                dtype=point_data.values.dtype,
+                array_data.name,
+                shape=array_data.global_shape,
+                dtype=array_data.values.dtype,
                 chunks=True,
-                maxshape=(None, point_data.values.shape[1]),
+                maxshape=(None, array_data.values.shape[1]),
                 mode=h5_mode,
             )
             insert_slice = _compute_append_slice(
                 dataset,
-                point_data.global_shape[0],
+                array_data.global_shape[0],
                 np.array(
                     [
-                        point_data.local_range[0],
-                        point_data.local_range[0] + point_data.values.shape[0],
+                        array_data.local_range[0],
+                        array_data.local_range[0] + array_data.values.shape[0],
                     ]
                 ),
                 mode=h5_mode,
             )
-            dataset[insert_slice] = point_data.values
+            dataset[insert_slice] = array_data.values
 
             steps = _create_group(block, "Steps", mode=h5_mode)
-            pdo = _create_group(steps, "PointDataOffsets", mode=h5_mode)
+            pdo = _create_group(steps, f"{extension}DataOffsets", mode=h5_mode)
 
             # Check if time step is already in time-stepping of mesh
             timestamps = steps["Values"][:]
@@ -1341,7 +1343,7 @@ def write_point_data(
                 idx = time_exists[0]
                 pdo_u = _create_dataset(
                     pdo,
-                    point_data.name,
+                    array_data.name,
                     shape=(1,),
                     dtype=np.int64,
                     chunks=True,
@@ -1350,8 +1352,8 @@ def write_point_data(
                     resize=False,
                 )
                 pdo_u[idx] = (
-                    dataset.shape[0] * dataset.shape[1]
-                    - point_data.global_shape[0] * point_data.global_shape[1]
+                    dataset.shape[0]  # * dataset.shape[1]
+                    - array_data.global_shape[0]  # * array_data.global_shape[1]
                 )
             elif len(time_exists) == 0:
                 # No mesh written at step, update mesh offsets
@@ -1374,13 +1376,24 @@ def write_point_data(
                     "CellOffsets",
                     "ConnectivityIdOffsets",
                     "CellDataOffsets",
+                    "PointDataOffsets",
                 ]:
                     if key in steps.keys():
-                        offset = steps[key]
-                        offset.resize(offset.size + 1, axis=0)
-                        offset[-1] = offset[-2]
+                        comp = steps[key]
+                        if isinstance(comp, h5py.Group):
+                            for dname, dset in comp.items():
+                                if dname != array_data.name and key != f"{extension}DataOffsets":
+                                    dset.resize(dset.size + 1, axis=0)
+                                    dset[-1] = dset[-2]
+                        elif isinstance(comp, h5py.Dataset):
+                            comp.resize(comp.size + 1, axis=0)
+                            comp[-1] = comp[-2]
+                        else:
+                            raise NotImplementedError(f"Ubsupported type {type(comp)}")
             else:
                 raise ValueError(f"Time step found multiple times in {filename}")
 
         else:
-            raise ValueError(f"Cannot write meshtags to {filename} with VTK type {file_type}")
+            raise ValueError(
+                f"Cannot write data {extension} to {filename} with VTK type {file_type}"
+            )
