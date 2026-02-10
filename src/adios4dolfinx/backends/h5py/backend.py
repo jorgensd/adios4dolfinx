@@ -812,7 +812,9 @@ def write_data(
 
     Args:
         filename: Path to file
-        u: Function to write to file.
+        array_data: Data to write to file
+        comm: MPI communicator to open the file with
+        time: Time-stamp for data.
         mode: Append or write
         backend_args: The backend arguments
     """

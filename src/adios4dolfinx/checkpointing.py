@@ -580,10 +580,11 @@ def write_point_data(
 
     Args:
         filename: Path to file
-        point_data: Data to write to file
+        u: The function to store
         time: Time stamp
         mode: Append or write
         backend_args: The backend arguments
+        backend: Which backend to use.
     """
     V = create_geometry_function_space(u.function_space.mesh, int(np.prod(u.ufl_shape)))
     v_out = dolfinx.fem.Function(V, name=u.name, dtype=u.x.array.dtype)

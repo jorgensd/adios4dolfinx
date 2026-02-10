@@ -395,7 +395,9 @@ class IOBackend(Protocol):
 
         Args:
             filename: Path to file
-            u: Function to write to file.
+            array_data: Data to write to file.
+            comm: The MPI communicator to open the writer with.
+            time: The time stamp
             mode: Append or write
             backend_args: The backend arguments
         """

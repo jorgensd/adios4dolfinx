@@ -481,7 +481,9 @@ def _create_dataset(
     mode: str,
     resize: bool = True,
 ) -> h5py.Dataset:
-    if mode == "w" or (mode == "a" and name not in root.keys()):
+    if name not in root.keys():
+        mode = "w"
+    if mode == "w":
         dataset = root.create_dataset(
             name, shape=shape, dtype=dtype, chunks=chunks, maxshape=maxshape
         )
@@ -501,7 +503,9 @@ def _create_dataset(
 
 
 def _create_group(root: h5py.File | h5py.Group, name: str, mode: str) -> h5py.Group:
-    if mode == "w" or (mode == "a" and name not in root.keys()):
+    if name not in root.keys():
+        mode = "w"
+    if mode == "w":
         # Track order has to be on to make multiblock work:
         # https://docs.vtk.org/en/latest/vtk_file_formats/vtkhdf_file_format/vtkhdf_specifications.html#partitioneddatasetcollection-and-multiblockdataset
         group = root.create_group(name, track_order=True)
