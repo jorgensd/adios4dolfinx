@@ -293,9 +293,7 @@ def test_read_write_pointdata(dtype, tmp_path):
     comm = MPI.COMM_WORLD
     tmp_path = comm.bcast(tmp_path, root=0)
     comm.barrier()
-    from pathlib import Path
 
-    tmp_path = Path("testdata")
     filename = tmp_path / "point_data.vtkhdf"
 
     mesh = create_unit_cube(comm, 3, 3, 3, dtype=dtype, cell_type=CellType.hexahedron)
@@ -367,9 +365,7 @@ def test_read_write_celldata(dtype, tmp_path):
     comm = MPI.COMM_WORLD
     tmp_path = comm.bcast(tmp_path, root=0)
     comm.barrier()
-    from pathlib import Path
 
-    tmp_path = Path("testdata")
     filename = tmp_path / "cell_data.vtkhdf"
 
     mesh = create_unit_cube(comm, 3, 3, 3, dtype=dtype, cell_type=CellType.tetrahedron)
@@ -457,9 +453,7 @@ def test_read_write_mix_data(dtype, tmp_path):
     z = Function(V, name="some_other_array", dtype=dtype)
     Q = functionspace(mesh, ("DG", 0))
     q = Function(Q, name="cells", dtype=dtype)
-    from pathlib import Path
 
-    tmp_path = Path("testdata")
     filename = tmp_path / "mixed_data.vtkhdf"
 
     backend_args = {"name": "MyGrid"}
