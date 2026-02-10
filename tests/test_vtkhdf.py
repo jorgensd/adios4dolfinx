@@ -37,10 +37,7 @@ def test_read_write_timedep_mesh(dtype, tmp_path, cell_type):
     )
 
     # Write temporal data
-    from pathlib import Path
-
-    tmp_path = Path(".")
-    filename = tmp_path / f"timedep_mesh_{cell_type.name}_{dtype}.vtkhdf"
+    filename = tmp_path / f"timedep_mesh_{cell_type.name}_{np.dtype(dtype).name}.vtkhdf"
     adios4dolfinx.write_mesh(filename, mesh, time=0.3, backend="vtkhdf")
     mesh.geometry.x[:, 0] += 0.05 * mesh.geometry.x[:, 0]
     mesh.geometry.x[:, 1] *= 1.1 + np.sin(mesh.geometry.x[:, 0])
@@ -90,7 +87,7 @@ def test_write_point_data(dtype, tmp_path, cell_type):
 
     # Write temporal data
     mesh = create_unit_cube(comm, 5, 5, 5, dtype=dtype, cell_type=cell_type)
-    filename = tmp_path / f"point_data_{cell_type.name}.vtkhdf"
+    filename = tmp_path / f"point_data_{cell_type.name}_{np.dtype(dtype).name}.vtkhdf"
     write_mesh(str(filename), mesh)
     t = np.linspace(0.1, 1.2, 25)
     num_nodes_local = mesh.geometry.index_map().size_local
@@ -141,7 +138,7 @@ def test_write_cell_data(dtype, tmp_path, cell_type):
 
     # Write temporal data
     mesh = create_unit_cube(comm, 5, 5, 5, dtype=dtype, cell_type=cell_type)
-    filename = tmp_path / f"cell_data_{cell_type.name}.vtkhdf"
+    filename = tmp_path / f"cell_data_{cell_type.name}_{np.dtype(dtype).name}.vtkhdf"
     write_mesh(str(filename), mesh)
 
     t = np.linspace(0.1, 1.2, 25)
@@ -192,10 +189,8 @@ def test_write_meshtags(dtype, tmp_path, generate_reference_map):
     comm = MPI.COMM_WORLD
     tmp_path = comm.bcast(tmp_path, root=0)
     comm.barrier()
-    from pathlib import Path
 
-    tmp_path = Path("testdata")
-    filename = tmp_path / "meshtags.vtkhdf"
+    filename = tmp_path / f"meshtags_{np.dtype(dtype).name}.vtkhdf"
 
     mesh = create_unit_cube(comm, 3, 3, 3, dtype=dtype, cell_type=CellType.hexahedron)
     adios4dolfinx.write_mesh(

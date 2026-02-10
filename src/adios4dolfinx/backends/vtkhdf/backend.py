@@ -541,6 +541,7 @@ def write_mesh(
     h5_mode = convert_file_mode(mode)
     backend_args = get_default_backend_args(backend_args)
     name = backend_args["name"]
+
     with h5pyfile(filename, h5_mode, comm=comm) as h5file:
         hdf = _create_group(h5file, "/VTKHDF", h5_mode)
         hdf.attrs.create("Type", "MultiBlockDataSet")
@@ -768,17 +769,6 @@ def write_mesh(
                 group[cd].resize(steps.attrs["NSteps"], axis=0)
                 group[cd][-1] = group[cd][-2]
 
-        # Copy over counters from parent
-        # NOTE: At the momement NumberOfCells and NumberOfConnectivityIds are time
-        # independent due to the BUG in VTKHDF.
-        copy_keys = ["NumberOfCells", "NumberOfPoints", "NumberOfConnectivityIds"]
-        for key in copy_keys:
-            if key in steps.keys():
-                steps[key].resize(steps.parent[key].shape)
-                steps[key][:] = steps.parent[key][:]
-            else:
-                hdf.copy(steps.parent[key].name, steps.name + f"/{key}")
-
         # Update Steps in all other parts of the mesh as well
         for key in mesh_assembly.keys():
             if key != name:
@@ -786,14 +776,6 @@ def write_mesh(
                 sub_group = mesh_assembly[key]
                 sub_step = sub_group["Steps"]
                 sub_step.attrs["NSteps"] = steps.attrs["NSteps"]
-                for key in ["NumberOfPoints"]:
-                    if key in sub_group.keys():
-                        sub_group[key].resize(steps.parent[key].shape)
-                        sub_step[key].resize(steps.parent[key].shape)
-                        sub_group[key][:] = steps.parent[key][:]
-                        sub_step[key][:] = sub_group[key][:]
-                    else:
-                        raise RuntimeError(f"{sub_group.name} should have {key}/")
 
                 # Copy time dependent and partition info from mesh to tag
                 step_copy_keys = ["Values", "PartOffsets", "NumberOfParts"]
@@ -904,11 +886,9 @@ def write_meshtags(
             parent_mesh_group = ass[mesh_block[0]][name]
 
             # Hardlink data should also follow hardlink for numbering
-            if "NumberOfPoints" not in mesh_group.keys():
-                mesh_group["NumberOfPoints"] = parent_mesh_group["NumberOfPoints"]
-
-            if "Points" not in mesh_group.keys():
-                mesh_group["Points"] = parent_mesh_group["Points"]
+            for key in ["Points", "NumberOfPoints"]:
+                if key not in mesh_group.keys():
+                    mesh_group[key] = parent_mesh_group[key]
 
             # Single celltype assumption
             num_dofs_per_cell = data.num_dofs_per_entity
@@ -998,17 +978,13 @@ def write_meshtags(
 
             steps = _create_group(mesh_group, "Steps", mode=h5_mode)
 
-            # Hardlink for exisiting data
-            steps["PointOffsets"] = parent_mesh_group["Steps"]["PointOffsets"]
-
+            # Copy n-step counter
             steps.attrs.create("NSteps", parent_mesh_group["Steps"].attrs["NSteps"])
 
-            # Write single partition data
-
-            # Copy over counters from parent
-            copy_keys = ["NumberOfParts", "PartOffsets", "Values"]
-            for key in copy_keys:
-                hdf.copy(parent_mesh_group["Steps"][key].name, steps.name + f"/{key}")
+            # Hardlink data that we know is the same across meshes
+            hardlink_keys = ["NumberOfParts", "PartOffsets", "Values", "PointOffsets"]
+            for key in hardlink_keys:
+                steps[key] = parent_mesh_group["Steps"][key]
 
             # Create offsets for data
             cell_offset = _create_dataset(
@@ -1032,10 +1008,6 @@ def write_meshtags(
                 mode=h5_mode,
             )
             connectivity_offsets[-1] = offsets.shape[0] - (data.num_entities_global + 1)
-
-            copy_keys = ["NumberOfCells", "NumberOfPoints", "NumberOfConnectivityIds"]
-            for key in copy_keys:
-                hdf.copy(steps.parent[key].name, steps.name + f"/{key}")
 
             # CellData requires an offset
             cd_off = _create_group(steps, "CellDataOffsets", mode=h5_mode)
