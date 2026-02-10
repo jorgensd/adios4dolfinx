@@ -15,6 +15,7 @@ import numpy as np
 import pytest
 
 import adios4dolfinx
+from adios4dolfinx.utils import skip_if_not_implemented, suffix
 
 dtypes = [np.float64, np.float32]  # Mesh geometry dtypes
 
@@ -129,7 +130,7 @@ def write_function_original(
     uh = dolfinx.fem.Function(V, dtype=dtype)
     uh.interpolate(f)
     uh.name = name
-    el_hash = (
+    file_hash = (
         adios4dolfinx.utils.element_signature(V)
         .replace(" ", "")
         .replace(",", "")
@@ -139,18 +140,11 @@ def write_function_original(
         .replace("]", "")
     )
 
-    file_hash = f"{el_hash}_{np.dtype(dtype).name}"
-    if backend == "adios2":
-        suffix = ".bp"
-    elif backend == "h5py":
-        suffix = ".h5"
-    else:
-        raise NotImplementedError(f"Unknown backend {backend}")
-
-    filename = (path / f"mesh_{file_hash}").with_suffix(suffix)
-    if write_mesh:
-        adios4dolfinx.write_mesh_input_order(filename, mesh, backend=backend)
-    adios4dolfinx.write_function_on_input_mesh(filename, uh, time=0.0, backend=backend)
+    with skip_if_not_implemented():
+        filename = (path / f"mesh_{file_hash}").with_suffix(suffix(backend))
+        if write_mesh:
+            adios4dolfinx.write_mesh_input_order(filename, mesh, backend=backend)
+        adios4dolfinx.write_function_on_input_mesh(filename, uh, time=0.0, backend=backend)
     return filename
 
 
@@ -435,6 +429,9 @@ def test_read_write_2D_vector_simplex(
             values[1] += 3j
         return values
 
+    if backend not in ["adios2", "h5py"]:
+        pytest.skip(reason=f"Backend {backend} not supported for this test")
+
     query = cluster[:].apply_async(
         write_function_vector,
         write_mesh,
@@ -493,6 +490,9 @@ def test_read_write_3D_vector_simplex(
             values[1] += 2j * np.cos(x[2])
         return values
 
+    if backend not in ["adios2", "h5py"]:
+        pytest.skip(reason=f"Backend {backend} not supported for this test")
+
     query = cluster[:].apply_async(
         write_function_vector,
         write_mesh,
@@ -550,6 +550,9 @@ def test_read_write_2D_vector_non_simplex(
             values[1] -= np.sin(x[0]) * 9j
         return values
 
+    if backend not in ["adios2", "h5py"]:
+        pytest.skip(reason=f"Backend {backend} not supported for this test")
+
     query = cluster[:].apply_async(
         write_function_vector,
         write_mesh,
@@ -606,6 +609,9 @@ def test_read_write_3D_vector_non_simplex(
         if is_complex:
             values[2] += x[0] * x[1] * 3j
         return values
+
+    if backend not in ["adios2", "h5py"]:
+        pytest.skip(reason=f"Backend {backend} not supported for this test")
 
     query = cluster[:].apply_async(
         write_function_vector,

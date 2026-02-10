@@ -7,16 +7,13 @@ import dolfinx
 import numpy as np
 import pytest
 
-from adios4dolfinx import FileMode, snapshot_checkpoint
+from adios4dolfinx import FileMode, snapshot_checkpoint as _stapshot_checkpoint
+from adios4dolfinx.utils import skip_if_not_implemented, suffix
 
 
-def suffix(backend: str) -> str:
-    if backend == "adios2":
-        return ".bp"
-    elif backend == "h5py":
-        return ".h5"
-    else:
-        raise NotImplementedError(f"Unsupported backend {backend}")
+def snapshot_checkpoint(*args, **kwargs):
+    with skip_if_not_implemented():
+        _stapshot_checkpoint(*args, **kwargs)
 
 
 triangle = dolfinx.mesh.CellType.triangle

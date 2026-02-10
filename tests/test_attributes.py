@@ -5,6 +5,7 @@ import pytest
 from packaging.version import parse as _v
 
 import adios4dolfinx
+from adios4dolfinx.utils import skip_if_not_implemented, suffix
 
 
 @pytest.mark.parametrize("comm", [MPI.COMM_SELF, MPI.COMM_WORLD])
@@ -25,22 +26,23 @@ def test_read_write_attributes(comm, backend, tmp_path):
     }
     fname = comm.bcast(tmp_path, root=0)
     fname = fname / "attributes"
-    suffix = ".bp" if backend == "adios2" else ".h5"
-    file = fname.with_suffix(suffix)
+    file = fname.with_suffix(suffix(backend))
     # print(comm.size)
 
-    adios4dolfinx.write_attributes(
-        comm=comm, filename=file, name="group1", attributes=attributes1, backend=backend
-    )
-    adios4dolfinx.write_attributes(
-        comm=comm, filename=file, name="group2", attributes=attributes2, backend=backend
-    )
-    loaded_attributes1 = adios4dolfinx.read_attributes(
-        comm=comm, filename=file, name="group1", backend=backend
-    )
-    loaded_attributes2 = adios4dolfinx.read_attributes(
-        comm=comm, filename=file, name="group2", backend=backend
-    )
+    with skip_if_not_implemented():
+        adios4dolfinx.write_attributes(
+            comm=comm, filename=file, name="group1", attributes=attributes1, backend=backend
+        )
+
+        adios4dolfinx.write_attributes(
+            comm=comm, filename=file, name="group2", attributes=attributes2, backend=backend
+        )
+        loaded_attributes1 = adios4dolfinx.read_attributes(
+            comm=comm, filename=file, name="group1", backend=backend
+        )
+        loaded_attributes2 = adios4dolfinx.read_attributes(
+            comm=comm, filename=file, name="group2", backend=backend
+        )
 
     for k, v in loaded_attributes1.items():
         assert np.allclose(v, attributes1[k])

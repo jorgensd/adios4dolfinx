@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 
+from adios4dolfinx.utils import skip_if_not_implemented
 from mpi4py import MPI
 
 import dolfinx
@@ -75,70 +76,73 @@ def test_checkpointing_meshtags_1D(
 
     # If mesh communicator is more than a self communicator or serial write on all processes.
     # If serial or self communicator, only write on root rank
-    if mesh.comm.size != 1:
-        adios4dolfinx.write_mesh(filename, mesh, backend=backend)
-    else:
-        if MPI.COMM_WORLD.rank == root:
-            adios4dolfinx.write_mesh(filename, mesh, backend=backend)
-
-    # Create meshtags labeling each entity (of each co-dimension) with a
-    # unique number (their initial global index).
-    org_maps = []
-    for dim in range(mesh.topology.dim + 1):
-        mesh.topology.create_connectivity(dim, mesh.topology.dim)
-        e_map = mesh.topology.index_map(dim)
-        num_entities_local = e_map.size_local
-        entities = np.arange(num_entities_local, dtype=np.int32)
-        ft = dolfinx.mesh.meshtags(mesh, dim, entities, e_map.local_range[0] + entities)
-        ft.name = f"entity_{dim}"
-
-        # If parallel write on all processes, else write on root rank
+    with skip_if_not_implemented():
         if mesh.comm.size != 1:
-            adios4dolfinx.write_meshtags(filename, mesh, ft, backend=backend)
-            # Create map from mesh tag value to its corresponding index and midpoint
-            org_map = generate_reference_map(mesh, ft, mesh.comm, root)
-            org_maps.append(org_map)
+            adios4dolfinx.write_mesh(filename, mesh, backend=backend)
         else:
             if MPI.COMM_WORLD.rank == root:
+                adios4dolfinx.write_mesh(filename, mesh, backend=backend)
+
+        # Create meshtags labeling each entity (of each co-dimension) with a
+        # unique number (their initial global index).
+        org_maps = []
+        for dim in range(mesh.topology.dim + 1):
+            mesh.topology.create_connectivity(dim, mesh.topology.dim)
+            e_map = mesh.topology.index_map(dim)
+            num_entities_local = e_map.size_local
+            entities = np.arange(num_entities_local, dtype=np.int32)
+            ft = dolfinx.mesh.meshtags(mesh, dim, entities, e_map.local_range[0] + entities)
+            ft.name = f"entity_{dim}"
+
+            # If parallel write on all processes, else write on root rank
+            if mesh.comm.size != 1:
                 adios4dolfinx.write_meshtags(filename, mesh, ft, backend=backend)
                 # Create map from mesh tag value to its corresponding index and midpoint
-                org_map = generate_reference_map(mesh, ft, MPI.COMM_SELF, root)
+                org_map = generate_reference_map(mesh, ft, mesh.comm, root)
                 org_maps.append(org_map)
-        del ft
-    del mesh
-    MPI.COMM_WORLD.Barrier()
-    # Read mesh on testing communicator
-    new_mesh = adios4dolfinx.read_mesh(filename, read_comm, ghost_mode=read_mode, backend=backend)
-    for dim in range(new_mesh.topology.dim + 1):
-        # Read meshtags on all processes if testing communicator has multiple ranks
-        # else read on root 0
-        if read_comm.size != 1:
-            new_ft = adios4dolfinx.read_meshtags(
-                filename,
-                new_mesh,
-                meshtag_name=f"entity_{dim}",
-                backend=backend,
-            )
-            # Generate meshtags map from mesh tag value to its corresponding index and midpoint
-            # and gather on root process
-            read_map = generate_reference_map(new_mesh, new_ft, new_mesh.comm, root)
-        else:
-            if MPI.COMM_WORLD.rank == root:
+            else:
+                if MPI.COMM_WORLD.rank == root:
+                    adios4dolfinx.write_meshtags(filename, mesh, ft, backend=backend)
+                    # Create map from mesh tag value to its corresponding index and midpoint
+                    org_map = generate_reference_map(mesh, ft, MPI.COMM_SELF, root)
+                    org_maps.append(org_map)
+            del ft
+        del mesh
+        MPI.COMM_WORLD.Barrier()
+        # Read mesh on testing communicator
+        new_mesh = adios4dolfinx.read_mesh(
+            filename, read_comm, ghost_mode=read_mode, backend=backend
+        )
+        for dim in range(new_mesh.topology.dim + 1):
+            # Read meshtags on all processes if testing communicator has multiple ranks
+            # else read on root 0
+            if read_comm.size != 1:
                 new_ft = adios4dolfinx.read_meshtags(
                     filename,
                     new_mesh,
                     meshtag_name=f"entity_{dim}",
                     backend=backend,
                 )
-                read_map = generate_reference_map(new_mesh, new_ft, read_comm, root)
+                # Generate meshtags map from mesh tag value to its corresponding index and midpoint
+                # and gather on root process
+                read_map = generate_reference_map(new_mesh, new_ft, new_mesh.comm, root)
+            else:
+                if MPI.COMM_WORLD.rank == root:
+                    new_ft = adios4dolfinx.read_meshtags(
+                        filename,
+                        new_mesh,
+                        meshtag_name=f"entity_{dim}",
+                        backend=backend,
+                    )
+                    read_map = generate_reference_map(new_mesh, new_ft, read_comm, root)
 
-        # On root process, check that midpoints are the same for each value in the meshtag
-        if MPI.COMM_WORLD.rank == root:
-            org_map = org_maps[dim]
-            assert len(org_map) == len(read_map)
-            for value, (_, midpoint) in org_map.items():
-                _, read_midpoint = read_map[value]
-                np.testing.assert_allclose(read_midpoint, midpoint)
+            # On root process, check that midpoints are the same for each value in the meshtag
+            if MPI.COMM_WORLD.rank == root:
+                org_map = org_maps[dim]
+                assert len(org_map) == len(read_map)
+                for value, (_, midpoint) in org_map.items():
+                    _, read_midpoint = read_map[value]
+                    np.testing.assert_allclose(read_midpoint, midpoint)
 
 
 @pytest.mark.parametrize("read_mode", read_modes)
@@ -151,58 +155,61 @@ def test_checkpointing_meshtags_2D(
     fname = MPI.COMM_WORLD.bcast(tmp_path, root=0)
     filename = fname / f"meshtags_1D_{hash}.bp"
 
-    if mesh.comm.size != 1:
-        adios4dolfinx.write_mesh(filename, mesh, backend=backend)
-    else:
-        if MPI.COMM_WORLD.rank == root:
-            adios4dolfinx.write_mesh(filename, mesh, backend=backend)
-
-    org_maps = []
-    for dim in range(mesh.topology.dim + 1):
-        mesh.topology.create_connectivity(dim, mesh.topology.dim)
-        e_map = mesh.topology.index_map(dim)
-        num_entities_local = e_map.size_local
-        entities = np.arange(num_entities_local, dtype=np.int32)
-        ft = dolfinx.mesh.meshtags(mesh, dim, entities, e_map.local_range[0] + entities)
-        ft.name = f"entity_{dim}"
+    with skip_if_not_implemented():
         if mesh.comm.size != 1:
-            adios4dolfinx.write_meshtags(filename, mesh, ft, backend=backend)
-            org_map = generate_reference_map(mesh, ft, mesh.comm, root)
-            org_maps.append(org_map)
+            adios4dolfinx.write_mesh(filename, mesh, backend=backend)
         else:
             if MPI.COMM_WORLD.rank == root:
+                adios4dolfinx.write_mesh(filename, mesh, backend=backend)
+
+        org_maps = []
+        for dim in range(mesh.topology.dim + 1):
+            mesh.topology.create_connectivity(dim, mesh.topology.dim)
+            e_map = mesh.topology.index_map(dim)
+            num_entities_local = e_map.size_local
+            entities = np.arange(num_entities_local, dtype=np.int32)
+            ft = dolfinx.mesh.meshtags(mesh, dim, entities, e_map.local_range[0] + entities)
+            ft.name = f"entity_{dim}"
+            if mesh.comm.size != 1:
                 adios4dolfinx.write_meshtags(filename, mesh, ft, backend=backend)
-                org_map = generate_reference_map(mesh, ft, MPI.COMM_SELF, root)
+                org_map = generate_reference_map(mesh, ft, mesh.comm, root)
                 org_maps.append(org_map)
-        del ft
-    del mesh
-    MPI.COMM_WORLD.Barrier()
-    new_mesh = adios4dolfinx.read_mesh(filename, read_comm, ghost_mode=read_mode, backend=backend)
-    for dim in range(new_mesh.topology.dim + 1):
-        if read_comm.size != 1:
-            new_ft = adios4dolfinx.read_meshtags(
-                filename,
-                new_mesh,
-                meshtag_name=f"entity_{dim}",
-                backend=backend,
-            )
-            read_map = generate_reference_map(new_mesh, new_ft, new_mesh.comm, root)
-        else:
-            if MPI.COMM_WORLD.rank == root:
+            else:
+                if MPI.COMM_WORLD.rank == root:
+                    adios4dolfinx.write_meshtags(filename, mesh, ft, backend=backend)
+                    org_map = generate_reference_map(mesh, ft, MPI.COMM_SELF, root)
+                    org_maps.append(org_map)
+            del ft
+        del mesh
+        MPI.COMM_WORLD.Barrier()
+        new_mesh = adios4dolfinx.read_mesh(
+            filename, read_comm, ghost_mode=read_mode, backend=backend
+        )
+        for dim in range(new_mesh.topology.dim + 1):
+            if read_comm.size != 1:
                 new_ft = adios4dolfinx.read_meshtags(
                     filename,
                     new_mesh,
                     meshtag_name=f"entity_{dim}",
                     backend=backend,
                 )
-                read_map = generate_reference_map(new_mesh, new_ft, read_comm, root)
+                read_map = generate_reference_map(new_mesh, new_ft, new_mesh.comm, root)
+            else:
+                if MPI.COMM_WORLD.rank == root:
+                    new_ft = adios4dolfinx.read_meshtags(
+                        filename,
+                        new_mesh,
+                        meshtag_name=f"entity_{dim}",
+                        backend=backend,
+                    )
+                    read_map = generate_reference_map(new_mesh, new_ft, read_comm, root)
 
-        if MPI.COMM_WORLD.rank == root:
-            org_map = org_maps[dim]
-            assert len(org_map) == len(read_map)
-            for value, (_, midpoint) in org_map.items():
-                _, read_midpoint = read_map[value]
-                np.testing.assert_allclose(read_midpoint, midpoint)
+            if MPI.COMM_WORLD.rank == root:
+                org_map = org_maps[dim]
+                assert len(org_map) == len(read_map)
+                for value, (_, midpoint) in org_map.items():
+                    _, read_midpoint = read_map[value]
+                    np.testing.assert_allclose(read_midpoint, midpoint)
 
 
 @pytest.mark.parametrize("read_mode", read_modes)
@@ -214,56 +221,59 @@ def test_checkpointing_meshtags_3D(
     hash = f"{mesh.comm.size}_{mesh.topology.cell_name()}_{mesh.geometry.x.dtype}"
     fname = MPI.COMM_WORLD.bcast(tmp_path, root=0)
     filename = fname / f"meshtags_1D_{hash}.bp"
-    if mesh.comm.size != 1:
-        adios4dolfinx.write_mesh(filename, mesh, backend=backend)
-    else:
-        if MPI.COMM_WORLD.rank == root:
-            adios4dolfinx.write_mesh(filename, mesh, backend=backend)
-
-    org_maps = []
-    for dim in range(mesh.topology.dim + 1):
-        mesh.topology.create_connectivity(dim, mesh.topology.dim)
-        e_map = mesh.topology.index_map(dim)
-        num_entities_local = e_map.size_local
-        entities = np.arange(num_entities_local, dtype=np.int32)
-        ft = dolfinx.mesh.meshtags(mesh, dim, entities, e_map.local_range[0] + entities)
-        ft.name = f"entity_{dim}"
-
+    with skip_if_not_implemented():
         if mesh.comm.size != 1:
-            adios4dolfinx.write_meshtags(filename, mesh, ft, backend=backend)
-            org_map = generate_reference_map(mesh, ft, mesh.comm, root)
-            org_maps.append(org_map)
+            adios4dolfinx.write_mesh(filename, mesh, backend=backend)
         else:
             if MPI.COMM_WORLD.rank == root:
-                adios4dolfinx.write_meshtags(filename, mesh, ft, backend=backend)
-                org_map = generate_reference_map(mesh, ft, MPI.COMM_SELF, root)
-                org_maps.append(org_map)
-        del ft
-    del mesh
+                adios4dolfinx.write_mesh(filename, mesh, backend=backend)
 
-    MPI.COMM_WORLD.Barrier()
-    new_mesh = adios4dolfinx.read_mesh(filename, read_comm, ghost_mode=read_mode, backend=backend)
-    for dim in range(new_mesh.topology.dim + 1):
-        if read_comm.size != 1:
-            new_ft = adios4dolfinx.read_meshtags(
-                filename,
-                new_mesh,
-                meshtag_name=f"entity_{dim}",
-                backend=backend,
-            )
-            read_map = generate_reference_map(new_mesh, new_ft, new_mesh.comm, root)
-        else:
-            if MPI.COMM_WORLD.rank == root:
+        org_maps = []
+        for dim in range(mesh.topology.dim + 1):
+            mesh.topology.create_connectivity(dim, mesh.topology.dim)
+            e_map = mesh.topology.index_map(dim)
+            num_entities_local = e_map.size_local
+            entities = np.arange(num_entities_local, dtype=np.int32)
+            ft = dolfinx.mesh.meshtags(mesh, dim, entities, e_map.local_range[0] + entities)
+            ft.name = f"entity_{dim}"
+
+            if mesh.comm.size != 1:
+                adios4dolfinx.write_meshtags(filename, mesh, ft, backend=backend)
+                org_map = generate_reference_map(mesh, ft, mesh.comm, root)
+                org_maps.append(org_map)
+            else:
+                if MPI.COMM_WORLD.rank == root:
+                    adios4dolfinx.write_meshtags(filename, mesh, ft, backend=backend)
+                    org_map = generate_reference_map(mesh, ft, MPI.COMM_SELF, root)
+                    org_maps.append(org_map)
+            del ft
+        del mesh
+
+        MPI.COMM_WORLD.Barrier()
+        new_mesh = adios4dolfinx.read_mesh(
+            filename, read_comm, ghost_mode=read_mode, backend=backend
+        )
+        for dim in range(new_mesh.topology.dim + 1):
+            if read_comm.size != 1:
                 new_ft = adios4dolfinx.read_meshtags(
                     filename,
                     new_mesh,
                     meshtag_name=f"entity_{dim}",
                     backend=backend,
                 )
-                read_map = generate_reference_map(new_mesh, new_ft, MPI.COMM_SELF, root)
-        if MPI.COMM_WORLD.rank == root:
-            org_map = org_maps[dim]
-            assert len(org_map) == len(read_map)
-            for value, (_, midpoint) in org_map.items():
-                _, read_midpoint = read_map[value]
-                np.testing.assert_allclose(read_midpoint, midpoint)
+                read_map = generate_reference_map(new_mesh, new_ft, new_mesh.comm, root)
+            else:
+                if MPI.COMM_WORLD.rank == root:
+                    new_ft = adios4dolfinx.read_meshtags(
+                        filename,
+                        new_mesh,
+                        meshtag_name=f"entity_{dim}",
+                        backend=backend,
+                    )
+                    read_map = generate_reference_map(new_mesh, new_ft, MPI.COMM_SELF, root)
+            if MPI.COMM_WORLD.rank == root:
+                org_map = org_maps[dim]
+                assert len(org_map) == len(read_map)
+                for value, (_, midpoint) in org_map.items():
+                    _, read_midpoint = read_map[value]
+                    np.testing.assert_allclose(read_midpoint, midpoint)

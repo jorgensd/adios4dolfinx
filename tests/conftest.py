@@ -13,6 +13,7 @@ import numpy.typing as npt
 import pytest
 
 import adios4dolfinx
+from adios4dolfinx.utils import skip_if_not_implemented, suffix
 
 
 def find_backends():
@@ -29,8 +30,18 @@ def find_backends():
 
         if h5py.get_config().mpi:
             backends.append("h5py")
+            backends.append("vtkhdf")
     except ModuleNotFoundError:
         pass
+
+    try:
+        import pyvista
+
+        backends.append("xdmf")
+        backends.append("pyvista")
+    except ModuleNotFoundError:
+        pass
+
     return backends
 
 
@@ -82,21 +93,24 @@ def write_function(tmp_path):
         # Consistent tmp dir across processes
         f_path = MPI.COMM_WORLD.bcast(tmp_path, root=0)
         file_hash = f"{el_hash}_{np.dtype(dtype).name}"
-        if backend == "adios2":
-            suffix = ".bp"
-        else:
-            suffix = ".h5"
 
-        filename = (f_path / f"mesh_{file_hash}").with_suffix(suffix)
+        filename = (f_path / f"mesh_{file_hash}").with_suffix(suffix(backend))
         if mesh.comm.size != 1:
             if not append:
-                adios4dolfinx.write_mesh(filename, mesh, backend=backend)
-            adios4dolfinx.write_function(filename, uh, time=0.0, backend=backend)
+                with skip_if_not_implemented():
+                    adios4dolfinx.write_mesh(filename, mesh, backend=backend)
+
+            with skip_if_not_implemented():
+                adios4dolfinx.write_function(filename, uh, time=0.0, backend=backend)
+
         else:
             if MPI.COMM_WORLD.rank == 0:
                 if not append:
-                    adios4dolfinx.write_mesh(filename, mesh, backend=backend)
-                adios4dolfinx.write_function(filename, uh, time=0.0, backend=backend)
+                    with skip_if_not_implemented():
+                        adios4dolfinx.write_mesh(filename, mesh, backend=backend)
+
+                with skip_if_not_implemented():
+                    adios4dolfinx.write_function(filename, uh, time=0.0, backend=backend)
 
         return filename
 
@@ -108,16 +122,18 @@ def read_function():
     def _read_function(
         comm, el, f, path, dtype, backend: typing.Literal["adios2", "h5py"], name="uh"
     ):
-        mesh = adios4dolfinx.read_mesh(
-            path,
-            comm,
-            ghost_mode=dolfinx.mesh.GhostMode.shared_facet,
-            backend=backend,
-        )
+        with skip_if_not_implemented():
+            mesh = adios4dolfinx.read_mesh(
+                path,
+                comm,
+                ghost_mode=dolfinx.mesh.GhostMode.shared_facet,
+                backend=backend,
+            )
         V = dolfinx.fem.functionspace(mesh, el)
         v = dolfinx.fem.Function(V, dtype=dtype)
         v.name = name
-        adios4dolfinx.read_function(path, v, backend=backend)
+        with skip_if_not_implemented():
+            adios4dolfinx.read_function(path, v, backend=backend)
         v_ex = dolfinx.fem.Function(V, dtype=dtype)
         v_ex.interpolate(f)
 
@@ -168,23 +184,21 @@ def write_function_time_dep(tmp_path):
         file_hash = f"{el_hash}_{np.dtype(dtype).name}"
         # Consistent tmp dir across processes
         f_path = MPI.COMM_WORLD.bcast(tmp_path, root=0)
-        if backend == "adios2":
-            suffix = ".bp"
-        else:
-            suffix = ".h5"
-        filename = (f_path / f"mesh_{file_hash}").with_suffix(suffix)
+        filename = (f_path / f"mesh_{file_hash}").with_suffix(suffix(backend))
         if mesh.comm.size != 1:
-            adios4dolfinx.write_mesh(filename, mesh, backend=backend)
-            adios4dolfinx.write_function(filename, uh, time=t0, backend=backend)
-            uh.interpolate(f1)
-            adios4dolfinx.write_function(filename, uh, time=t1, backend=backend)
-
-        else:
-            if MPI.COMM_WORLD.rank == 0:
+            with skip_if_not_implemented():
                 adios4dolfinx.write_mesh(filename, mesh, backend=backend)
                 adios4dolfinx.write_function(filename, uh, time=t0, backend=backend)
                 uh.interpolate(f1)
                 adios4dolfinx.write_function(filename, uh, time=t1, backend=backend)
+
+        else:
+            if MPI.COMM_WORLD.rank == 0:
+                with skip_if_not_implemented():
+                    adios4dolfinx.write_mesh(filename, mesh, backend=backend)
+                    adios4dolfinx.write_function(filename, uh, time=t0, backend=backend)
+                    uh.interpolate(f1)
+                    adios4dolfinx.write_function(filename, uh, time=t1, backend=backend)
 
         return filename
 
@@ -196,28 +210,29 @@ def read_function_time_dep():
     def _read_function_time_dep(
         comm, el, f0, f1, t0, t1, path, dtype, backend: typing.Literal["adios2", "h5py"]
     ):
-        mesh = adios4dolfinx.read_mesh(
-            path,
-            comm,
-            ghost_mode=dolfinx.mesh.GhostMode.shared_facet,
-            backend=backend,
-        )
-        V = dolfinx.fem.functionspace(mesh, el)
-        v = dolfinx.fem.Function(V, dtype=dtype)
+        with skip_if_not_implemented():
+            mesh = adios4dolfinx.read_mesh(
+                path,
+                comm,
+                ghost_mode=dolfinx.mesh.GhostMode.shared_facet,
+                backend=backend,
+            )
+            V = dolfinx.fem.functionspace(mesh, el)
+            v = dolfinx.fem.Function(V, dtype=dtype)
 
-        adios4dolfinx.read_function(path, v, time=t1, backend=backend)
-        v_ex = dolfinx.fem.Function(V, dtype=dtype)
-        v_ex.interpolate(f1)
+            adios4dolfinx.read_function(path, v, time=t1, backend=backend)
+            v_ex = dolfinx.fem.Function(V, dtype=dtype)
+            v_ex.interpolate(f1)
 
-        res = np.finfo(dtype).resolution
-        assert np.allclose(v.x.array, v_ex.x.array, atol=10 * res, rtol=10 * res)
+            res = np.finfo(dtype).resolution
+            assert np.allclose(v.x.array, v_ex.x.array, atol=10 * res, rtol=10 * res)
 
-        adios4dolfinx.read_function(path, v, time=t0, backend=backend)
-        v_ex = dolfinx.fem.Function(V, dtype=dtype)
-        v_ex.interpolate(f0)
+            adios4dolfinx.read_function(path, v, time=t0, backend=backend)
+            v_ex = dolfinx.fem.Function(V, dtype=dtype)
+            v_ex.interpolate(f0)
 
-        res = np.finfo(dtype).resolution
-        assert np.allclose(v.x.array, v_ex.x.array, atol=10 * res, rtol=10 * res)
+            res = np.finfo(dtype).resolution
+            assert np.allclose(v.x.array, v_ex.x.array, atol=10 * res, rtol=10 * res)
 
     return _read_function_time_dep
 

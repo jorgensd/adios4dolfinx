@@ -10,6 +10,7 @@ Vectorized numpy operations used internally in adios4dolfinx
 
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 
 from mpi4py import MPI
@@ -29,6 +30,31 @@ __all__ = [
     "unroll_insert_position",
     "get_hdf5_version",
 ]
+
+
+@contextlib.contextmanager
+def skip_if_not_implemented():
+    try:
+        yield
+    except NotImplementedError:
+        import pytest  # type: ignore
+
+        pytest.skip(reason="Feature not implemented for this backend")
+
+
+def suffix(backend: str) -> str:
+    if backend == "adios2":
+        return ".bp"
+    elif backend == "h5py":
+        return ".h5"
+    elif backend == "xdmf":
+        return ".xdmf"
+    elif backend == "vtkhdf":
+        return ".vtkhdf"
+    elif backend == "pyvista":
+        return ".vtu"
+    else:
+        raise NotImplementedError(f"Unsupported backend {backend}")
 
 
 def get_hdf5_version():
