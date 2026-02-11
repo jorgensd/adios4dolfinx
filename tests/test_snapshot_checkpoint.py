@@ -13,7 +13,7 @@ from adios4dolfinx.utils import skip_if_not_implemented, suffix
 
 def snapshot_checkpoint(*args, **kwargs):
     with skip_if_not_implemented():
-        _stapshot_checkpoint(*args, **kwargs)
+        _snapshot_checkpoint(*args, **kwargs)
 
 
 triangle = dolfinx.mesh.CellType.triangle
