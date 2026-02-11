@@ -708,35 +708,36 @@ def write_mesh(
 
         # Update Steps in all other parts of the mesh as well
         for key in mesh_assembly.keys():
-            if key != name:
-                # Copy time-dependent geometry info (NumberOfPoints) from mesh to tag
-                sub_group = mesh_assembly[key]
-                sub_step = sub_group["Steps"]
-                sub_step.attrs["NSteps"] = steps.attrs["NSteps"]
+            if key == name:
+                continue
+            # Copy time-dependent geometry info (NumberOfPoints) from mesh to tag
+            sub_group = mesh_assembly[key]
+            sub_step = sub_group["Steps"]
+            sub_step.attrs["NSteps"] = steps.attrs["NSteps"]
 
-                # Copy time dependent and partition info from mesh to tag
-                step_copy_keys = ["Values", "PartOffsets", "NumberOfParts"]
-                for key in step_copy_keys:
-                    if key in sub_step.keys():
-                        sub_step[key].resize(steps[key].shape)
-                        sub_step[key][:] = steps[key][:]
-                    else:
-                        raise RuntimeError(f"{sub_step.name} should have {key}/")
+            # Copy time dependent and partition info from mesh to tag
+            step_copy_keys = ["Values", "PartOffsets", "NumberOfParts"]
+            for key in step_copy_keys:
+                if key in sub_step.keys():
+                    sub_step[key].resize(steps[key].shape)
+                    sub_step[key][:] = steps[key][:]
+                else:
+                    raise RuntimeError(f"{sub_step.name} should have {key}/")
 
-                # Append value from previous step for meshtags as they are time-independent
-                append_keys = ["CellOffsets", "ConnectivityIdOffsets"]
-                for key in append_keys:
-                    if key in sub_step.keys():
-                        sub_step[key].resize(sub_step[key].size + 1, axis=0)
-                        sub_step[key][-1] = sub_step[key][-2]
-                    else:
-                        raise RuntimeError(f"{sub_step.name} should have {key}/")
-                # Append value from previous step for meshtags celldata
-                for key in ["CellDataOffsets", "PointDataOffsets"]:
-                    group = _create_group(sub_step, key, mode=h5_mode)
-                    for cd in group.keys():
-                        group[cd].resize(sub_step.attrs["NSteps"], axis=0)
-                        group[cd][-1] = group[cd][-2]
+            # Append value from previous step for meshtags as they are time-independent
+            append_keys = ["CellOffsets", "ConnectivityIdOffsets"]
+            for key in append_keys:
+                if key in sub_step.keys():
+                    sub_step[key].resize(sub_step[key].size + 1, axis=0)
+                    sub_step[key][-1] = sub_step[key][-2]
+                else:
+                    raise RuntimeError(f"{sub_step.name} should have {key}/")
+            # Append value from previous step for meshtags celldata
+            for key in ["CellDataOffsets", "PointDataOffsets"]:
+                group = _create_group(sub_step, key, mode=h5_mode)
+                for cd in group.keys():
+                    group[cd].resize(sub_step.attrs["NSteps"], axis=0)
+                    group[cd][-1] = group[cd][-2]
 
 
 def write_meshtags(
