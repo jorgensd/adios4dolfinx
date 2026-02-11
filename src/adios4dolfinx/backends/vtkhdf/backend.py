@@ -652,29 +652,20 @@ def write_mesh(
 
         steps = _create_group(mesh_group, "Steps", mode=h5_mode)
         # First fetch time-steps to see if we have stored this timestep already
+        values = _create_dataset(
+            steps,
+            "Values",
+            shape=(1,),
+            dtype=np.float64,
+            chunks=True,
+            maxshape=(None,),
+            mode=h5_mode,
+            resize=h5_mode == "a",
+        )
+
         if h5_mode == "w":
-            values = _create_dataset(
-                steps,
-                "Values",
-                shape=(1,),
-                dtype=np.float64,
-                chunks=True,
-                maxshape=(None,),
-                mode="w",
-                resize=False,
-            )
             values[0] = time
         else:
-            values = _create_dataset(
-                steps,
-                "Values",
-                shape=(1,),
-                dtype=np.float64,
-                chunks=True,
-                maxshape=(None,),
-                mode="a",
-                resize=True,
-            )
             existing_steps = values[:-1]
             if len(np.flatnonzero(np.isclose(existing_steps, time))) > 0:
                 raise RuntimeError(f"Mesh already exists at time {time} in {filename}.")
@@ -682,59 +673,31 @@ def write_mesh(
         steps.attrs.create("NSteps", np.int64(len(values)), dtype=np.int64)
 
         # Write single partition data
-        num_parts = _create_dataset(
-            steps,
+        all_parts = {}
+        for key in [
             "NumberOfParts",
-            shape=(1,),
-            dtype=np.int64,
-            chunks=True,
-            maxshape=(None,),
-            mode=h5_mode,
-        )
-        num_parts[-1] = 1
-        part_offset = _create_dataset(
-            steps,
             "PartOffsets",
-            shape=(1,),
-            dtype=np.int64,
-            chunks=True,
-            maxshape=(None,),
-            mode=h5_mode,
-        )
-        part_offset[-1] = 0
-
-        # Create offsets for data
-        point_offset = _create_dataset(
-            steps,
             "PointOffsets",
-            shape=(1,),
-            dtype=np.int64,
-            chunks=True,
-            maxshape=(None,),
-            mode=h5_mode,
-        )
-        point_offset[-1] = points.shape[0] - mesh.num_nodes_global
-        cell_offset = _create_dataset(
-            steps,
             "CellOffsets",
-            shape=(1,),
-            dtype=np.int64,
-            chunks=True,
-            maxshape=(None,),
-            mode=h5_mode,
-        )
-        cell_offset[-1] = types.shape[0] - mesh.num_cells_global
-
-        connectivity_offsets = _create_dataset(
-            steps,
             "ConnectivityIdOffsets",
-            shape=(1,),
-            dtype=np.int64,
-            chunks=True,
-            maxshape=(None,),
-            mode=h5_mode,
+        ]:
+            all_parts[key] = _create_dataset(
+                steps,
+                key,
+                shape=(1,),
+                dtype=np.int64,
+                chunks=True,
+                maxshape=(None,),
+                mode=h5_mode,
+            )
+
+        all_parts["NumberOfParts"][-1] = 1
+        all_parts["PartOffsets"][-1] = 0
+        all_parts["PointOffsets"][-1] = points.shape[0] - mesh.num_nodes_global
+        all_parts["CellOffsets"][-1] = types.shape[0] - mesh.num_cells_global
+        all_parts["ConnectivityIdOffsets"][-1] = (
+            topology.shape[0] - mesh.num_cells_global * num_dofs_per_cell
         )
-        connectivity_offsets[-1] = offsets.shape[0] - (mesh.num_cells_global + 1)
 
         # Update cell-data and point-data offsets by copying over data from previous step
         for key in ["CellDataOffsets", "PointDataOffsets"]:
