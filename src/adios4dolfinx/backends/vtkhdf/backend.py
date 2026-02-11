@@ -106,6 +106,19 @@ def _get_vtk_group(h5file, name: str):
         raise RuntimeError(f"Not supported file type {file_type}")
 
 
+def _get_time_index(hdf: h5py.Group, time: float, filename: str | Path) -> int:
+    """Finds the index of a specific time stamp."""
+    if "Steps" not in hdf.keys():
+        raise RuntimeError(f"No timestepping information found in {filename}.")
+    stamps = hdf["Steps"]["Values"][:]
+    pos = np.flatnonzero(np.isclose(stamps, time))
+    if len(pos) == 0:
+        raise RuntimeError(f"Could not find mesh at t={time} in {filename}.")
+    elif len(pos) > 1:
+        raise RuntimeError(f"Multiple time steps for mesh at t={time} in {filename}")
+    return pos[0]
+
+
 def read_mesh_data(
     filename: Path | str,
     comm: MPI.Intracomm,
@@ -148,18 +161,12 @@ def read_mesh_data(
             ]
             offset = local_connectivity_offset - local_connectivity_offset[0]
         else:
-            if "Steps" not in hdf.keys():
-                raise RuntimeError(f"No timestepping information found in {filename}.")
-            stamps = hdf["Steps"]["Values"][:]
-            pos = np.flatnonzero(np.isclose(stamps, time))
-            if len(pos) == 0:
-                raise RuntimeError(f"Could not find mesh at t={time} in {filename}.")
-            elif len(pos) > 1:
-                raise RuntimeError(f"Multiple time steps for mesh at t={time} in {filename}")
+            time_index = _get_time_index(hdf, time, filename)
 
+            stamps = hdf["Steps"]["Values"][:]
             # Get number of points
             point_node = hdf["Points"]
-            step_start = hdf["Steps"]["PointOffsets"][pos[0]]
+            step_start = hdf["Steps"]["PointOffsets"][time_index]
 
             # NOTE: currently, it doesn't seem like we follow:
             # https://docs.vtk.org/en/latest/vtk_file_formats/vtkhdf_file_format/vtkhdf_specifications.html#temporal-unstructuredgrid-and-polydata
@@ -167,23 +174,23 @@ def read_mesh_data(
             if hdf["NumberOfPoints"].shape[0] != len(stamps):
                 num_pts = hdf["NumberOfPoints"][0]
             else:
-                num_pts = hdf["NumberOfPoints"][pos[0]]
+                num_pts = hdf["NumberOfPoints"][time_index]
             lr = compute_local_range(comm, num_pts)
             points_local = point_node[step_start + lr[0] : step_start + lr[1]]
 
             # Get cell-types in step
-            cell_start = hdf["Steps"]["CellOffsets"][pos[0]]
+            cell_start = hdf["Steps"]["CellOffsets"][time_index]
             if hdf["NumberOfCells"].shape[0] != len(stamps):
                 num_cells = hdf["NumberOfCells"][0]
             else:
-                num_cells = hdf["NumberOfCells"][pos[0]]
+                num_cells = hdf["NumberOfCells"][time_index]
             local_cell_range = compute_local_range(comm, num_cells)
             cell_types_local = hdf["Types"][
                 cell_start + local_cell_range[0] : cell_start + local_cell_range[1]
             ]
 
             # Get connectivity in step
-            connectivity_start = hdf["Steps"]["ConnectivityIdOffsets"][pos[0]]
+            connectivity_start = hdf["Steps"]["ConnectivityIdOffsets"][time_index]
             # Connectivity read
             offsets = hdf["Offsets"]
             local_connectivity_offset = offsets[
@@ -256,22 +263,16 @@ def read_point_data(
             data = func_node[slice(*lr)]
             return data, lr[0]
         else:
-            if "Steps" not in hdf.keys():
-                raise RuntimeError(f"No timestepping information found in {filename}.")
+            time_index = _get_time_index(hdf, time, filename)
             stamps = hdf["Steps"]["Values"][:]
-            pos = np.flatnonzero(np.isclose(stamps, time))
-            if len(pos) == 0:
-                raise RuntimeError(f"Could not find {name}(t={time}) in {filename}.")
-            elif len(pos) > 1:
-                raise RuntimeError(f"Multiple time steps for {name}(t={time}) in {filename}")
-            step_start = hdf["Steps"]["PointDataOffsets"][name][pos[0]]
+            step_start = hdf["Steps"]["PointDataOffsets"][name][time_index]
             # NOTE: currently, it doesn't seem like we follow:
             # https://docs.vtk.org/en/latest/vtk_file_formats/vtkhdf_file_format/vtkhdf_specifications.html#temporal-unstructuredgrid-and-polydata
             # As only one num_points is stored irregardless of time steps added.
             if hdf["NumberOfPoints"].shape[0] != len(stamps):
                 num_pts = hdf["NumberOfPoints"][0]
             else:
-                num_pts = hdf["NumberOfPoints"][pos[0]]
+                num_pts = hdf["NumberOfPoints"][time_index]
             lr = compute_local_range(comm, num_pts)
             return func_node[step_start + lr[0] : step_start + lr[1]], lr[0]
 
@@ -303,15 +304,9 @@ def read_cell_data(
             local_cell_range = compute_local_range(comm, num_cells_global)
             data = cell_data_node[slice(*local_cell_range)]
         else:
-            if "Steps" not in hdf.keys():
-                raise RuntimeError(f"No timestepping information found in {filename}.")
+            time_index = _get_time_index(hdf, time, filename)
             stamps = hdf["Steps"]["Values"][:]
-            pos = np.flatnonzero(np.isclose(stamps, time))
-            if len(pos) == 0:
-                raise RuntimeError(f"Could not find {name}(t={time}) in {filename}.")
-            elif len(pos) > 1:
-                raise RuntimeError(f"Multiple time steps for {name}(t={time}) in {filename}")
-            cd_start = hdf["Steps"]["CellDataOffsets"][name][pos[0]]
+            cd_start = hdf["Steps"]["CellDataOffsets"][name][time_index]
 
             # NOTE: currently, it doesn't seem like we follow:
             # https://docs.vtk.org/en/latest/vtk_file_formats/vtkhdf_file_format/vtkhdf_specifications.html#temporal-unstructuredgrid-and-polydata
@@ -319,7 +314,7 @@ def read_cell_data(
             if hdf["NumberOfCells"].shape[0] != len(stamps):
                 number_of_cells = hdf["NumberOfCells"][0]
             else:
-                number_of_cells = hdf["NumberOfCells"][pos[0]]
+                number_of_cells = hdf["NumberOfCells"][time_index]
             lr = compute_local_range(comm, number_of_cells)
             data = cell_data_node[cd_start + lr[0] : cd_start + lr[1]]
 
