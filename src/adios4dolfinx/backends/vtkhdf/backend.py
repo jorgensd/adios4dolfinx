@@ -64,6 +64,48 @@ def find_all_unique_cell_types(comm, cell_types, num_nodes):
     return all_unique_cell_types
 
 
+def _get_vtk_group(h5file, name: str):
+    """
+    Navigates the VTKHDF group hierarchy to find the specific UnstructuredGrid.
+    Handles both MultiBlockDataSet and direct UnstructuredGrid types.
+    """
+    hdf = h5file["VTKHDF"]
+    file_type = hdf.attrs["Type"]
+
+    # decode bytes if necessary (h5py compatibility)
+    if isinstance(file_type, bytes):
+        file_type = file_type.decode("utf-8")
+
+    if file_type == "MultiBlockDataSet":
+        ass = hdf["Assembly"]
+        mesh_node = []
+
+        def visitor(path):
+            if path.split("/")[-1] == name:
+                obj = ass.get(path)
+                # Check attributes carefully
+                if "Type" in obj.attrs.keys():
+                    attr_type = obj.attrs["Type"]
+                    if isinstance(attr_type, bytes):
+                        attr_type = attr_type.decode("utf-8")
+                    if attr_type == "UnstructuredGrid":
+                        mesh_node.append(path)
+                        return 1
+            return None
+
+        ass.visit_links(visitor)
+
+        if len(mesh_node) != 1:
+            raise RuntimeError(f"Could not find unique mesh named '{name}' in Assembly.")
+
+        return ass[mesh_node[0]]
+
+    elif file_type == "UnstructuredGrid":
+        return hdf
+    else:
+        raise RuntimeError(f"Not supported file type {file_type}")
+
+
 def read_mesh_data(
     filename: Path | str,
     comm: MPI.Intracomm,
@@ -88,31 +130,7 @@ def read_mesh_data(
     if read_from_partition:
         raise RuntimeError("Cannot read partition data with VTKHDF")
     with h5pyfile(filename, "r", comm=comm) as h5file:
-        hdf = h5file["VTKHDF"]
-        # Check for type of VTKHDF file
-        if (file_type := hdf.attrs["Type"]) in (b"MultiBlockDataSet", "MultiBlockDataSet"):
-            # Recursive search of subgroups to find the unstructured grid
-            name = backend_args["name"]
-            ass = hdf["Assembly"]
-            mesh_node = []
-
-            def visitor(path):
-                if path.split("/")[-1] == name:
-                    # Retrieve the link object to check its type
-                    obj = ass.get(path)
-                    if "Type" in obj.attrs.keys() and obj.attrs["Type"] == "UnstructuredGrid":
-                        mesh_node.append(path)
-                        return 1
-                # Return None to continue searching, or return a value to stop
-                return None
-
-            ass.visit_links(visitor)
-            assert len(mesh_node) == 1
-            hdf = ass[mesh_node[0]]
-        elif file_type in (b"UnstructuredGrid", "UnstructuredGrid"):
-            pass
-        else:
-            raise RuntimeError(f"Not supported file type {file_type}")
+        hdf = _get_vtk_group(h5file, backend_args["name"])
         if time is None:
             num_cells_global = hdf["Types"].size
             local_cell_range = compute_local_range(comm, num_cells_global)
@@ -225,30 +243,7 @@ def read_point_data(
     backend_args = get_default_backend_args(backend_args)
     check_file_exists(filename)
     with h5pyfile(filename, "r", comm=comm) as h5file:
-        hdf = h5file["VTKHDF"]
-        if (file_type := hdf.attrs["Type"]) in (b"MultiBlockDataSet", "MultiBlockDataSet"):
-            # Recursive search of subgroups to find the unstructured grid
-            mesh_name = backend_args["name"]
-            ass = hdf["Assembly"]
-            mesh_node = []
-
-            def visitor(path):
-                if path.split("/")[-1] == mesh_name:
-                    # Retrieve the link object to check its type
-                    obj = ass.get(path)
-                    if "Type" in obj.attrs.keys() and obj.attrs["Type"] == "UnstructuredGrid":
-                        mesh_node.append(path)
-                        return 1
-                # Return None to continue searching, or return a value to stop
-                return None
-
-            ass.visit_links(visitor)
-            assert len(mesh_node) == 1
-            hdf = ass[mesh_node[0]]
-        elif file_type in (b"UnstructuredGrid", "UnstructuredGrid"):
-            pass
-        else:
-            raise RuntimeError(f"Not supported file type {file_type}")
+        hdf = _get_vtk_group(h5file, backend_args["name"])
         point_data = hdf["PointData"]
         assert point_data is not None
         if name not in point_data.keys():
@@ -291,30 +286,7 @@ def read_cell_data(
     backend_args = get_default_backend_args(backend_args)
     check_file_exists(filename)
     with h5pyfile(filename, "r", comm=comm) as h5file:
-        hdf = h5file["VTKHDF"]
-        if (file_type := hdf.attrs["Type"]) in (b"MultiBlockDataSet", "MultiBlockDataSet"):
-            # Recursive search of subgroups to find the unstructured grid
-            mesh_name = backend_args["name"]
-            ass = hdf["Assembly"]
-            mesh_node = []
-
-            def visitor(path):
-                if path.split("/")[-1] == mesh_name:
-                    # Retrieve the link object to check its type
-                    obj = ass.get(path)
-                    if "Type" in obj.attrs.keys() and obj.attrs["Type"] == "UnstructuredGrid":
-                        mesh_node.append(path)
-                        return 1
-                # Return None to continue searching, or return a value to stop
-                return None
-
-            ass.visit_links(visitor)
-            assert len(mesh_node) == 1
-            hdf = ass[mesh_node[0]]
-        elif file_type in (b"UnstructuredGrid", "UnstructuredGrid"):
-            pass
-        else:
-            raise RuntimeError(f"Unsupported type {file_type}")
+        hdf = _get_vtk_group(h5file, backend_args["name"])
 
         if "CellData" not in hdf.keys():
             raise RuntimeError(f"No cell data found in {filename}.")
@@ -1053,30 +1025,7 @@ def read_meshtags_data(
     indices, values = read_cell_data(filename, name, comm, None, backend_args=backend_args)
     # Read cell-type of grid to get topological dimension
     with h5pyfile(filename, "r", comm=comm) as h5file:
-        hdf = h5file["VTKHDF"]
-        if (file_type := hdf.attrs["Type"]) in (b"MultiBlockDataSet", "MultiBlockDataSet"):
-            # Recursive search of subgroups to find the unstructured grid
-            name = backend_args["name"]
-            ass = hdf["Assembly"]
-            mesh_node = []
-
-            def visitor(path):
-                if path.split("/")[-1] == name:
-                    # Retrieve the link object to check its type
-                    obj = ass.get(path)
-                    if "Type" in obj.attrs.keys() and obj.attrs["Type"] == "UnstructuredGrid":
-                        mesh_node.append(path)
-                        return 1
-                # Return None to continue searching, or return a value to stop
-                return None
-
-            ass.visit_links(visitor)
-            assert len(mesh_node) == 1
-            hdf = ass[mesh_node[0]]
-        elif file_type in (b"UnstructuredGrid", "UnstructuredGrid"):
-            pass
-        else:
-            raise RuntimeError(f"Unsupported type {file_type}")
+        hdf = _get_vtk_group(h5file, backend_args["name"])
         num_cells_global = hdf["Types"].size
         local_cell_range = compute_local_range(comm, num_cells_global)
         cell_types_local = hdf["Types"][slice(*local_cell_range)]
