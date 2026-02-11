@@ -64,17 +64,20 @@ def find_all_unique_cell_types(comm, cell_types, num_nodes):
     return all_unique_cell_types
 
 
+def _decode_bytes_if_needed(value: bytes | str) -> str:
+    """Decode bytes to string if necessary (for h5py compatibility)"""
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    return value
+
+
 def _get_vtk_group(h5file, name: str):
     """
     Navigates the VTKHDF group hierarchy to find the specific UnstructuredGrid.
     Handles both MultiBlockDataSet and direct UnstructuredGrid types.
     """
     hdf = h5file["VTKHDF"]
-    file_type = hdf.attrs["Type"]
-
-    # decode bytes if necessary (h5py compatibility)
-    if isinstance(file_type, bytes):
-        file_type = file_type.decode("utf-8")
+    file_type = _decode_bytes_if_needed(hdf.attrs["Type"])
 
     if file_type == "MultiBlockDataSet":
         ass = hdf["Assembly"]
@@ -792,209 +795,209 @@ def write_meshtags(
     h5_mode = "a"
     with h5pyfile(filename, h5_mode, comm=comm) as h5file:
         hdf = h5file["VTKHDF"]
+        file_type = _decode_bytes_if_needed(hdf.attrs["Type"])
         # Check for type of VTKHDF file
-        if (file_type := hdf.attrs["Type"]) in (b"MultiBlockDataSet", "MultiBlockDataSet"):
-            # Place softlink to data in assembly
-            ass = hdf["Assembly"]
-            mesh_block = []
-
-            def visitor(path):
-                if path.split("/")[-1] == name:
-                    # Retrieve the link object to check its type
-                    obj = ass.get(path)
-                    if "Type" in obj.attrs.keys() and obj.attrs["Type"] == "UnstructuredGrid":
-                        mesh_block.append("".join(path.split("/")[:-1]))
-                        return 1
-                # Return None to continue searching, or return a value to stop
-                return None
-
-            ass.visit_links(visitor)
-            assert len(mesh_block) == 1
-            block = ass[mesh_block[0]]
-            tag_path = f"/VTKHDF/{name}_{data.name}"
-            if data.name not in block.keys():
-                block[data.name] = h5py.SoftLink(tag_path)
-
-            mesh_group = _create_group(hdf, tag_path, mode=h5_mode)
-
-            mesh_group.attrs.create("Type", "UnstructuredGrid")
-
-            mesh_group.attrs["Version"] = np.array([2, 1], dtype=np.int32)
-
-            cell_data = _create_group(mesh_group, "CellData", mode=h5_mode)
-            assert data.num_entities_global is not None
-            dataset = _create_dataset(
-                cell_data,
-                data.name,
-                shape=(data.num_entities_global,),
-                dtype=data.values.dtype,
-                chunks=True,
-                maxshape=(None,),
-                mode=h5_mode,
-            )
-            insert_slice = _compute_append_slice(
-                dataset,
-                data.num_entities_global,
-                np.array([data.local_start, data.local_start + data.indices.shape[0]]),
-                mode=h5_mode,
-            )
-            dataset[insert_slice] = data.values
-            # NOTE: The following is more or less a copy from write_mesh,
-            # except that we pull out the point storage and use a softlink
-            # Partition split. We use no partitioning
-            num_cells = _create_dataset(
-                mesh_group,
-                "NumberOfCells",
-                shape=(1,),
-                dtype=np.int64,
-                chunks=True,
-                maxshape=(None,),
-                mode=h5_mode,
-                resize=False,  # Resize should really be True, see issue below
-            )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
-            num_cells[-1] = data.num_entities_global
-
-            parent_mesh_group = ass[mesh_block[0]][name]
-
-            # Hardlink data should also follow hardlink for numbering
-            for key in ["Points", "NumberOfPoints"]:
-                if key not in mesh_group.keys():
-                    mesh_group[key] = parent_mesh_group[key]
-
-            # Single celltype assumption
-            num_dofs_per_cell = data.num_dofs_per_entity
-            number_of_connectivities = _create_dataset(
-                mesh_group,
-                "NumberOfConnectivityIds",
-                shape=(1,),
-                dtype=np.int64,
-                chunks=True,
-                maxshape=(None,),
-                mode=h5_mode,
-                resize=False,  # Resize should really be True, see issue below
-            )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
-            assert data.num_entities_global is not None and num_dofs_per_cell is not None
-            number_of_connectivities[-1] = data.num_entities_global * num_dofs_per_cell
-
-            # Store topology offsets (single celltype assumption)
-            offsets = _create_dataset(
-                mesh_group,
-                "Offsets",
-                shape=(data.num_entities_global + 1,),
-                dtype=np.int64,
-                chunks=True,
-                mode=h5_mode,
-                maxshape=(None,),
-                resize=False,  # Resize should really be True, see issue below
-            )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
-            offset_data = np.arange(0, data.indices.size + 1, data.indices.shape[1])
-            assert data.local_start is not None
-            offset_data += num_dofs_per_cell * data.local_start
-            insert_slice = _compute_append_slice(
-                offsets,
-                data.num_entities_global + 1,
-                (data.local_start, data.local_start + data.indices.shape[0] + 1),
-                mode=h5_mode,
-            )
-            offsets[insert_slice] = offset_data
-            del offset_data
-
-            # Permute and store topology data
-            dx_ct = dolfinx.mesh.to_type(data.cell_type)
-            top_perm = np.argsort(dolfinx.cpp.io.perm_vtk(dx_ct, num_dofs_per_cell))
-            topology_data = data.indices[:, top_perm].flatten()
-            topology = _create_dataset(
-                mesh_group,
-                "Connectivity",
-                shape=(data.num_entities_global * num_dofs_per_cell,),
-                dtype=np.int64,
-                chunks=True,
-                maxshape=(None,),
-                mode=h5_mode,
-                resize=False,  # Resize should really be True, see issue below
-            )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
-            insert_slice = _compute_append_slice(
-                topology,
-                data.num_entities_global * num_dofs_per_cell,
-                np.array([data.local_start, data.local_start + data.indices.shape[0]])
-                * num_dofs_per_cell,
-                mode=h5_mode,
-            )
-            topology[insert_slice] = topology_data
-            del topology_data
-
-            # Store celltypes
-            cell_types = np.full(
-                data.indices.shape[0],
-                dolfinx.cpp.io.get_vtk_cell_type(dx_ct, dolfinx.mesh.cell_dim(dx_ct)),
-            )
-            types = _create_dataset(
-                mesh_group,
-                "Types",
-                shape=(data.num_entities_global,),
-                dtype=np.uint8,
-                maxshape=(None,),
-                chunks=True,
-                mode=h5_mode,
-                resize=False,  # Resize should really be True, see issue below
-            )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
-            insert_slice = _compute_append_slice(
-                types,
-                data.num_entities_global,
-                (data.local_start, data.local_start + data.indices.shape[0]),
-                h5_mode,
-            )
-            types[insert_slice] = cell_types
-            del cell_types
-
-            steps = _create_group(mesh_group, "Steps", mode=h5_mode)
-
-            # Copy n-step counter
-            steps.attrs.create("NSteps", parent_mesh_group["Steps"].attrs["NSteps"])
-
-            # Hardlink data that we know is the same across meshes
-            hardlink_keys = ["NumberOfParts", "PartOffsets", "Values", "PointOffsets"]
-            for key in hardlink_keys:
-                steps[key] = parent_mesh_group["Steps"][key]
-
-            # Create offsets for data
-            cell_offset = _create_dataset(
-                steps,
-                "CellOffsets",
-                shape=parent_mesh_group["Steps"]["CellOffsets"].shape,
-                dtype=np.int64,
-                chunks=True,
-                maxshape=(None,),
-                mode=h5_mode,
-            )
-            cell_offset[-1] = types.shape[0] - data.num_entities_global
-
-            connectivity_offsets = _create_dataset(
-                steps,
-                "ConnectivityIdOffsets",
-                shape=parent_mesh_group["Steps"]["ConnectivityIdOffsets"].shape,
-                dtype=np.int64,
-                chunks=True,
-                maxshape=(None,),
-                mode=h5_mode,
-            )
-            connectivity_offsets[-1] = offsets.shape[0] - (data.num_entities_global + 1)
-
-            # CellData requires an offset
-            cd_off = _create_group(steps, "CellDataOffsets", mode=h5_mode)
-            cd_data = _create_dataset(
-                cd_off,
-                data.name,
-                shape=parent_mesh_group["Steps"]["CellOffsets"].shape,
-                dtype=np.int64,
-                chunks=True,
-                maxshape=(None,),
-                mode=h5_mode,
-            )
-            cd_data[-1] = types.shape[0] - data.num_entities_global
-
-        else:
+        if file_type != "MultiBlockDataSet":
             raise ValueError(f"Cannot write meshtags to {filename} with VTK type {file_type}")
+
+        # Place softlink to data in assembly
+        ass = hdf["Assembly"]
+        mesh_block = []
+
+        def visitor(path):
+            if path.split("/")[-1] == name:
+                # Retrieve the link object to check its type
+                obj = ass.get(path)
+                if "Type" in obj.attrs.keys() and obj.attrs["Type"] == "UnstructuredGrid":
+                    mesh_block.append("".join(path.split("/")[:-1]))
+                    return 1
+            # Return None to continue searching, or return a value to stop
+            return None
+
+        ass.visit_links(visitor)
+        assert len(mesh_block) == 1
+        block = ass[mesh_block[0]]
+        tag_path = f"/VTKHDF/{name}_{data.name}"
+        if data.name not in block.keys():
+            block[data.name] = h5py.SoftLink(tag_path)
+
+        mesh_group = _create_group(hdf, tag_path, mode=h5_mode)
+
+        mesh_group.attrs.create("Type", "UnstructuredGrid")
+
+        mesh_group.attrs["Version"] = np.array([2, 1], dtype=np.int32)
+
+        cell_data = _create_group(mesh_group, "CellData", mode=h5_mode)
+        assert data.num_entities_global is not None
+        dataset = _create_dataset(
+            cell_data,
+            data.name,
+            shape=(data.num_entities_global,),
+            dtype=data.values.dtype,
+            chunks=True,
+            maxshape=(None,),
+            mode=h5_mode,
+        )
+        insert_slice = _compute_append_slice(
+            dataset,
+            data.num_entities_global,
+            np.array([data.local_start, data.local_start + data.indices.shape[0]]),
+            mode=h5_mode,
+        )
+        dataset[insert_slice] = data.values
+        # NOTE: The following is more or less a copy from write_mesh,
+        # except that we pull out the point storage and use a softlink
+        # Partition split. We use no partitioning
+        num_cells = _create_dataset(
+            mesh_group,
+            "NumberOfCells",
+            shape=(1,),
+            dtype=np.int64,
+            chunks=True,
+            maxshape=(None,),
+            mode=h5_mode,
+            resize=False,  # Resize should really be True, see issue below
+        )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
+        num_cells[-1] = data.num_entities_global
+
+        parent_mesh_group = ass[mesh_block[0]][name]
+
+        # Hardlink data should also follow hardlink for numbering
+        for key in ["Points", "NumberOfPoints"]:
+            if key not in mesh_group.keys():
+                mesh_group[key] = parent_mesh_group[key]
+
+        # Single celltype assumption
+        num_dofs_per_cell = data.num_dofs_per_entity
+        number_of_connectivities = _create_dataset(
+            mesh_group,
+            "NumberOfConnectivityIds",
+            shape=(1,),
+            dtype=np.int64,
+            chunks=True,
+            maxshape=(None,),
+            mode=h5_mode,
+            resize=False,  # Resize should really be True, see issue below
+        )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
+        assert data.num_entities_global is not None and num_dofs_per_cell is not None
+        number_of_connectivities[-1] = data.num_entities_global * num_dofs_per_cell
+
+        # Store topology offsets (single celltype assumption)
+        offsets = _create_dataset(
+            mesh_group,
+            "Offsets",
+            shape=(data.num_entities_global + 1,),
+            dtype=np.int64,
+            chunks=True,
+            mode=h5_mode,
+            maxshape=(None,),
+            resize=False,  # Resize should really be True, see issue below
+        )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
+        offset_data = np.arange(0, data.indices.size + 1, data.indices.shape[1])
+        assert data.local_start is not None
+        offset_data += num_dofs_per_cell * data.local_start
+        insert_slice = _compute_append_slice(
+            offsets,
+            data.num_entities_global + 1,
+            (data.local_start, data.local_start + data.indices.shape[0] + 1),
+            mode=h5_mode,
+        )
+        offsets[insert_slice] = offset_data
+        del offset_data
+
+        # Permute and store topology data
+        dx_ct = dolfinx.mesh.to_type(data.cell_type)
+        top_perm = np.argsort(dolfinx.cpp.io.perm_vtk(dx_ct, num_dofs_per_cell))
+        topology_data = data.indices[:, top_perm].flatten()
+        topology = _create_dataset(
+            mesh_group,
+            "Connectivity",
+            shape=(data.num_entities_global * num_dofs_per_cell,),
+            dtype=np.int64,
+            chunks=True,
+            maxshape=(None,),
+            mode=h5_mode,
+            resize=False,  # Resize should really be True, see issue below
+        )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
+        insert_slice = _compute_append_slice(
+            topology,
+            data.num_entities_global * num_dofs_per_cell,
+            np.array([data.local_start, data.local_start + data.indices.shape[0]])
+            * num_dofs_per_cell,
+            mode=h5_mode,
+        )
+        topology[insert_slice] = topology_data
+        del topology_data
+
+        # Store celltypes
+        cell_types = np.full(
+            data.indices.shape[0],
+            dolfinx.cpp.io.get_vtk_cell_type(dx_ct, dolfinx.mesh.cell_dim(dx_ct)),
+        )
+        types = _create_dataset(
+            mesh_group,
+            "Types",
+            shape=(data.num_entities_global,),
+            dtype=np.uint8,
+            maxshape=(None,),
+            chunks=True,
+            mode=h5_mode,
+            resize=False,  # Resize should really be True, see issue below
+        )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
+        insert_slice = _compute_append_slice(
+            types,
+            data.num_entities_global,
+            (data.local_start, data.local_start + data.indices.shape[0]),
+            h5_mode,
+        )
+        types[insert_slice] = cell_types
+        del cell_types
+
+        steps = _create_group(mesh_group, "Steps", mode=h5_mode)
+
+        # Copy n-step counter
+        steps.attrs.create("NSteps", parent_mesh_group["Steps"].attrs["NSteps"])
+
+        # Hardlink data that we know is the same across meshes
+        hardlink_keys = ["NumberOfParts", "PartOffsets", "Values", "PointOffsets"]
+        for key in hardlink_keys:
+            steps[key] = parent_mesh_group["Steps"][key]
+
+        # Create offsets for data
+        cell_offset = _create_dataset(
+            steps,
+            "CellOffsets",
+            shape=parent_mesh_group["Steps"]["CellOffsets"].shape,
+            dtype=np.int64,
+            chunks=True,
+            maxshape=(None,),
+            mode=h5_mode,
+        )
+        cell_offset[-1] = types.shape[0] - data.num_entities_global
+
+        connectivity_offsets = _create_dataset(
+            steps,
+            "ConnectivityIdOffsets",
+            shape=parent_mesh_group["Steps"]["ConnectivityIdOffsets"].shape,
+            dtype=np.int64,
+            chunks=True,
+            maxshape=(None,),
+            mode=h5_mode,
+        )
+        connectivity_offsets[-1] = offsets.shape[0] - (data.num_entities_global + 1)
+
+        # CellData requires an offset
+        cd_off = _create_group(steps, "CellDataOffsets", mode=h5_mode)
+        cd_data = _create_dataset(
+            cd_off,
+            data.name,
+            shape=parent_mesh_group["Steps"]["CellOffsets"].shape,
+            dtype=np.int64,
+            chunks=True,
+            maxshape=(None,),
+            mode=h5_mode,
+        )
+        cd_data[-1] = types.shape[0] - data.num_entities_global
 
 
 def read_meshtags_data(
@@ -1206,114 +1209,112 @@ def write_data(
     extension = array_data.type
     with h5pyfile(filename, h5_mode, comm=comm) as h5file:
         hdf = h5file["VTKHDF"]
+        file_type = _decode_bytes_if_needed(hdf.attrs["Type"])
         # Check for type of VTKHDF file
-        if (file_type := hdf.attrs["Type"]) in (b"MultiBlockDataSet", "MultiBlockDataSet"):
-            # Place softlink to data in assembly
-            ass = hdf["Assembly"]
-            mesh_block = []
+        if file_type != "MultiBlockDataSet":
+            raise ValueError(f"Cannot write meshtags to {filename} with VTK type {file_type}")
 
-            def visitor(path):
-                if path.split("/")[-1] == mesh_name:
-                    # Retrieve the link object to check its type
-                    obj = ass.get(path)
-                    if "Type" in obj.attrs.keys() and obj.attrs["Type"] == "UnstructuredGrid":
-                        mesh_block.append(obj)
-                        return 1
-                # Return None to continue searching, or return a value to stop
-                return None
+        # Place softlink to data in assembly
+        ass = hdf["Assembly"]
+        mesh_block = []
 
-            ass.visit_links(visitor)
-            assert len(mesh_block) == 1
+        def visitor(path):
+            if path.split("/")[-1] == mesh_name:
+                # Retrieve the link object to check its type
+                obj = ass.get(path)
+                if "Type" in obj.attrs.keys() and obj.attrs["Type"] == "UnstructuredGrid":
+                    mesh_block.append(obj)
+                    return 1
+            # Return None to continue searching, or return a value to stop
+            return None
 
-            block = mesh_block[0]
+        ass.visit_links(visitor)
+        assert len(mesh_block) == 1
 
-            point_group = _create_group(block, f"{extension}Data", mode=h5_mode)
-            dataset = _create_dataset(
-                point_group,
+        block = mesh_block[0]
+
+        point_group = _create_group(block, f"{extension}Data", mode=h5_mode)
+        dataset = _create_dataset(
+            point_group,
+            array_data.name,
+            shape=array_data.global_shape,
+            dtype=array_data.values.dtype,
+            chunks=True,
+            maxshape=(None, array_data.values.shape[1]),
+            mode=h5_mode,
+        )
+        insert_slice = _compute_append_slice(
+            dataset,
+            array_data.global_shape[0],
+            np.array(
+                [
+                    array_data.local_range[0],
+                    array_data.local_range[0] + array_data.values.shape[0],
+                ]
+            ),
+            mode=h5_mode,
+        )
+        dataset[insert_slice] = array_data.values
+
+        steps = _create_group(block, "Steps", mode=h5_mode)
+        pdo = _create_group(steps, f"{extension}DataOffsets", mode=h5_mode)
+
+        # Check if time step is already in time-stepping of mesh
+        timestamps = steps["Values"][:]
+        assert isinstance(timestamps, np.ndarray)
+        assert isinstance(time, float)
+        time_exists = np.flatnonzero(np.isclose(timestamps, time))
+
+        if len(time_exists) == 1:
+            idx = time_exists[0]
+            pdo_u = _create_dataset(
+                pdo,
                 array_data.name,
-                shape=array_data.global_shape,
-                dtype=array_data.values.dtype,
+                shape=(1,),
+                dtype=np.int64,
                 chunks=True,
-                maxshape=(None, array_data.values.shape[1]),
+                maxshape=(None,),
                 mode=h5_mode,
+                resize=False,
             )
-            insert_slice = _compute_append_slice(
-                dataset,
-                array_data.global_shape[0],
-                np.array(
-                    [
-                        array_data.local_range[0],
-                        array_data.local_range[0] + array_data.values.shape[0],
-                    ]
-                ),
+            pdo_u[idx] = (
+                dataset.shape[0]  # * dataset.shape[1]
+                - array_data.global_shape[0]  # * array_data.global_shape[1]
+            )
+        elif len(time_exists) == 0:
+            # No mesh written at step, update mesh offsets
+            steps.attrs.create("NSteps", block["Steps"].attrs["NSteps"] + 1)
+            step_vals = _create_dataset(
+                steps,
+                "Values",
+                shape=(1,),
+                dtype=np.float64,
+                chunks=True,
+                maxshape=(None,),
                 mode=h5_mode,
+                resize=True,
             )
-            dataset[insert_slice] = array_data.values
-
-            steps = _create_group(block, "Steps", mode=h5_mode)
-            pdo = _create_group(steps, f"{extension}DataOffsets", mode=h5_mode)
-
-            # Check if time step is already in time-stepping of mesh
-            timestamps = steps["Values"][:]
-            assert isinstance(timestamps, np.ndarray)
-            assert isinstance(time, float)
-            time_exists = np.flatnonzero(np.isclose(timestamps, time))
-
-            if len(time_exists) == 1:
-                idx = time_exists[0]
-                pdo_u = _create_dataset(
-                    pdo,
-                    array_data.name,
-                    shape=(1,),
-                    dtype=np.int64,
-                    chunks=True,
-                    maxshape=(None,),
-                    mode=h5_mode,
-                    resize=False,
-                )
-                pdo_u[idx] = (
-                    dataset.shape[0]  # * dataset.shape[1]
-                    - array_data.global_shape[0]  # * array_data.global_shape[1]
-                )
-            elif len(time_exists) == 0:
-                # No mesh written at step, update mesh offsets
-                steps.attrs.create("NSteps", block["Steps"].attrs["NSteps"] + 1)
-                step_vals = _create_dataset(
-                    steps,
-                    "Values",
-                    shape=(1,),
-                    dtype=np.float64,
-                    chunks=True,
-                    maxshape=(None,),
-                    mode=h5_mode,
-                    resize=True,
-                )
-                step_vals[-1] = time
-                for key in [
-                    "PartOffsets",
-                    "NumberOfParts",
-                    "PointOffsets",
-                    "CellOffsets",
-                    "ConnectivityIdOffsets",
-                    "CellDataOffsets",
-                    "PointDataOffsets",
-                ]:
-                    if key in steps.keys():
-                        comp = steps[key]
-                        if isinstance(comp, h5py.Group):
-                            for dname, dset in comp.items():
-                                if dname != array_data.name and key != f"{extension}DataOffsets":
-                                    dset.resize(dset.size + 1, axis=0)
-                                    dset[-1] = dset[-2]
-                        elif isinstance(comp, h5py.Dataset):
-                            comp.resize(comp.size + 1, axis=0)
-                            comp[-1] = comp[-2]
-                        else:
-                            raise NotImplementedError(f"Ubsupported type {type(comp)}")
-            else:
-                raise ValueError(f"Time step found multiple times in {filename}")
-
+            step_vals[-1] = time
+            for key in [
+                "PartOffsets",
+                "NumberOfParts",
+                "PointOffsets",
+                "CellOffsets",
+                "ConnectivityIdOffsets",
+                "CellDataOffsets",
+                "PointDataOffsets",
+            ]:
+                if key in steps.keys():
+                    comp = steps[key]
+                    if isinstance(comp, h5py.Group):
+                        for dname, dset in comp.items():
+                            if dname != array_data.name and key != f"{extension}DataOffsets":
+                                dset.resize(dset.size + 1, axis=0)
+                                dset[-1] = dset[-2]
+                    elif isinstance(comp, h5py.Dataset):
+                        comp.resize(comp.size + 1, axis=0)
+                        comp[-1] = comp[-2]
+                    else:
+                        raise NotImplementedError(f"Ubsupported type {type(comp)}")
         else:
-            raise ValueError(
-                f"Cannot write data {extension} to {filename} with VTK type {file_type}"
-            )
+            raise ValueError(f"Time step found multiple times in {filename}")
