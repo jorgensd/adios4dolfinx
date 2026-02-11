@@ -7,7 +7,7 @@ import dolfinx
 import numpy as np
 import pytest
 
-from adios4dolfinx import FileMode, snapshot_checkpoint as _stapshot_checkpoint
+from adios4dolfinx import FileMode, snapshot_checkpoint as _snapshot_checkpoint
 from adios4dolfinx.utils import skip_if_not_implemented, suffix
 
 
