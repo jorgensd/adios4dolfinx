@@ -799,7 +799,6 @@ def write_meshtags(
 
         # NOTE: The following is more or less a copy from write_mesh,
         # except that we pull out the point storage and use a softlink
-        # Partition split. We use no partitioning
         num_cells = _create_dataset(
             mesh_group,
             "NumberOfCells",
