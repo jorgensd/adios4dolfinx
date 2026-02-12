@@ -71,9 +71,10 @@ def _decode_bytes_if_needed(value: bytes | str) -> str:
     return value
 
 
-def _get_vtk_group(h5file, name: str):
+def _get_vtk_group(h5file, name: str) -> h5py.Group:
     """
-    Navigates the VTKHDF group hierarchy to find the specific UnstructuredGrid.
+    Navigates the VTKHDF group hierarchy to find the specific first
+    UnstructuredGrid with a specific name.
     Handles both MultiBlockDataSet and direct UnstructuredGrid types.
     """
     hdf = h5file["VTKHDF"]
@@ -81,10 +82,11 @@ def _get_vtk_group(h5file, name: str):
 
     if file_type == "MultiBlockDataSet":
         ass = hdf["Assembly"]
-        mesh_node = []
 
         def visitor(path):
-            if path.split("/")[-1] == name:
+            mesh_group = path.rsplit("/", 1)
+            mesh_name = mesh_group[0] if len(mesh_group) == 1 else mesh_group[1]
+            if mesh_name == name:
                 obj = ass.get(path)
                 # Check attributes carefully
                 if "Type" in obj.attrs.keys():
@@ -92,16 +94,14 @@ def _get_vtk_group(h5file, name: str):
                     if isinstance(attr_type, bytes):
                         attr_type = attr_type.decode("utf-8")
                     if attr_type == "UnstructuredGrid":
-                        mesh_node.append(path)
-                        return 1
+                        return path
             return None
 
-        ass.visit_links(visitor)
-
-        if len(mesh_node) != 1:
+        mesh_node = ass.visit_links(visitor)
+        if mesh_node is None:
             raise RuntimeError(f"Could not find unique mesh named '{name}' in Assembly.")
 
-        return ass[mesh_node[0]]
+        return ass[mesh_node]
 
     elif file_type == "UnstructuredGrid":
         return hdf
@@ -109,7 +109,7 @@ def _get_vtk_group(h5file, name: str):
         raise RuntimeError(f"Not supported file type {file_type}")
 
 
-def _get_time_index(hdf: h5py.Group, time: float, filename: str | Path) -> int:
+def _get_time_index(hdf: h5py.Group, time: float|str, filename: str | Path) -> int:
     """Finds the index of a specific time stamp."""
     if "Steps" not in hdf.keys():
         raise RuntimeError(f"No timestepping information found in {filename}.")
@@ -764,23 +764,10 @@ def write_meshtags(
         if file_type != "MultiBlockDataSet":
             raise ValueError(f"Cannot write meshtags to {filename} with VTK type {file_type}")
 
-        # Place softlink to data in assembly
-        ass = hdf["Assembly"]
-        mesh_block = []
+        # We place the mesh-tags in the same subgroup of assembly as the mesh
+        parent_mesh_group = _get_vtk_group(h5file, name)
+        block = parent_mesh_group.parent
 
-        def visitor(path):
-            if path.split("/")[-1] == name:
-                # Retrieve the link object to check its type
-                obj = ass.get(path)
-                if "Type" in obj.attrs.keys() and obj.attrs["Type"] == "UnstructuredGrid":
-                    mesh_block.append("".join(path.split("/")[:-1]))
-                    return 1
-            # Return None to continue searching, or return a value to stop
-            return None
-
-        ass.visit_links(visitor)
-        assert len(mesh_block) == 1
-        block = ass[mesh_block[0]]
         tag_path = f"/VTKHDF/{name}_{data.name}"
         if data.name not in block.keys():
             block[data.name] = h5py.SoftLink(tag_path)
@@ -823,8 +810,6 @@ def write_meshtags(
             resize=False,  # Resize should really be True, see issue below
         )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
         num_cells[-1] = data.num_entities_global
-
-        parent_mesh_group = ass[mesh_block[0]][name]
 
         # Hardlink data should also follow hardlink for numbering
         for key in ["Points", "NumberOfPoints"]:
@@ -1178,24 +1163,8 @@ def write_data(
         if file_type != "MultiBlockDataSet":
             raise ValueError(f"Cannot write meshtags to {filename} with VTK type {file_type}")
 
-        # Place softlink to data in assembly
-        ass = hdf["Assembly"]
-        mesh_block = []
-
-        def visitor(path):
-            if path.split("/")[-1] == mesh_name:
-                # Retrieve the link object to check its type
-                obj = ass.get(path)
-                if "Type" in obj.attrs.keys() and obj.attrs["Type"] == "UnstructuredGrid":
-                    mesh_block.append(obj)
-                    return 1
-            # Return None to continue searching, or return a value to stop
-            return None
-
-        ass.visit_links(visitor)
-        assert len(mesh_block) == 1
-
-        block = mesh_block[0]
+        # Find mesh block to add data to
+        block = _get_vtk_group(h5file, mesh_name)
 
         point_group = _create_group(block, f"{extension}Data", mode=h5_mode)
         dataset = _create_dataset(

@@ -453,7 +453,7 @@ def test_read_write_mix_data(dtype, tmp_path):
     z = Function(V, name="some_other_array", dtype=dtype)
     Q = functionspace(mesh, ("DG", 0))
     q = Function(Q, name="cells", dtype=dtype)
-
+    tmp_path = mesh.comm.bcast(tmp_path, root=0)
     filename = tmp_path / "mixed_data.vtkhdf"
 
     backend_args = {"name": "MyGrid"}
