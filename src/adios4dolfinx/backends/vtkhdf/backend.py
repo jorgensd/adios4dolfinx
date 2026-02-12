@@ -22,6 +22,8 @@ from ..pyvista.backend import _arbitrary_lagrange_vtk, _cell_degree, _first_orde
 
 read_mode = ReadMode.parallel
 
+_vtk_hdf_version = np.array([2, 1], dtype=np.int32)
+
 
 def get_default_backend_args(arguments: dict[str, Any] | None) -> dict[str, Any]:
     """Get default backend arguments given a set of input arguments.
@@ -109,7 +111,7 @@ def _get_vtk_group(h5file, name: str) -> h5py.Group:
         raise RuntimeError(f"Not supported file type {file_type}")
 
 
-def _get_time_index(hdf: h5py.Group, time: float|str, filename: str | Path) -> int:
+def _get_time_index(hdf: h5py.Group, time: float | str, filename: str | Path) -> int:
     """Finds the index of a specific time stamp."""
     if "Steps" not in hdf.keys():
         raise RuntimeError(f"No timestepping information found in {filename}.")
@@ -519,11 +521,11 @@ def write_mesh(
     with h5pyfile(filename, h5_mode, comm=comm) as h5file:
         hdf = _create_group(h5file, "/VTKHDF", h5_mode)
         hdf.attrs.create("Type", "MultiBlockDataSet")
-        hdf.attrs["Version"] = np.array([2, 1], dtype=np.int32)
+        hdf.attrs["Version"] = _vtk_hdf_version
 
         mesh_group = _create_group(hdf, name, h5_mode)
         mesh_group.attrs.create("Type", "UnstructuredGrid")
-        mesh_group.attrs["Version"] = np.array([2, 1], dtype=np.int32)
+        mesh_group.attrs["Version"] = _vtk_hdf_version
 
         assembly = _create_group(hdf, "Assembly", h5_mode)
 
@@ -531,19 +533,7 @@ def write_mesh(
         if name not in mesh_assembly.keys():
             mesh_assembly[name] = h5py.SoftLink(f"/VTKHDF/{name}")
 
-        # Partition split. We use no partitioning
-        num_cells = _create_dataset(
-            mesh_group,
-            "NumberOfCells",
-            shape=(1,),
-            dtype=np.int64,
-            chunks=True,
-            maxshape=(None,),
-            mode=h5_mode,
-            resize=False,  # Resize should really be True, see issue below
-        )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
-        num_cells[-1] = mesh.num_cells_global
-
+        # Write time dependent points
         number_of_points = _create_dataset(
             mesh_group,
             "NumberOfPoints",
@@ -554,20 +544,6 @@ def write_mesh(
             mode=h5_mode,
         )
         number_of_points[-1] = mesh.num_nodes_global
-
-        # Single celltype assumption
-        num_dofs_per_cell = mesh.local_topology.shape[1]
-        number_of_connectivities = _create_dataset(
-            mesh_group,
-            "NumberOfConnectivityIds",
-            shape=(1,),
-            dtype=np.int64,
-            chunks=True,
-            maxshape=(None,),
-            mode=h5_mode,
-            resize=False,  # Resize should really be True, see issue below
-        )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
-        number_of_connectivities[-1] = mesh.num_cells_global * num_dofs_per_cell
 
         # Store nodes
         points = _create_dataset(
@@ -584,6 +560,32 @@ def write_mesh(
         )
         points[insert_slice, : mesh.local_geometry.shape[1]] = mesh.local_geometry
 
+        # NOTE: VTKHDF currently does not support reading time dependent topology in
+        # Paraview: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
+        # Therefore the following data is not resized
+        time_indep_datasets = {}
+        for key in ["NumberOfCells", "NumberOfConnectivityIds"]:
+            time_indep_datasets[key] = _create_dataset(
+                mesh_group,
+                key,
+                shape=(1,),
+                dtype=np.int64,
+                chunks=True,
+                maxshape=(None,),
+                mode=h5_mode,
+                resize=False,  # Resize should really be True
+            )
+
+        num_dofs_per_cell = mesh.local_topology.shape[1]
+        time_indep_datasets["NumberOfCells"][-1] = mesh.num_cells_global
+        time_indep_datasets["NumberOfConnectivityIds"][-1] = (
+            mesh.num_cells_global * num_dofs_per_cell
+        )
+
+        # NOTE: The following offsets are currently overwriting the existing topology data.
+        # This is due to the VTKHDF bug. When we switch resize=True this will automatically work
+        # for time dependent topologies
+
         # Store topology offsets (single celltype assumption)
         offsets = _create_dataset(
             mesh_group,
@@ -593,8 +595,8 @@ def write_mesh(
             chunks=True,
             mode=h5_mode,
             maxshape=(None,),
-            resize=False,  # Resize should really be True, see issue below
-        )  # VTKHDFReader issue: https://gitlab.kitware.com/vtk/vtk/-/issues/19257
+            resize=False,  # Resize should really be True
+        )
         offset_data = np.arange(0, mesh.local_topology.size + 1, mesh.local_topology.shape[1])
         offset_data += num_dofs_per_cell * mesh.local_topology_pos[0]
         insert_slice = _compute_append_slice(
@@ -672,7 +674,7 @@ def write_mesh(
             values[-1] = time
         steps.attrs.create("NSteps", np.int64(len(values)), dtype=np.int64)
 
-        # Write single partition data
+        # Write offset data for current time-step
         all_parts = {}
         for key in [
             "NumberOfParts",
@@ -773,10 +775,8 @@ def write_meshtags(
             block[data.name] = h5py.SoftLink(tag_path)
 
         mesh_group = _create_group(hdf, tag_path, mode=h5_mode)
-
         mesh_group.attrs.create("Type", "UnstructuredGrid")
-
-        mesh_group.attrs["Version"] = np.array([2, 1], dtype=np.int32)
+        mesh_group.attrs["Version"] = _vtk_hdf_version
 
         cell_data = _create_group(mesh_group, "CellData", mode=h5_mode)
         assert data.num_entities_global is not None
@@ -796,6 +796,7 @@ def write_meshtags(
             mode=h5_mode,
         )
         dataset[insert_slice] = data.values
+
         # NOTE: The following is more or less a copy from write_mesh,
         # except that we pull out the point storage and use a softlink
         # Partition split. We use no partitioning
@@ -912,29 +913,21 @@ def write_meshtags(
         for key in hardlink_keys:
             steps[key] = parent_mesh_group["Steps"][key]
 
-        # Create offsets for data
-        cell_offset = _create_dataset(
-            steps,
-            "CellOffsets",
-            shape=parent_mesh_group["Steps"]["CellOffsets"].shape,
-            dtype=np.int64,
-            chunks=True,
-            maxshape=(None,),
-            mode=h5_mode,
-        )
-        cell_offset[-1] = types.shape[0] - data.num_entities_global
+        # Write offset data for current time-step
+        all_parts = {}
+        for key in ["CellOffsets", "ConnectivityIdOffsets"]:
+            all_parts[key] = _create_dataset(
+                steps,
+                key,
+                shape=(1,),
+                dtype=np.int64,
+                chunks=True,
+                maxshape=(None,),
+                mode=h5_mode,
+            )
 
-        connectivity_offsets = _create_dataset(
-            steps,
-            "ConnectivityIdOffsets",
-            shape=parent_mesh_group["Steps"]["ConnectivityIdOffsets"].shape,
-            dtype=np.int64,
-            chunks=True,
-            maxshape=(None,),
-            mode=h5_mode,
-        )
-        connectivity_offsets[-1] = offsets.shape[0] - (data.num_entities_global + 1)
-
+        all_parts["CellOffsets"][-1] = types.shape[0] - data.num_entities_global
+        all_parts["ConnectivityIdOffsets"][-1] = offsets.shape[0] - (data.num_entities_global + 1)
         # CellData requires an offset
         cd_off = _create_group(steps, "CellDataOffsets", mode=h5_mode)
         cd_data = _create_dataset(
@@ -1166,9 +1159,9 @@ def write_data(
         # Find mesh block to add data to
         block = _get_vtk_group(h5file, mesh_name)
 
-        point_group = _create_group(block, f"{extension}Data", mode=h5_mode)
+        data_group = _create_group(block, f"{extension}Data", mode=h5_mode)
         dataset = _create_dataset(
-            point_group,
+            data_group,
             array_data.name,
             shape=array_data.global_shape,
             dtype=array_data.values.dtype,
@@ -1199,6 +1192,7 @@ def write_data(
         time_exists = np.flatnonzero(np.isclose(timestamps, time))
 
         if len(time_exists) == 1:
+            # If mesh time-step exists, update the data offsets for that step
             idx = time_exists[0]
             pdo_u = _create_dataset(
                 pdo,
@@ -1210,10 +1204,7 @@ def write_data(
                 mode=h5_mode,
                 resize=False,
             )
-            pdo_u[idx] = (
-                dataset.shape[0]  # * dataset.shape[1]
-                - array_data.global_shape[0]  # * array_data.global_shape[1]
-            )
+            pdo_u[idx] = dataset.shape[0] - array_data.global_shape[0]
         elif len(time_exists) == 0:
             # No mesh written at step, update mesh offsets
             steps.attrs.create("NSteps", block["Steps"].attrs["NSteps"] + 1)
