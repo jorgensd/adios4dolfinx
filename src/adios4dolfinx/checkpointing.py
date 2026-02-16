@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import inspect
 import typing
 from pathlib import Path
 
@@ -534,6 +535,7 @@ def read_mesh_data(
     time: float = 0.0,
     legacy: bool = False,
     read_from_partition: bool = False,
+    max_facet_to_cell_links: int = 2,
 ) -> ReadMeshData:
     """
     Read an ADIOS2 mesh data for use with DOLFINx.
@@ -547,6 +549,7 @@ def read_mesh_data(
         time: Time stamp associated with mesh
         legacy: If checkpoint was made prior to time-dependent mesh-writer set to True
         read_from_partition: Read mesh with partition from file
+        max_facet_to_cell_links: Maximum number of cells a facet can be connected to.
     Returns:
         The mesh topology, geometry, UFL domain and partition function
     """
@@ -661,7 +664,11 @@ def read_mesh_data(
             else:
                 return partition_graph
     else:
-        partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)
+        sig = inspect.signature(dolfinx.mesh.create_cell_partitioner)
+        part_kwargs = {}
+        if "max_facet_to_cell_links" in list(sig.parameters.keys()):
+            part_kwargs["max_facet_to_cell_links"] = max_facet_to_cell_links
+        partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode, **part_kwargs)
 
     return ReadMeshData(
         cells=mesh_topology,
@@ -679,6 +686,7 @@ def read_mesh(
     time: float = 0.0,
     legacy: bool = False,
     read_from_partition: bool = False,
+    max_facet_to_cell_links: int = 2,
 ) -> dolfinx.mesh.Mesh:
     """
     Read an ADIOS2 mesh into DOLFINx.
@@ -692,10 +700,15 @@ def read_mesh(
         time: Time stamp associated with mesh
         legacy: If checkpoint was made prior to time-dependent mesh-writer set to True
         read_from_partition: Read mesh with partition from file
+        max_facet_to_cell_links: Maximum number of cells a facet can be connected to.
     Returns:
         The distributed mesh
     """
     check_file_exists(filename)
+    sig = inspect.signature(dolfinx.mesh.create_mesh)
+    kwargs = {}
+    if "max_facet_to_cell_links" in list(sig.parameters.keys()):
+        kwargs["max_facet_to_cell_links"] = max_facet_to_cell_links
     return dolfinx.mesh.create_mesh(
         comm,
         **read_mesh_data(
@@ -707,6 +720,7 @@ def read_mesh(
             legacy=legacy,
             read_from_partition=read_from_partition,
         ),
+        **kwargs,
     )
 
 
