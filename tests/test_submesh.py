@@ -105,7 +105,6 @@ def test_write_submesh_codim1(tmp_path):
     u_sub_new = dolfinx.fem.Function(V_new, name="u_sub_new")
     adios4dolfinx.read_function(
         outfile, u_sub_new, time=0, name="u_sub", original_cell_index=input_indices,
-        parent_mesh = new_mesh
     )
 
     u_ref = dolfinx.fem.Function(V_new, name="u_ref")

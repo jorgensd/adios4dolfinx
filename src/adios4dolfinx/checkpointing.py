@@ -1010,6 +1010,7 @@ def write_submesh(
         adios_file.io.DefineAttribute(f"{name}_dim", sub_cell_dim)
 
         adios_file.file.PerformPuts()
+        adios_file.file.EndStep()
 
 
 def read_submesh(filename: Path, mesh: dolfinx.mesh.Mesh, name: str, engine="BP4"):
@@ -1093,5 +1094,7 @@ def read_submesh(filename: Path, mesh: dolfinx.mesh.Mesh, name: str, engine="BP4
     vec.scatter_forward()
     submesh_cells = np.flatnonzero(vec.array >= 0)
     submesh, cell_map, vertex_map, node_map = dolfinx.mesh.create_submesh(mesh, dim, submesh_cells)
-    submesh_input_indices = vec.array[cell_map]
+    num_submesh_cells = submesh.topology.index_map(submesh.topology.dim).size_local + submesh.topology.index_map(submesh.topology.dim).num_ghosts
+    cm = cell_map.sub_topology_to_topology(np.arange(num_submesh_cells, dtype=np.int32), False)
+    submesh_input_indices = vec.array[cm]
     return submesh, cell_map, vertex_map, node_map, submesh_input_indices
