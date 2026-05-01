@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import inspect
 import typing
 from pathlib import Path
 
@@ -212,7 +213,10 @@ def write_meshtags(
     local_start = local_start if mesh.comm.rank != 0 else 0
     global_num_tag_entities = mesh.comm.allreduce(num_saved_tag_entities, op=MPI.SUM)
     dof_layout = mesh.geometry.cmap.create_dof_layout()
-    num_dofs_per_entity = dof_layout.num_entity_closure_dofs(dim)
+    if hasattr(dof_layout, "num_entity_closure_dofs"):
+        num_dofs_per_entity = dof_layout.num_entity_closure_dofs(dim)
+    else:
+        num_dofs_per_entity = len(dof_layout.entity_closure_dofs(dim, 0))
 
     entities_to_geometry = dolfinx.cpp.mesh.entities_to_geometry(
         mesh._cpp_object, dim, local_tag_entities, False
@@ -536,6 +540,17 @@ def read_function(
     u.x.scatter_forward()
 
 
+class ReadMeshData(typing.TypedDict):
+    cells: npt.NDArray[np.int64]
+    e: typing.Union[
+        ufl.Mesh,
+        basix.finite_element.FiniteElement,
+        basix.ufl._BasixElement,
+    ]
+    x: npt.NDArray[np.floating]
+    partitioner: typing.Optional[typing.Callable]
+
+
 def read_mesh_data(
     filename: typing.Union[Path, str],
     comm: MPI.Intracomm,
@@ -544,8 +559,9 @@ def read_mesh_data(
     time: float = 0.0,
     legacy: bool = False,
     read_from_partition: bool = False,
+    max_facet_to_cell_links: int = 2,
     name: typing.Optional[str] = None,
-) -> tuple[np.ndarray, np.ndarray, ufl.Mesh, typing.Callable]:
+) -> ReadMeshData:
     """
     Read an ADIOS2 mesh data for use with DOLFINx.
 
@@ -558,7 +574,9 @@ def read_mesh_data(
         time: Time stamp associated with mesh
         legacy: If checkpoint was made prior to time-dependent mesh-writer set to True
         read_from_partition: Read mesh with partition from file
+        max_facet_to_cell_links: Maximum number of cells a facet can be connected to.
         name: Name of the mesh to read.
+
     Returns:
         The mesh topology, geometry, UFL domain and partition function
     """
@@ -700,9 +718,18 @@ def read_mesh_data(
             else:
                 return partition_graph
     else:
-        partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)
+        sig = inspect.signature(dolfinx.mesh.create_cell_partitioner)
+        part_kwargs = {}
+        if "max_facet_to_cell_links" in list(sig.parameters.keys()):
+            part_kwargs["max_facet_to_cell_links"] = max_facet_to_cell_links
+        partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode, **part_kwargs)
 
-    return mesh_topology, mesh_geometry, domain, partitioner
+    return ReadMeshData(
+        cells=mesh_topology,
+        x=mesh_geometry,
+        e=domain,
+        partitioner=partitioner,
+    )
 
 
 def read_mesh(
@@ -713,6 +740,7 @@ def read_mesh(
     time: float = 0.0,
     legacy: bool = False,
     read_from_partition: bool = False,
+    max_facet_to_cell_links: int = 2,
     name: typing.Optional[str] = None,
 ) -> dolfinx.mesh.Mesh:
     """
@@ -727,15 +755,21 @@ def read_mesh(
         time: Time stamp associated with mesh
         legacy: If checkpoint was made prior to time-dependent mesh-writer set to True
         read_from_partition: Read mesh with partition from file
+        max_facet_to_cell_links: Maximum number of cells a facet can be connected to.
         name: Name of the mesh to read.
+
     Returns:
         The distributed mesh
     """
     check_file_exists(filename)
     name = "" if name is None else name
+    sig = inspect.signature(dolfinx.mesh.create_mesh)
+    kwargs = {}
+    if "max_facet_to_cell_links" in list(sig.parameters.keys()):
+        kwargs["max_facet_to_cell_links"] = max_facet_to_cell_links
     return dolfinx.mesh.create_mesh(
         comm,
-        *read_mesh_data(
+        **read_mesh_data(
             filename,
             comm,
             engine=engine,
@@ -745,6 +779,7 @@ def read_mesh(
             read_from_partition=read_from_partition,
             name=name,
         ),
+        **kwargs,
     )
 
 
@@ -782,7 +817,10 @@ def write_mesh(
     cell_range = mesh.topology.index_map(mesh.topology.dim).local_range
     cmap = mesh.geometry.cmap
     geom_layout = cmap.create_dof_layout()
-    num_dofs_per_cell = geom_layout.num_entity_closure_dofs(mesh.topology.dim)
+    if hasattr(geom_layout, "num_entity_closure_dofs"):
+        num_dofs_per_cell = geom_layout.num_entity_closure_dofs(mesh.topology.dim)
+    else:
+        num_dofs_per_cell = len(geom_layout.entity_closure_dofs(mesh.topology.dim, 0))
     dofs_out = np.zeros((num_cells_local, num_dofs_per_cell), dtype=np.int64)
     assert g_dmap.shape[1] == num_dofs_per_cell
     dofs_out[:, :] = np.asarray(

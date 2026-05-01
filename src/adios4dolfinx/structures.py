@@ -19,7 +19,7 @@ __all__ = ["MeshData", "FunctionData"]
 @dataclass
 class MeshData:
     # 2 dimensional array of node coordinates
-    local_geometry: npt.NDArray[np.floating]
+    local_geometry: typing.Union[npt.NDArray[np.float32], npt.NDArray[np.float64]]
     local_geometry_pos: tuple[int, int]  # Insert range on current process for geometry nodes
     num_nodes_global: int  # Number of nodes in global geometry array
 

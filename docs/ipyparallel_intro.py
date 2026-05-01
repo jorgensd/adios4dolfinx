@@ -1,8 +1,8 @@
 # # Introduction to IPython parallel
-# The following demos heavily rely on IPython-parallel to illustrate how checkpointing works when
-# using multiple MPI processes.
+# The following demos heavily rely on {py:mod}`IPython-parallel<ipyparallel>` to illustrate how
+# checkpointing works when using multiple {py:mod}`MPI<mpi4py>` processes.
 # We illustrate what happens in parallel by launching three MPI processes
-# using [ipyparallel](https://ipyparallel.readthedocs.io/en/latest/)
+# using IPython-parallel's MPI engine support.
 
 import logging
 
@@ -18,7 +18,7 @@ def hello_mpi():
 
 with ipp.Cluster(engines="mpi", n=3, log_level=logging.ERROR) as cluster:
     # We send the query to run the function `hello_mpi` on all engines
-    query = cluster[:].apply_async(hello_mpi)
+    query: ipp.AsyncResult = cluster[:].apply_async(hello_mpi)
     # We wait for all engines to finish
     query.wait()
     # We check that all engines exited successfully

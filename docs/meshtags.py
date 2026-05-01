@@ -7,6 +7,7 @@
 
 # As an example we will use a unit-cube, where each entity has been tagged with a unique index.
 
+# +
 import logging
 from pathlib import Path
 
@@ -21,6 +22,7 @@ import adios4dolfinx
 assert MPI.COMM_WORLD.size == 1, "This example should only be run with 1 MPI process"
 
 mesh = dolfinx.mesh.create_unit_cube(MPI.COMM_WORLD, nx=3, ny=4, nz=5)
+# -
 
 # We start by computing the unique global index of each (owned) entity in the mesh
 # as well as its corresponding midpoint
@@ -39,7 +41,8 @@ for i in range(mesh.topology.dim + 1):
     values = np.arange(e_map.size_local, dtype=np.int32) + e_map.local_range[0]
     meshtags[i] = dolfinx.mesh.meshtags(mesh, i, entities, values)
 
-# We use adios4dolfinx to write the mesh and meshtags to file.
+# We use {py:func}`adios4dolfinx.write_mesh` and `adios4dolfinx.write_meshtags` to write the
+# {py:class}`dolfinx.mesh.Mesh` and {py:class}`dolfinx.mesh.MeshTags` to file.
 # We associate each meshtag with a name
 
 filename = Path("mesh_with_meshtags.bp")
@@ -49,7 +52,8 @@ for i, tag in meshtags.items():
 
 
 # Next we want to read the meshtags in on a different number of processes,
-# and check that the midpoints of each entity is still correct
+# and check that the midpoints of each entity is still correct.
+# We do this with {py:func}`adios4dolfinx.read_meshtags`.
 
 
 def verify_meshtags(filename: Path):

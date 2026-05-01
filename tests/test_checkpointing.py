@@ -59,7 +59,7 @@ def test_read_write_P_2D(
 
     el = basix.ufl.element(
         family,
-        mesh.ufl_cell().cellname(),
+        mesh.basix_cell(),
         degree,
         basix.LagrangeVariant.gll_warped,
         shape=(mesh.geometry.dim,),
@@ -91,7 +91,7 @@ def test_read_write_P_3D(
     f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
     el = basix.ufl.element(
         family,
-        mesh.ufl_cell().cellname(),
+        mesh.basix_cell(),
         degree,
         basix.LagrangeVariant.gll_warped,
         shape=(mesh.geometry.dim,),
@@ -133,7 +133,7 @@ def test_read_write_P_2D_time(
 
     el = basix.ufl.element(
         family,
-        mesh.ufl_cell().cellname(),
+        mesh.basix_cell(),
         degree,
         basix.LagrangeVariant.gll_warped,
         shape=(mesh.geometry.dim,),
@@ -183,7 +183,7 @@ def test_read_write_P_3D_time(
     f_dtype = get_dtype(mesh.geometry.x.dtype, is_complex)
     el = basix.ufl.element(
         family,
-        mesh.ufl_cell().cellname(),
+        mesh.basix_cell(),
         degree,
         basix.LagrangeVariant.gll_warped,
         shape=(mesh.geometry.dim,),
@@ -257,7 +257,7 @@ def test_read_timestamps(get_dtype, mesh_2D, tmp_path):
 
     el = basix.ufl.element(
         "Lagrange",
-        mesh.ufl_cell().cellname(),
+        mesh.basix_cell(),
         1,
         shape=(mesh.geometry.dim,),
         dtype=mesh.geometry.x.dtype,

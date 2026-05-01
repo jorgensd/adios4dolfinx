@@ -22,7 +22,8 @@ The `adios4dolfinx` library extends the [DOLFINx](https://github.com/FEniCS/dolf
 
 Compatibility with DOLFINx:
 
-- ADIOS4DOLFINx v0.9.0 is compatible with DOLFINx v0.9.x
+- ADIOS4DOLFINx v0.10.0 is compatible with DOLFINx v0.10.x
+- ADIOS4DOLFINx v0.9.6 is compatible with DOLFINx v0.9.x
 - ADIOS4DOLFINx v0.8.1 is compatible with DOLFINx v0.8.x
 - ADIOS4DOLFINx v0.7.3 is compatible with DOLFINx v0.7.x
 
@@ -32,8 +33,28 @@ The library depends on the Python-interface of [DOLFINx](https://github.com/) an
 Therefore `ADIOS2` should not be install through PYPI/pip, but has to be installed through Conda, Spack or from source.
 
 > [!IMPORTANT]  
-> ADIOS2<2.10.2 does not work properly with `numpy>=2.0.0`. Everyone is adviced to use the newest version of ADIOS2.
+> ADIOS2<2.10.2 does not work properly with `numpy>=2.0.0`. Everyone is advised to use the newest version of ADIOS2.
 > This is for instance available through `conda` or the `ghcr.io/fenics/dolfinx/dolfinx:nightly` Docker-image.
+
+### Spack
+
+ADIOS4DOLFINx is a [spack package](https://packages.spack.io/package.html?name=py-adios4dolfinx)
+which can be installed with
+
+```bash
+spack add py-adios4dolfinx ^py-fenics-dolfinx+petsc4py+slepc4py
+spack concretize
+spack install
+```
+
+once you have downloaded spack and set up a new environment, as described in [Spack: Installation notes](https://github.com/spack/spack?tab=readme-ov-file#installation).
+To ensure that the spack packages are up to date, please call
+
+```bash
+spack repo update builtin
+```
+
+prior to concretizing.
 
 ### Docker
 
@@ -122,7 +143,7 @@ The repository contains many documented examples of usage, in the `docs`-folder,
 ### Backwards compatibility
 
 > [!WARNING]
-> If you are using v0.7.2, you are adviced to upgrade to v0.7.3, as it contains som crucial fixes for openmpi.
+> If you are using v0.7.2, you are advised to upgrade to v0.7.3, as it contains som crucial fixes for openmpi.
 
 ### Legacy DOLFIN
 

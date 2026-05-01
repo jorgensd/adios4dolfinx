@@ -26,7 +26,7 @@ hex = dolfinx.mesh.CellType.hexahedron
 @pytest.mark.parametrize("degree", [1, 4])
 def test_read_write_2D(family, degree, cell_type, tmp_path):
     mesh = dolfinx.mesh.create_unit_square(MPI.COMM_WORLD, 10, 10, cell_type=cell_type)
-    el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
+    el = basix.ufl.element(family, mesh.basix_cell(), degree)
 
     def f(x):
         return (np.full(x.shape[1], np.pi) + x[0], x[1])
@@ -48,7 +48,7 @@ def test_read_write_2D(family, degree, cell_type, tmp_path):
 @pytest.mark.parametrize("degree", [1, 4])
 def test_read_write_3D(family, degree, cell_type, tmp_path):
     mesh = dolfinx.mesh.create_unit_cube(MPI.COMM_WORLD, 3, 3, 3, cell_type=cell_type)
-    el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree)
+    el = basix.ufl.element(family, mesh.basix_cell(), degree)
 
     def f(x):
         return (np.full(x.shape[1], np.pi) + x[0], x[1], x[1] * x[2])
@@ -73,7 +73,7 @@ def test_read_write_3D(family, degree, cell_type, tmp_path):
 @pytest.mark.parametrize("degree", [1, 4])
 def test_read_write_P_2D(family, degree, cell_type, tmp_path):
     mesh = dolfinx.mesh.create_unit_square(MPI.COMM_WORLD, 5, 5, cell_type=cell_type)
-    el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree, shape=(mesh.geometry.dim,))
+    el = basix.ufl.element(family, mesh.basix_cell(), degree, shape=(mesh.geometry.dim,))
 
     def f(x):
         return (np.full(x.shape[1], np.pi) + x[0], x[1])
@@ -98,7 +98,7 @@ def test_read_write_P_2D(family, degree, cell_type, tmp_path):
 @pytest.mark.parametrize("degree", [1, 4])
 def test_read_write_P_3D(family, degree, cell_type, tmp_path):
     mesh = dolfinx.mesh.create_unit_cube(MPI.COMM_WORLD, 5, 5, 5, cell_type=cell_type)
-    el = basix.ufl.element(family, mesh.ufl_cell().cellname(), degree, shape=(mesh.geometry.dim,))
+    el = basix.ufl.element(family, mesh.basix_cell(), degree, shape=(mesh.geometry.dim,))
 
     def f(x):
         return (np.full(x.shape[1], np.pi) + x[0], x[1] + 2 * x[0], np.cos(x[2]))

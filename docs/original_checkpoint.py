@@ -1,6 +1,6 @@
 # # Checkpoint on input mesh
 # As we have discussed earlier, one can choose to store function data in a way that
-# is N-to-M compatible by using `adios4dolfinx.write_checkpoint`.
+# is N-to-M compatible by using {py:func}`adios4dolfinx.write_checkpoint`.
 # This stores the distributed mesh in it's current (partitioned) ordering, and does
 # use the original input data ordering for the cells and connectivity.
 # This means that you cannot use your original mesh (from `.xdmf` files) or mesh tags
@@ -10,9 +10,10 @@
 # An optional way of store an N-to-M checkpoint is to store the function data in the same
 # ordering as the mesh. The write operation will be more expensive, as it requires data
 # communication to ensure contiguous data being written to the checkpoint.
-# The method is exposed as `adios4dolfinx.write_function_on_input_mesh`.
+# The method is exposed as {py:func}`adios4dolfinx.write_function_on_input_mesh`.
 # Below we will demonstrate this method.
 
+# +
 import logging
 from pathlib import Path
 from typing import Tuple
@@ -47,11 +48,12 @@ with ipp.Cluster(engines="mpi", n=4, log_level=logging.ERROR) as cluster:
     query.wait()
     assert query.successful(), query.error
     print("".join(query.stdout))
-
+# -
 
 # Next, we will create a function on the mesh and write it to a checkpoint.
 
 
+# +
 def f(x):
     return (x[0] + x[1]) * (x[0] < 0.5), x[1], x[2] - x[1]
 
@@ -83,6 +85,8 @@ def write_function(
         f"{function_filename.with_suffix('.bp')}",
     )
 
+
+# -
 
 # Read in mesh and write function to file
 

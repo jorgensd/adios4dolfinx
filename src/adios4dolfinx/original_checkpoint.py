@@ -50,7 +50,9 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
 
     # Compute outgoing edges from current process to outputting process
     # Computes the number of cells sent to each process at the same time
-    cell_destinations, send_cells_per_proc = np.unique(output_cell_owner, return_counts=True)
+    cell_destinations, _send_cells_per_proc = np.unique(output_cell_owner, return_counts=True)
+    send_cells_per_proc = _send_cells_per_proc.astype(np.int32)
+    del _send_cells_per_proc
     cell_to_output_comm = mesh.comm.Create_dist_graph(
         [mesh.comm.rank],
         [len(cell_destinations)],
@@ -122,8 +124,10 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
         mesh.comm, original_node_index[:num_owned_nodes], num_nodes_global
     )
 
-    node_destinations, send_nodes_per_proc = np.unique(output_node_owner, return_counts=True)
-    send_nodes_per_proc = send_nodes_per_proc.astype(np.int32)
+    node_destinations, _send_nodes_per_proc = np.unique(output_node_owner, return_counts=True)
+    send_nodes_per_proc = _send_nodes_per_proc.astype(np.int32)
+    del _send_nodes_per_proc
+
     geometry_to_owner_comm = mesh.comm.Create_dist_graph(
         [mesh.comm.rank],
         [len(node_destinations)],
@@ -172,9 +176,11 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     # Sort geometry based on input index and strip to gdim
     gdim = mesh.geometry.dim
     recv_nodes = recv_coordinates.reshape(-1, 3)
-    geometry = np.empty_like(recv_nodes)
-    geometry[recv_indices, :] = recv_nodes
-    geometry = geometry[:, :gdim].copy()
+    _geometry = np.empty(recv_nodes.shape, dtype=mesh.geometry.x.dtype)
+    _geometry[recv_indices, :] = recv_nodes
+    geometry = _geometry[:, :gdim].copy()
+    del _geometry, recv_nodes
+
     assert local_node_range[1] - local_node_range[0] == geometry.shape[0]
     cmap = mesh.geometry.cmap
 
@@ -183,8 +189,10 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
 
     # NOTE: Could in theory store partitioning information, but would not work nicely
     # as one would need to read this data rather than the xdmffile.
+    # NOTE: Local geometry type hint skip is only required on DOLFINX<0.10 where
+    # proper `dolfinx.mesh.Geometry` wrapper doesn't exist
     return MeshData(
-        local_geometry=geometry,
+        local_geometry=geometry,  # type: ignore[arg-type]
         local_geometry_pos=local_node_range,
         num_nodes_global=num_nodes_global,
         local_topology=sorted_recv_dofmap,
@@ -222,8 +230,9 @@ def create_function_data_on_original_mesh(
 
     # Compute outgoing edges from current process to outputting process
     # Computes the number of cells sent to each process at the same time
-    cell_destinations, send_cells_per_proc = np.unique(output_cell_owner, return_counts=True)
-    send_cells_per_proc = send_cells_per_proc.astype(np.int32)
+    cell_destinations, _send_cells_per_proc = np.unique(output_cell_owner, return_counts=True)
+    send_cells_per_proc = _send_cells_per_proc.astype(np.int32)
+    del _send_cells_per_proc
     cell_to_output_comm = mesh.comm.Create_dist_graph(
         [mesh.comm.rank],
         [len(cell_destinations)],
@@ -299,9 +308,9 @@ def create_function_data_on_original_mesh(
     shaped_dofmap = recv_function_dofmap.reshape(
         local_cell_range[1] - local_cell_range[0], num_dofs_per_cell
     ).copy()
-    final_dofmap = np.empty_like(shaped_dofmap)
-    final_dofmap[local_cell_index] = shaped_dofmap
-    final_dofmap = final_dofmap.reshape(-1)
+    _final_dofmap = np.empty_like(shaped_dofmap)
+    _final_dofmap[local_cell_index] = shaped_dofmap
+    final_dofmap = _final_dofmap.reshape(-1)
 
     # Get offsets of dofmap
     num_cells_local = local_cell_range[1] - local_cell_range[0]
