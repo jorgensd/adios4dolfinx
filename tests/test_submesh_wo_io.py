@@ -267,9 +267,10 @@ def submesh_dof_perm(sub_space, parent_mesh, cell_map, inverse, dofmap_to_permut
 def pack_submesh_data(mesh, sub_function, cell_map, node_map):
     V_sub = sub_function.function_space
     submesh = V_sub.mesh
+    num_sub_cells_local = submesh.topology.index_map(submesh.topology.dim).size_local
 
     # First pack the submesh geometry dofmap, as it is easy to read with distribute_entity_data
-    submesh_geometry_dm = submesh.geometry.dofmap
+    submesh_geometry_dm = submesh.geometry.dofmap[:num_sub_cells_local]
     parent_geometry_dm = node_map[submesh_geometry_dm]
     global_parent_geom = mesh.geometry.index_map().local_to_global(parent_geometry_dm.flatten())
     global_parent_geom = global_parent_geom.reshape(submesh_geometry_dm.shape)
@@ -286,7 +287,6 @@ def pack_submesh_data(mesh, sub_function, cell_map, node_map):
     index_map_bs = V_sub.dofmap.index_map_bs
 
     # Unroll dofmap for block size
-    num_sub_cells_local  = submesh.topology.index_map(submesh.topology.dim).size_local
     unrolled_dofmap = adios4dolfinx.utils.unroll_dofmap(dofmap.list[:num_sub_cells_local, :], dofmap_bs)
     dmap_loc = (unrolled_dofmap // index_map_bs).reshape(-1)
     dmap_rem = (unrolled_dofmap % index_map_bs).reshape(-1)
