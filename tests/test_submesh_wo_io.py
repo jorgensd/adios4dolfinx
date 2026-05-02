@@ -158,7 +158,7 @@ def permute_submesh_dofmap(sub_space, global_sub_dofmap, parent_mesh, cell_map, 
         pos = np.where(facets == facet)[0][0]
         itg_data[i, :] = (cell, pos)
     if inverse:
-        func = p_e.basix_element.inv_permute_subentity_closure
+        func = p_e.basix_element.permute_subentity_closure_inv
     else:
         func = p_e.basix_element.permute_subentity_closure
     for i, (cell, pos) in enumerate(itg_data):
