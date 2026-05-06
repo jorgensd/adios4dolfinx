@@ -209,7 +209,7 @@ def write_meshtags(
     local_start = mesh.comm.exscan(num_saved_tag_entities, op=MPI.SUM)
     local_start = local_start if mesh.comm.rank != 0 else 0
     global_num_tag_entities = mesh.comm.allreduce(num_saved_tag_entities, op=MPI.SUM)
-    dof_layout = mesh.geometry.cmap.create_dof_layout()
+    dof_layout = mesh.geometry.cmap().create_dof_layout()
     if hasattr(dof_layout, "num_entity_closure_dofs"):
         num_dofs_per_entity = dof_layout.num_entity_closure_dofs(dim)
     else:
@@ -755,7 +755,7 @@ def write_mesh(
     num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
     cell_range = mesh.topology.index_map(mesh.topology.dim).local_range
     cmap = mesh.geometry.cmap
-    geom_layout = cmap.create_dof_layout()
+    geom_layout = cmap().create_dof_layout()
     if hasattr(geom_layout, "num_entity_closure_dofs"):
         num_dofs_per_cell = geom_layout.num_entity_closure_dofs(mesh.topology.dim)
     else:
@@ -808,8 +808,8 @@ def write_mesh(
         local_topology_pos=cell_range,
         num_cells_global=num_cells_global,
         cell_type=mesh.topology.cell_name(),
-        degree=mesh.geometry.cmap.degree,
-        lagrange_variant=mesh.geometry.cmap.variant,
+        degree=mesh.geometry.cmap().degree,
+        lagrange_variant=mesh.geometry.cmap().variant,
         store_partition=store_partition_info,
         partition_processes=partition_processes,
         ownership_array=ownership_array,

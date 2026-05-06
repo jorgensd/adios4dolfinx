@@ -182,7 +182,7 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     del _geometry, recv_nodes
 
     assert local_node_range[1] - local_node_range[0] == geometry.shape[0]
-    cmap = mesh.geometry.cmap
+    cmap = mesh.geometry.cmap()
 
     cell_to_output_comm.Free()
     geometry_to_owner_comm.Free()
@@ -199,8 +199,8 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
         local_topology_pos=local_cell_range,
         num_cells_global=num_cells_global,
         cell_type=mesh.topology.cell_name(),
-        degree=cmap.degree,
-        lagrange_variant=cmap.variant,
+        degree=cmap().degree,
+        lagrange_variant=cmap().variant,
         store_partition=False,
         partition_processes=None,
         ownership_array=None,
