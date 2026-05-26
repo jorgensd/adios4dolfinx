@@ -245,9 +245,10 @@ def write_meshtags(
         adios_file.file.Put(topology_var, indices, adios2.Mode.Sync)
 
         # Write meshtag topology
+        vals = np.array(local_values)
         values_var = adios_file.io.DefineVariable(
             name + "_values",
-            local_values,
+            vals,
             shape=[global_num_tag_entities],
             start=[local_start],
             count=[num_saved_tag_entities],
