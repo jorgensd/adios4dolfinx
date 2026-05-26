@@ -21,6 +21,7 @@ from .structures import FunctionData, MeshData
 from .utils import (
     compute_insert_position,
     compute_local_range,
+    get_cmap,
     index_owner,
     unroll_dofmap,
     unroll_insert_position,
@@ -182,7 +183,7 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     del _geometry, recv_nodes
 
     assert local_node_range[1] - local_node_range[0] == geometry.shape[0]
-    cmap = mesh.geometry.cmap
+    cmap = get_cmap(mesh)
 
     cell_to_output_comm.Free()
     geometry_to_owner_comm.Free()

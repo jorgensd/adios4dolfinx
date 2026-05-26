@@ -27,9 +27,18 @@ __all__ = [
     "compute_insert_position",
     "unroll_insert_position",
 ]
+"""Layer for small backward compatibility wrappers for DOLFINx"""
 
 valid_function_types = typing.Union[np.float32, np.float64, np.complex64, np.complex128]
 valid_real_types = typing.Union[np.float32, np.float64]
+
+
+def get_cmap(mesh: dolfinx.mesh.Mesh) -> dolfinx.fem.CoordinateElement:
+    """Get the basix Cmap for the mesh."""
+    if callable(mesh.geometry.cmap):
+        return mesh.geometry.cmap()
+    else:
+        return mesh.geometry.cmap
 
 
 def element_signature(V):
