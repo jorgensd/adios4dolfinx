@@ -253,7 +253,7 @@ def write_meshtags(
             start=[local_start],
             count=[num_saved_tag_entities],
         )
-        adios_file.file.Put(values_var, local_values, adios2.Mode.Sync)
+        adios_file.file.Put(values_var, vals, adios2.Mode.Sync)
 
         # Write meshtag dim
         adios_file.io.DefineAttribute(name + "_dim", np.array([meshtags.dim], dtype=np.uint8))
