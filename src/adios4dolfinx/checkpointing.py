@@ -37,6 +37,7 @@ from .structures import FunctionData, MeshData
 from .utils import (
     compute_dofmap_pos,
     compute_local_range,
+    get_cmap,
     index_owner,
     unroll_dofmap,
     unroll_insert_position,
@@ -209,7 +210,7 @@ def write_meshtags(
     local_start = mesh.comm.exscan(num_saved_tag_entities, op=MPI.SUM)
     local_start = local_start if mesh.comm.rank != 0 else 0
     global_num_tag_entities = mesh.comm.allreduce(num_saved_tag_entities, op=MPI.SUM)
-    dof_layout = mesh.geometry.cmap.create_dof_layout()
+    dof_layout = get_cmap(mesh).create_dof_layout()
     if hasattr(dof_layout, "num_entity_closure_dofs"):
         num_dofs_per_entity = dof_layout.num_entity_closure_dofs(dim)
     else:
@@ -244,14 +245,15 @@ def write_meshtags(
         adios_file.file.Put(topology_var, indices, adios2.Mode.Sync)
 
         # Write meshtag topology
+        vals = np.array(local_values)
         values_var = adios_file.io.DefineVariable(
             name + "_values",
-            local_values,
+            vals,
             shape=[global_num_tag_entities],
             start=[local_start],
             count=[num_saved_tag_entities],
         )
-        adios_file.file.Put(values_var, local_values, adios2.Mode.Sync)
+        adios_file.file.Put(values_var, vals, adios2.Mode.Sync)
 
         # Write meshtag dim
         adios_file.io.DefineAttribute(name + "_dim", np.array([meshtags.dim], dtype=np.uint8))
@@ -754,7 +756,7 @@ def write_mesh(
     num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
     num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
     cell_range = mesh.topology.index_map(mesh.topology.dim).local_range
-    cmap = mesh.geometry.cmap
+    cmap = get_cmap(mesh)
     geom_layout = cmap.create_dof_layout()
     if hasattr(geom_layout, "num_entity_closure_dofs"):
         num_dofs_per_cell = geom_layout.num_entity_closure_dofs(mesh.topology.dim)
@@ -808,8 +810,8 @@ def write_mesh(
         local_topology_pos=cell_range,
         num_cells_global=num_cells_global,
         cell_type=mesh.topology.cell_name(),
-        degree=mesh.geometry.cmap.degree,
-        lagrange_variant=mesh.geometry.cmap.variant,
+        degree=get_cmap(mesh).degree,
+        lagrange_variant=get_cmap(mesh).variant,
         store_partition=store_partition_info,
         partition_processes=partition_processes,
         ownership_array=ownership_array,
