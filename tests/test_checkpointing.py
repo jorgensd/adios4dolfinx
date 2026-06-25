@@ -1,14 +1,20 @@
 import itertools
+from pathlib import Path
 
 from mpi4py import MPI
 
+import adios2
 import basix
 import basix.ufl
 import dolfinx
 import numpy as np
 import pytest
+import ufl
 
 import adios4dolfinx
+import adios4dolfinx.adios2_helpers
+
+adios2 = adios4dolfinx.adios2_helpers.resolve_adios_scope(adios2)
 
 dtypes = [np.float64, np.float32]  # Mesh geometry dtypes
 write_comm = [MPI.COMM_SELF, MPI.COMM_WORLD]  # Communicators for creating mesh
@@ -266,7 +272,6 @@ def test_read_timestamps(get_dtype, mesh_2D, tmp_path):
 
     t_u = [0.1, 1.4]
     t_v = [0.45, 1.2]
-
     adios4dolfinx.write_mesh(filename, mesh)
     adios4dolfinx.write_function(filename, u, time=t_u[0])
     adios4dolfinx.write_function(filename, v, time=t_v[0])
@@ -282,3 +287,4 @@ def test_read_timestamps(get_dtype, mesh_2D, tmp_path):
 
     assert np.allclose(timestamps_u, t_u)
     assert np.allclose(timestamps_v, t_v)
+
