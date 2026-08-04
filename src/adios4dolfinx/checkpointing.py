@@ -415,7 +415,7 @@ def read_function(
 
     # Compute mesh->input communicator
     # 1.1 Compute mesh->input communicator
-    num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
+    num_cells_global = np.int64(mesh.topology.index_map(mesh.topology.dim).size_global)
     owners = index_owner(mesh.comm, input_cells, num_cells_global)
 
     # -------------------Step 2------------------------------------
@@ -437,7 +437,7 @@ def read_function(
     num_dofs_global = (
         u.function_space.dofmap.index_map.size_global * u.function_space.dofmap.index_map_bs
     )
-    dof_owner = index_owner(comm, input_dofmap.array, num_dofs_global)
+    dof_owner = index_owner(comm, input_dofmap.array.astype(np.int64), np.int64(num_dofs_global))
 
     # --------------------Step 4-----------------------------------
     # Read array from file and communicate them to input dofmap process
@@ -450,7 +450,7 @@ def read_function(
         adios, filename, array_path, engine, comm, time, time_name, legacy=legacy
     )
     recv_array = send_dofs_and_recv_values(
-        input_dofmap.array, dof_owner, comm, input_array, starting_pos
+        input_dofmap.array.astype(np.int64), dof_owner, comm, input_array, starting_pos
     )
 
     # -------------------Step 5--------------------------------------
@@ -464,7 +464,7 @@ def read_function(
         local_input_range = compute_local_range(comm, num_cells_global)
         input_local_cell_index = inc_cells - local_input_range[0]
         input_perms = read_cell_perms(
-            adios, comm, filename, "CellPermutations", num_cells_global, engine
+            adios, comm, filename, "CellPermutations", np.int64(num_cells_global), engine
         )
         # Start by sorting data array by cell permutation
         num_dofs_per_cell = input_dofmap.offsets[1:] - input_dofmap.offsets[:-1]

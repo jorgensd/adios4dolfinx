@@ -380,8 +380,8 @@ def read_function_from_legacy_h5(
 
     # Compute mesh->input communicator
     # 1.1 Compute mesh->input communicator
-    num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
-    owners = index_owner(mesh.comm, input_cells, num_cells_global)
+    num_cells_global = np.int64(mesh.topology.index_map(mesh.topology.dim).size_global)
+    owners = index_owner(mesh.comm, input_cells, np.int64(num_cells_global))
     unique_owners, owner_count = np.unique(owners, return_counts=True)
     # FIXME: In C++ use NBX to find neighbourhood
     _tmp_comm = mesh.comm.Create_dist_graph(
@@ -400,7 +400,6 @@ def read_function_from_legacy_h5(
     # ----------------------Step 2--------------------------------
     # Get global dofmap indices from input process
     bs = V.dofmap.bs
-    num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
     dofmap_indices = send_cells_and_receive_dofmap_index(
         filename,
         comm,

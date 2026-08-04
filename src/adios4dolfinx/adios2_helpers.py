@@ -180,7 +180,11 @@ def read_adjacency_list(
     dofmap_offsets: str,
     num_cells_global: np.int64,
     engine: str,
-) -> Union[dolfinx.cpp.graph.AdjacencyList_int64, dolfinx.cpp.graph.AdjacencyList_int32]:
+) -> Union[
+    dolfinx.cpp.graph.AdjacencyList_int64,
+    dolfinx.cpp.graph.AdjacencyList_int32,
+    dolfinx.graph.AdjacencyList,
+]:
     """
     Read an adjacency-list from an ADIOS file with given communicator.
     The adjancency list is split in to a flat array (data) and its corresponding offset.

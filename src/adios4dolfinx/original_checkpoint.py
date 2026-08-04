@@ -45,7 +45,7 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     original_cell_index = mesh.topology.original_cell_index[:num_owned_cells]
 
     # Compute owner of cells on this process based on the original cell index
-    num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
+    num_cells_global = np.int64(mesh.topology.index_map(mesh.topology.dim).size_global)
     output_cell_owner = index_owner(mesh.comm, original_cell_index, num_cells_global)
     local_cell_range = compute_local_range(mesh.comm, num_cells_global)
 
@@ -120,7 +120,7 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     # Compute outgoing edges from current process and create neighbourhood communicator
     # Also create number of outgoing cells at the same time
     num_owned_nodes = mesh.geometry.index_map().size_local
-    num_nodes_global = mesh.geometry.index_map().size_global
+    num_nodes_global = np.int64(mesh.geometry.index_map().size_global)
     output_node_owner = index_owner(
         mesh.comm, original_node_index[:num_owned_nodes], num_nodes_global
     )
@@ -195,10 +195,10 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     return MeshData(
         local_geometry=geometry,  # type: ignore[arg-type]
         local_geometry_pos=local_node_range,
-        num_nodes_global=num_nodes_global,
+        num_nodes_global=int(num_nodes_global),
         local_topology=sorted_recv_dofmap,
         local_topology_pos=local_cell_range,
-        num_cells_global=num_cells_global,
+        num_cells_global=int(num_cells_global),
         cell_type=mesh.topology.cell_name(),
         degree=cmap.degree,
         lagrange_variant=cmap.variant,
@@ -225,7 +225,7 @@ def create_function_data_on_original_mesh(
     original_cell_index = mesh.topology.original_cell_index[:num_owned_cells]
 
     # Compute owner of cells on this process based on the original cell index
-    num_cells_global = mesh.topology.index_map(mesh.topology.dim).size_global
+    num_cells_global = np.int64(mesh.topology.index_map(mesh.topology.dim).size_global)
     output_cell_owner = index_owner(mesh.comm, original_cell_index, num_cells_global)
     local_cell_range = compute_local_range(mesh.comm, num_cells_global)
 
@@ -323,18 +323,24 @@ def create_function_data_on_original_mesh(
 
     num_dofs_local = dofmap.index_map.size_local * dofmap.index_map_bs
     num_dofs_global = dofmap.index_map.size_global * dofmap.index_map_bs
-    local_range = np.asarray(dofmap.index_map.local_range, dtype=np.int64) * dofmap.index_map_bs
+    local_range = (
+        (np.asarray(dofmap.index_map.local_range, dtype=np.int64) * dofmap.index_map_bs)
+        .astype(int)
+        .tolist()
+    )
+    assert len(local_range) == 2
+    l_r: tuple[int, int] = tuple([local_range[0], local_range[1]])
     func_name = name if name is not None else u.name
     cell_to_output_comm.Free()
     return FunctionData(
         cell_permutations=cell_permutation_info,
         local_cell_range=local_cell_range,
-        num_cells_global=num_cells_global,
+        num_cells_global=int(num_cells_global),
         dofmap_array=final_dofmap,
         dofmap_offsets=local_dofmap_offsets,
         values=u.x.array[:num_dofs_local].copy(),
-        dof_range=local_range,
-        num_dofs_global=num_dofs_global,
+        dof_range=l_r,
+        num_dofs_global=int(num_dofs_global),
         dofmap_range=dofmap_imap.local_range,
         global_dofs_in_dofmap=dofmap_imap.size_global,
         name=func_name,
