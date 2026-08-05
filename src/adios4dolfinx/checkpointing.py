@@ -492,7 +492,6 @@ def read_function(
     V = u.function_space
     local_cells, dof_pos = compute_dofmap_pos(V)
     input_cells = V.mesh.topology.original_cell_index[local_cells]
-    num_cells_global = V.mesh.topology.index_map(V.mesh.topology.dim).size_global
     owners = index_owner(V.mesh.comm, input_cells, num_cells_global)
     unique_owners, owner_count = np.unique(owners, return_counts=True)
     # FIXME: In C++ use NBX to find neighbourhood
@@ -661,16 +660,18 @@ def read_mesh_data(
 
         def partitioner(comm: MPI.Intracomm, n, m, topo):
             assert len(topo[0]) % (len(partition_graph.offsets) - 1) == 0
-            if Version(dolfinx.__version__) > Version("0.9.0"):
-                return partition_graph._cpp_object
+            if hasattr(partition_graph, "_cpp_object"):
+                return partition_graph._cpp_object  # For modern DOLFINx wrappers
             else:
                 return partition_graph
     else:
         sig = inspect.signature(dolfinx.mesh.create_cell_partitioner)
-        part_kwargs = {}
         if "max_facet_to_cell_links" in list(sig.parameters.keys()):
-            part_kwargs["max_facet_to_cell_links"] = max_facet_to_cell_links
-        partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode, **part_kwargs)
+            partitioner = dolfinx.mesh.create_cell_partitioner(
+                ghost_mode, max_facet_to_cell_links=max_facet_to_cell_links
+            )
+        else:
+            partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)  # type:ignore[call-overload]
 
     return ReadMeshData(
         cells=mesh_topology,
@@ -776,7 +777,7 @@ def write_mesh(
             consensus_tag = 1202
             cell_map = mesh.topology.index_map(mesh.topology.dim).index_to_dest_ranks(consensus_tag)
         else:
-            cell_map = mesh.topology.index_map(mesh.topology.dim).index_to_dest_ranks()
+            cell_map = mesh.topology.index_map(mesh.topology.dim).index_to_dest_ranks()  # type: ignore[call-arg]
         num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
         cell_offsets = cell_map.offsets[: num_cells_local + 1]
         if cell_offsets[-1] == 0:
@@ -786,7 +787,7 @@ def write_mesh(
 
         # Compute adjacency with current process as first entry
         ownership_array = np.full(num_cells_local + cell_offsets[-1], -1, dtype=np.int32)
-        ownership_offset = cell_offsets + np.arange(len(cell_offsets), dtype=np.int32)
+        ownership_offset = (cell_offsets + np.arange(len(cell_offsets))).astype(np.int32)
         ownership_array[ownership_offset[:-1]] = mesh.comm.rank
         insert_position = np.flatnonzero(ownership_array == -1)
         ownership_array[insert_position] = cell_array
