@@ -76,8 +76,8 @@ jobs:
 
       - name: Run tests
         run: |
-          coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
+          coverage run --rcfile=.coveragerc -m mpi4py -m pytest -vs ./tests/
 
       - name: Run tests in parallel
         run: |
-          mpirun -n 2 coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
+          mpirun -n 2 coverage run --rcfile=.coveragerc -m mpi4py -m pytest -vs ./tests/
