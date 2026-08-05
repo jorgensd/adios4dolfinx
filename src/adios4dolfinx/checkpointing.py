@@ -668,7 +668,8 @@ def read_mesh_data(
         sig = inspect.signature(dolfinx.mesh.create_cell_partitioner)
         if "max_facet_to_cell_links" in list(sig.parameters.keys()):
             partitioner = dolfinx.mesh.create_cell_partitioner(
-                ghost_mode, max_facet_to_cell_links=max_facet_to_cell_links  # type:ignore[call-arg]
+                ghost_mode,  # type:ignore[call-arg]
+                max_facet_to_cell_links=max_facet_to_cell_links,
             )
         else:
             partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)  # type:ignore[call-overload]
