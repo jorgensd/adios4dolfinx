@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     container: ghcr.io/fenics/dolfinx/dolfinx:${{ needs.get_image_tag.outputs.image }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Update pip
         run: python3 -m pip install --break-system-packages --upgrade pip setuptools
@@ -54,4 +54,4 @@ jobs:
           ruff format --check .
 
       - name: Mypy check
-        run: python3 -m mypy -v
+        run: python3 -m mypy
