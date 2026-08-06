@@ -236,7 +236,13 @@ def send_dofs_and_recv_values(
     dofmap_to_values.Free()
 
     # Send back appropriate input values
-    sending_values = input_array[inc_dofs - array_start]
+    local_indices = inc_dofs - array_start
+    # Ensure all indices are within valid bounds
+    assert np.all(local_indices >= 0) and np.all(local_indices < len(input_array)), (
+        f"Invalid indices: min={local_indices.min()}, max={local_indices.max()}, "
+        f"array length={len(input_array)}"
+    )
+    sending_values = input_array[local_indices]
 
     values_to_dofmap = comm.Create_dist_graph_adjacent(dest, source, reorder=False)
     inc_values = np.zeros_like(out_dofs, dtype=input_array.dtype)
