@@ -780,11 +780,14 @@ def write_mesh(
         else:
             cell_map = mesh.topology.index_map(mesh.topology.dim).index_to_dest_ranks()  # type: ignore[call-arg]
         num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
-        cell_offsets = cell_map.offsets[: num_cells_local + 1]
-        if cell_offsets[-1] == 0:
-            cell_array = np.empty(0, dtype=np.int32)
-        else:
-            cell_array = cell_map.array[: cell_offsets[-1]]
+        try:
+            cell_offsets = cell_map.offsets[: num_cells_local + 1]  # type: ignore[attr-defined]
+            if cell_offsets[-1] == 0:
+                cell_array = np.empty(0, dtype=np.int32)
+            else:
+                cell_array = cell_map.array[: cell_offsets[-1]]  # type: ignore[attr-defined]
+        except AttributeError:
+            cell_array, cell_offsets = cell_map
 
         # Compute adjacency with current process as first entry
         ownership_array = np.full(num_cells_local + cell_offsets[-1], -1, dtype=np.int32)

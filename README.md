@@ -172,8 +172,7 @@ Some tests check the capability of reading data created with the legacy version 
 To create this dataset, start a docker container with legacy DOLFIN, for instance:
 
 ```bash
-docker run -ti -v $(pwd):/root/shared -w /root/s
-hared --rm ghcr.io/scientificcomputing/fenics:2024-02-19
+docker run -ti -v $(pwd):/root/shared -w /root/shared --rm ghcr.io/scientificcomputing/fenics:2024-02-19
 ```
 
 Then, inside this container, call
