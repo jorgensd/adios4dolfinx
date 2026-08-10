@@ -788,6 +788,7 @@ def write_mesh(
                 cell_array = cell_map.array[: cell_offsets[-1]]  # type: ignore[attr-defined]
         except AttributeError:
             cell_array, cell_offsets = cell_map
+            cell_offsets = cell_offsets[: num_cells_local + 1]
 
         # Compute adjacency with current process as first entry
         ownership_array = np.full(num_cells_local + cell_offsets[-1], -1, dtype=np.int32)
