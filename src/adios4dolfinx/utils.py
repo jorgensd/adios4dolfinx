@@ -109,7 +109,7 @@ def unroll_insert_position(
     return unrolled_ip
 
 
-def compute_local_range(comm: MPI.Intracomm, N: np.int64):
+def compute_local_range(comm: MPI.Intracomm | MPI.Comm, N: np.int64):
     """
     Divide a set of `N` objects into `M` partitions, where `M` is
     the size of the MPI communicator `comm`.
@@ -131,7 +131,7 @@ def compute_local_range(comm: MPI.Intracomm, N: np.int64):
 
 
 def index_owner(
-    comm: MPI.Intracomm, indices: npt.NDArray[np.int64], N: np.int64
+    comm: MPI.Comm, indices: npt.NDArray[np.int64], N: np.int64 | int
 ) -> npt.NDArray[np.int32]:
     """
     Find which rank (local to comm) which owns an `index`, given that

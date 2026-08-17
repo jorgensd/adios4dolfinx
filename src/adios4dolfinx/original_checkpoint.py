@@ -54,8 +54,10 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     cell_destinations, _send_cells_per_proc = np.unique(output_cell_owner, return_counts=True)
     send_cells_per_proc = _send_cells_per_proc.astype(np.int32)
     del _send_cells_per_proc
-    cell_to_output_comm = mesh.comm.Create_dist_graph(
-        [mesh.comm.rank],
+    mesh_comm = mesh.comm
+    assert isinstance(mesh_comm, MPI.Intracomm)
+    cell_to_output_comm = mesh_comm.Create_dist_graph(
+        [mesh_comm.rank],
         [len(cell_destinations)],
         cell_destinations.tolist(),
         reorder=False,
@@ -129,8 +131,8 @@ def create_original_mesh_data(mesh: dolfinx.mesh.Mesh) -> MeshData:
     send_nodes_per_proc = _send_nodes_per_proc.astype(np.int32)
     del _send_nodes_per_proc
 
-    geometry_to_owner_comm = mesh.comm.Create_dist_graph(
-        [mesh.comm.rank],
+    geometry_to_owner_comm = mesh_comm.Create_dist_graph(
+        [mesh_comm.rank],
         [len(node_destinations)],
         node_destinations.tolist(),
         reorder=False,
@@ -226,16 +228,19 @@ def create_function_data_on_original_mesh(
 
     # Compute owner of cells on this process based on the original cell index
     num_cells_global = np.int64(mesh.topology.index_map(mesh.topology.dim).size_global)
-    output_cell_owner = index_owner(mesh.comm, original_cell_index, num_cells_global)
-    local_cell_range = compute_local_range(mesh.comm, num_cells_global)
+    mesh_comm = mesh.comm
+    assert isinstance(mesh_comm, MPI.Intracomm)
+    output_cell_owner = index_owner(mesh_comm, original_cell_index, num_cells_global)
+    local_cell_range = compute_local_range(mesh_comm, num_cells_global)
 
     # Compute outgoing edges from current process to outputting process
     # Computes the number of cells sent to each process at the same time
     cell_destinations, _send_cells_per_proc = np.unique(output_cell_owner, return_counts=True)
     send_cells_per_proc = _send_cells_per_proc.astype(np.int32)
     del _send_cells_per_proc
-    cell_to_output_comm = mesh.comm.Create_dist_graph(
-        [mesh.comm.rank],
+    assert isinstance(mesh_comm, MPI.Intracomm)
+    cell_to_output_comm = mesh_comm.Create_dist_graph(
+        [mesh_comm.rank],
         [len(cell_destinations)],
         cell_destinations.tolist(),
         reorder=False,
@@ -292,6 +297,7 @@ def create_function_data_on_original_mesh(
     # Convert imap index to global index
     imap_global = dofmap.index_map.local_to_global(dmap_loc)
     dofmap_global = (imap_global * index_map_bs + dmap_rem).reshape(unrolled_dofmap.shape)
+    assert len(dofmap_global.shape) == 2
     num_dofs_per_cell = dofmap_global.shape[1]
     dofmap_insert_position = unroll_insert_position(cell_insert_position, num_dofs_per_cell)
 
@@ -369,9 +375,11 @@ def write_function_on_input_mesh(
     mesh = u.function_space.mesh
     function_data = create_function_data_on_original_mesh(u, name)
     fname = Path(filename)
+    mesh_comm = mesh.comm
+    assert isinstance(mesh_comm, MPI.Intracomm)
     write_function(
         fname,
-        mesh.comm,
+        mesh_comm,
         function_data,
         engine,
         mode,
@@ -389,4 +397,6 @@ def write_mesh_input_order(
 
     mesh_data = create_original_mesh_data(mesh)
     fname = Path(filename)
-    write_mesh(fname, mesh.comm, mesh_data, engine, io_name="OriginalMeshWriter")
+    comm = mesh.comm
+    assert isinstance(comm, MPI.Intracomm)
+    write_mesh(fname, comm, mesh_data, engine, io_name="OriginalMeshWriter")
