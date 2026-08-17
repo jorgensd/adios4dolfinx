@@ -207,9 +207,11 @@ def write_meshtags(
     local_values = meshtags.values[: len(local_tag_entities)]
 
     num_saved_tag_entities = len(local_tag_entities)
-    local_start = mesh.comm.exscan(num_saved_tag_entities, op=MPI.SUM)
-    local_start = local_start if mesh.comm.rank != 0 else 0
-    global_num_tag_entities = mesh.comm.allreduce(num_saved_tag_entities, op=MPI.SUM)
+    mesh_comm = mesh.comm
+    assert isinstance(mesh_comm, MPI.Intracomm)
+    local_start = mesh_comm.exscan(num_saved_tag_entities, op=MPI.SUM)
+    local_start = local_start if mesh_comm.rank != 0 else 0
+    global_num_tag_entities = mesh_comm.allreduce(num_saved_tag_entities, op=MPI.SUM)
     dof_layout = get_cmap(mesh).create_dof_layout()
     if hasattr(dof_layout, "num_entity_closure_dofs"):
         num_dofs_per_entity = dof_layout.num_entity_closure_dofs(dim)
@@ -420,7 +422,8 @@ def read_function(
 
     # -------------------Step 2------------------------------------
     # Send and receive global cell index and cell perm
-    inc_cells, inc_perms = send_and_recv_cell_perm(input_cells, cell_perm, owners, mesh.comm)
+    assert isinstance(comm, MPI.Intracomm)
+    inc_cells, inc_perms = send_and_recv_cell_perm(input_cells, cell_perm, owners, comm)
 
     # -------------------Step 3-----------------------------------
     # Read dofmap from file and compute dof owners
@@ -495,8 +498,10 @@ def read_function(
     owners = index_owner(V.mesh.comm, input_cells, num_cells_global)
     unique_owners, owner_count = np.unique(owners, return_counts=True)
     # FIXME: In C++ use NBX to find neighbourhood
-    sub_comm = V.mesh.comm.Create_dist_graph(
-        [V.mesh.comm.rank], [len(unique_owners)], unique_owners, reorder=False
+    comm = V.mesh.comm
+    assert isinstance(comm, MPI.Intracomm)
+    sub_comm = comm.Create_dist_graph(
+        [comm.rank], [len(unique_owners)], unique_owners.tolist(), reorder=False
     )
     source, dest, _ = sub_comm.Get_dist_neighbors()
     sub_comm.Free()
@@ -829,10 +834,11 @@ def write_mesh(
         partition_range=partition_range,
         partition_global=partition_global,
     )
-
+    comm = mesh.comm
+    assert isinstance(comm, MPI.Intracomm)
     _internal_mesh_writer(
         filename,
-        mesh.comm,
+        comm,
         mesh_data,
         engine,
         mode=mode,
@@ -864,6 +870,7 @@ def write_function(
     values = u.x.array
     mesh = u.function_space.mesh
     comm = mesh.comm
+    assert isinstance(comm, MPI.Intracomm)
     mesh.topology.create_entity_permutations()
     cell_perm = mesh.topology.get_cell_permutation_info()
     num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
@@ -893,7 +900,7 @@ def write_function(
     local_dofmap_offsets += dofmap_imap.local_range[0]
 
     num_dofs_global = dofmap.index_map.size_global * dofmap.index_map_bs
-    local_dof_range = np.asarray(dofmap.index_map.local_range) * dofmap.index_map_bs
+    local_dof_range = tuple(np.asarray(dofmap.index_map.local_range) * dofmap.index_map_bs)
     num_dofs_local = local_dof_range[1] - local_dof_range[0]
 
     # Create internal data structure for function data to write to file

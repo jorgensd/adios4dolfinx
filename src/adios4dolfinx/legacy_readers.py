@@ -42,7 +42,7 @@ __all__ = [
 
 
 def read_dofmap_legacy(
-    comm: MPI.Intracomm,
+    comm: MPI.Comm,
     filename: pathlib.Path,
     dofmap: str,
     dofmap_offsets: str,
@@ -265,7 +265,7 @@ def read_mesh_geometry(io: adios2.ADIOS, infile: adios2.Engine, group: str):
 
 def read_mesh_from_legacy_h5(
     filename: pathlib.Path,
-    comm: MPI.Intracomm,
+    comm: MPI.Comm,
     group: str,
     cell_type: str = "tetrahedron",
     max_facet_to_cell_links: int = 2,
@@ -384,8 +384,10 @@ def read_function_from_legacy_h5(
     owners = index_owner(mesh.comm, input_cells, np.int64(num_cells_global))
     unique_owners, owner_count = np.unique(owners, return_counts=True)
     # FIXME: In C++ use NBX to find neighbourhood
-    _tmp_comm = mesh.comm.Create_dist_graph(
-        [mesh.comm.rank], [len(unique_owners)], unique_owners, reorder=False
+    mesh_comm = mesh.comm
+    assert isinstance(mesh_comm, MPI.Intracomm)
+    _tmp_comm = mesh_comm.Create_dist_graph(
+        [mesh_comm.rank], [len(unique_owners)], unique_owners.tolist(), reorder=False
     )
     source, dest, _ = _tmp_comm.Get_dist_neighbors()
     _tmp_comm.Free()
@@ -419,7 +421,7 @@ def read_function_from_legacy_h5(
     # ----------------------Step 3---------------------------------
     # Compute owner of global dof on distributed mesh
     num_dof_global = V.dofmap.index_map_bs * V.dofmap.index_map.size_global
-    dof_owner = index_owner(comm=mesh.comm, indices=dofmap_indices, N=num_dof_global)
+    dof_owner = index_owner(comm=mesh_comm, indices=dofmap_indices, N=num_dof_global)
     # Create MPI neigh comm to owner.
     # NOTE: USE NBX in C++
 
