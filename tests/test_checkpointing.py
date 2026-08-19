@@ -282,3 +282,38 @@ def test_read_timestamps(get_dtype, mesh_2D, tmp_path):
 
     assert np.allclose(timestamps_u, t_u)
     assert np.allclose(timestamps_v, t_v)
+
+
+def test_read_function_with_invalid_time_stamp_display_warning(tmp_path):
+    comm = MPI.COMM_WORLD
+    mesh = dolfinx.mesh.create_unit_square(comm, 10, 10, cell_type=dolfinx.mesh.CellType.triangle)
+
+    el = basix.ufl.element(
+        "Lagrange",
+        mesh.basix_cell(),
+        1,
+        shape=(mesh.geometry.dim,),
+        dtype=mesh.geometry.x.dtype,
+    )
+    V = dolfinx.fem.functionspace(mesh, el)
+
+    u = dolfinx.fem.Function(V, name="u")
+
+    f_path = mesh.comm.bcast(tmp_path, root=0)
+    filename = f_path / "read_time_stamps.bp"
+
+    t0 = 0.0
+    t1 = 1.0 + 1e-8
+    adios4dolfinx.write_mesh(filename, mesh)
+    adios4dolfinx.write_function(filename, u, time=t0)
+    adios4dolfinx.write_function(filename, u, time=t1)
+
+    new_mesh = adios4dolfinx.read_mesh(comm=mesh.comm, filename=filename)
+    V_new = dolfinx.fem.functionspace(new_mesh, el)
+    u_new = dolfinx.fem.Function(V_new, name="u")
+    adios4dolfinx.read_function(filename, u_new, time=0.0)
+    url = "https://jsdokken.com/adios4dolfinx/docs/debugging.html#checkpoint-time-stamps-and-floating-point-precision-issues"
+    with pytest.raises(KeyError) as e:
+        adios4dolfinx.read_function(filename, u_new, time=1.0)
+
+    assert url in e.value.args[0]
