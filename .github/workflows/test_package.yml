@@ -86,15 +86,24 @@ jobs:
           name: legacy_checkpoint_mpich
           path: ./legacy_checkpoint
 
-      - name: Install DOLFINx
+      - name: Install DOLFINx (nightly)
+        if: needs.get_image_tag.outputs.image == 'stable'
         uses: jorgensd/actions/install-dolfinx@v0.4
         with:
           adios2: v2.12.1
           petsc_arch: linux-gnu-real64-32
-          dolfinx: main
-          basix: main
-          ufl: main
-          ffcx: main
+          dolfinx: v0.11.0.post0
+          basix: v0.11.0
+          ufl: 2026.1.1
+          ffcx: v0.11.0
+          working-directory: ${{ env.working-directory}}
+
+      - name: Install DOLFINx (stable)
+        if: needs.get_image_tag.outputs.image == 'nightly'
+        uses: jorgensd/actions/install-dolfinx@v0.4
+        with:
+          adios2: v2.12.1
+          petsc_arch: linux-gnu-real64-32
           working-directory: ${{ env.working-directory}}
 
       - name: Install package
