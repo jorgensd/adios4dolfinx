@@ -86,7 +86,7 @@ jobs:
           name: legacy_checkpoint_mpich
           path: ./legacy_checkpoint
 
-      - name: Install DOLFINx (nightly)
+      - name: Install DOLFINx (stable)
         if: needs.get_image_tag.outputs.image == 'stable'
         uses: jorgensd/actions/install-dolfinx@v0.4
         with:
@@ -98,7 +98,7 @@ jobs:
           ffcx: v0.11.0
           working-directory: ${{ env.working-directory}}
 
-      - name: Install DOLFINx (stable)
+      - name: Install DOLFINx (nightly)
         if: needs.get_image_tag.outputs.image == 'nightly'
         uses: jorgensd/actions/install-dolfinx@v0.4
         with:
