@@ -94,7 +94,7 @@ jobs:
           petsc_arch: linux-gnu-real64-32
           dolfinx: v0.11.0.post0
           basix: v0.11.0
-          ufl: 2026.1.1
+          ufl: 2026.1.0
           ffcx: v0.11.0
           working-directory: ${{ env.working-directory}}
 
