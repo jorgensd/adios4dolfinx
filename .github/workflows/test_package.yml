@@ -28,6 +28,9 @@ env:
   HDF5_MPI: "ON"
   HDF5_INCLUDEDIR: "/usr/include/hdf5/openmpi"
   H5PY_SETUP_REQUIRES: 0
+  OMPI_ALLOW_RUN_AS_ROOT: 1
+  OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
+  PRTE_MCA_rmaps_default_mapping_policy: :oversubscribe
 
 jobs:
   get_image_tag:
@@ -58,7 +61,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs:
       [create-datasets, create-legacy-datasets, check-formatting, get_image_tag]
-    container: ghcr.io/fenics/dolfinx/dolfinx:${{ needs.get_image_tag.outputs.image }}
+    container: ghcr.io/fenics/dolfinx/test-env:current
     env:
       working-directory: ./src
 
