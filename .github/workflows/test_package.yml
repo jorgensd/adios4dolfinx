@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs:
       [create-datasets, create-legacy-datasets, check-formatting, get_image_tag]
-    container: ghcr.io/fenics/dolfinx/test-env:current
+    container: ghcr.io/fenics/test-env:current
     env:
       working-directory: ./src
 
