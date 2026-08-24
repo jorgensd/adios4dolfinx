@@ -75,13 +75,13 @@ jobs:
           echo "HDF5_LIBDIR=/usr/lib/${ARCH_TRIPLET}/hdf5/openmpi" >> $GITHUB_ENV
 
       - name: Download legacy data
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: legacy_mpich
           path: ./legacy
 
       - name: Download legacy data
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: legacy_checkpoint_mpich
           path: ./legacy_checkpoint
@@ -124,7 +124,7 @@ jobs:
           coverage html
 
       - name: Upload coverage report as artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: code-coverage-report
           path: htmlcov
