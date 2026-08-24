@@ -56,9 +56,11 @@ jobs:
     needs:
       [create-datasets, create-legacy-datasets, check-formatting, get_image_tag]
     container: ghcr.io/fenics/dolfinx/dolfinx:${{ needs.get_image_tag.outputs.image }}
+    env:
+      working-directory: ./src
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Update pip
         run: python3 -m pip install --break-system-packages --upgrade pip setuptools
@@ -74,6 +76,17 @@ jobs:
         with:
           name: legacy_checkpoint_mpich
           path: ./legacy_checkpoint
+
+      - name: Install DOLFINx
+        uses: jorgensd/actions/install-dolfinx@v0.4
+        with:
+          adios2: v2.12.1
+          petsc_arch: linux-gnu-real64-32
+          dolfinx: main
+          basix: main
+          ufl: main
+          ffcx: main
+          working-directory: ${{ env.working-directory}}
 
       - name: Install package
         run: python3 -m pip install --break-system-packages .[test]

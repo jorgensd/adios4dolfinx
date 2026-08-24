@@ -38,10 +38,9 @@ jobs:
 
     strategy:
       matrix:
-        adios2: ["default", "v2.11.0-rc1", "v2.12.1"]
+        adios2: ["v2.11.0-rc1", "v2.12.1"]
         container:
-          - ghcr.io/fenics/test-env:current-openmpi
-          - ghcr.io/fenics/test-env:current-mpich
+          - ghcr.io/fenics/test-env:current
     steps:
       - uses: actions/checkout@v7
 
