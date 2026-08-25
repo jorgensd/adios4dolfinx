@@ -111,7 +111,7 @@ jobs:
           working-directory: ${{ env.working-directory}}
 
       - name: Install package
-        run: python3 -m pip install --break-system-packages .[test]. --no-build-isolation
+        run: python3 -m pip install --break-system-packages .[test] --no-build-isolation
 
       - name: Run tests
         run: |
