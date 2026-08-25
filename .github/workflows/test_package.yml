@@ -95,10 +95,10 @@ jobs:
         with:
           adios2: v2.12.1
           petsc_arch: linux-gnu-real64-32
-          dolfinx: v0.11.0.post0
-          basix: v0.11.0
-          ufl: 2026.1.0
-          ffcx: v0.11.0
+          dolfinx: release
+          basix: release
+          ufl: release
+          ffcx: release
           working-directory: ${{ env.working-directory}}
 
       - name: Install DOLFINx (nightly)
