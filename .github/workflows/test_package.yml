@@ -74,7 +74,7 @@ jobs:
 
       - name: Install nanobind with pin if stable
         if: needs.get_image_tag.outputs.image == 'stable'
-        run: python3 -m pip install --break-system-packages nanobind<3 --no-build-isolation
+        run: python3 -m pip install --break-system-packages "nanobind<3" --no-build-isolation
       
       - name: Install nanobind without pin if nightly
         if: needs.get_image_tag.outputs.image == 'nightly'
