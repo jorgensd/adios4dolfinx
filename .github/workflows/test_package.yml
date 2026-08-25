@@ -32,6 +32,7 @@ env:
   OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
   PRTE_MCA_rmaps_default_mapping_policy: :oversubscribe
 
+
 jobs:
   get_image_tag:
     runs-on: ubuntu-latest
@@ -110,7 +111,7 @@ jobs:
           working-directory: ${{ env.working-directory}}
 
       - name: Install package
-        run: python3 -m pip install --break-system-packages .[test]
+        run: python3 -m pip install --break-system-packages .[test]. --no-build-isolation
 
       - name: Run tests
         run: |
