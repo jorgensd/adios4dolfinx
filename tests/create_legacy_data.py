@@ -14,7 +14,6 @@ import pathlib
 
 import dolfin
 import numpy as np
-import ufl_legacy as ufl
 
 
 def create_reference_data(
