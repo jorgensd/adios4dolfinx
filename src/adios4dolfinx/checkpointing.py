@@ -669,7 +669,7 @@ def read_mesh_data(
                 return partition_graph._cpp_object
         else:
 
-            def partitioner(comm: MPI.Intracomm, n, m, topo):
+            def partitioner(comm: MPI.Intracomm, n, m, topo):  # type: ignore
                 assert len(topo[0]) % (len(partition_graph.offsets) - 1) == 0
                 if hasattr(partition_graph, "_cpp_object"):
                     return partition_graph._cpp_object  # For modern DOLFINx wrappers
@@ -684,7 +684,7 @@ def read_mesh_data(
                     max_facet_to_cell_links=max_facet_to_cell_links,
                 )
             else:
-                partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)  # type:ignore[call-overload]
+                partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)  # type:ignore
         else:
             partitioner = dolfinx.graph.partitioner()
     return ReadMeshData(
@@ -723,7 +723,7 @@ def read_mesh(
     """
     check_file_exists(filename)
     sig = inspect.signature(dolfinx.mesh.create_mesh)
-    kwargs = {}
+    kwargs: dict[str, int | dolfinx.mesh.GhostMode] = {}
     if "max_facet_to_cell_links" in list(sig.parameters.keys()):
         kwargs["max_facet_to_cell_links"] = max_facet_to_cell_links
     if "ghost_mode" in list(sig.parameters.keys()):
@@ -740,7 +740,7 @@ def read_mesh(
     return dolfinx.mesh.create_mesh(
         comm,
         **rmd,
-        **kwargs,
+        **kwargs,  # type: ignore[arg-type]
     )
 
 
