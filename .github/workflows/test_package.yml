@@ -94,7 +94,7 @@ jobs:
         if: needs.get_image_tag.outputs.image == 'stable'
         uses: jorgensd/actions/install-dolfinx@v0.4
         with:
-          adios2: v2.12.1
+          adios2: default
           petsc_arch: linux-gnu-real64-32
           dolfinx: release
           basix: release
