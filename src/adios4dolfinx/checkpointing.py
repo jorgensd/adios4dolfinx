@@ -662,7 +662,7 @@ def read_mesh_data(
         partition_graph = read_adjacency_list(
             adios, comm, filename, "PartitioningData", "PartitioningOffset", shape[0], engine
         )
-        if hasattr(dolfinx.graph, "partitioner"):
+        if not hasattr(dolfinx.mesh, "create_cell_partitioner"):
 
             def partitioner(comm, nparts, local_graph, node_weights, edge_weights, ghosting):
                 assert len(local_graph) % (len(partition_graph.offsets) - 1) == 0
