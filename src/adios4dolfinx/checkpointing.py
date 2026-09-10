@@ -662,23 +662,31 @@ def read_mesh_data(
         partition_graph = read_adjacency_list(
             adios, comm, filename, "PartitioningData", "PartitioningOffset", shape[0], engine
         )
+        if not hasattr(dolfinx.mesh, "create_cell_partitioner"):
 
-        def partitioner(comm: MPI.Intracomm, n, m, topo):
-            assert len(topo[0]) % (len(partition_graph.offsets) - 1) == 0
-            if hasattr(partition_graph, "_cpp_object"):
-                return partition_graph._cpp_object  # For modern DOLFINx wrappers
-            else:
-                return partition_graph
-    else:
-        sig = inspect.signature(dolfinx.mesh.create_cell_partitioner)
-        if "max_facet_to_cell_links" in list(sig.parameters.keys()):
-            partitioner = dolfinx.mesh.create_cell_partitioner(
-                ghost_mode,  # type:ignore[call-arg]
-                max_facet_to_cell_links=max_facet_to_cell_links,
-            )
+            def partitioner(comm, nparts, local_graph, node_weights, edge_weights, ghosting):
+                assert len(local_graph) % (len(partition_graph.offsets) - 1) == 0
+                return partition_graph._cpp_object
         else:
-            partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)  # type:ignore[call-overload]
 
+            def partitioner(comm: MPI.Intracomm, n, m, topo):  # type: ignore
+                assert len(topo[0]) % (len(partition_graph.offsets) - 1) == 0
+                if hasattr(partition_graph, "_cpp_object"):
+                    return partition_graph._cpp_object  # For modern DOLFINx wrappers
+                else:
+                    return partition_graph
+    else:
+        if hasattr(dolfinx.mesh, "create_cell_partitioner"):
+            sig = inspect.signature(dolfinx.mesh.create_cell_partitioner)
+            if "max_facet_to_cell_links" in list(sig.parameters.keys()):
+                partitioner = dolfinx.mesh.create_cell_partitioner(
+                    ghost_mode,  # type:ignore[call-arg]
+                    max_facet_to_cell_links=max_facet_to_cell_links,
+                )
+            else:
+                partitioner = dolfinx.cpp.mesh.create_cell_partitioner(ghost_mode)  # type:ignore
+        else:
+            partitioner = dolfinx.graph.partitioner()
     return ReadMeshData(
         cells=mesh_topology,
         x=mesh_geometry,
@@ -715,21 +723,24 @@ def read_mesh(
     """
     check_file_exists(filename)
     sig = inspect.signature(dolfinx.mesh.create_mesh)
-    kwargs = {}
+    kwargs: dict[str, int | dolfinx.mesh.GhostMode] = {}
     if "max_facet_to_cell_links" in list(sig.parameters.keys()):
         kwargs["max_facet_to_cell_links"] = max_facet_to_cell_links
+    if "ghost_mode" in list(sig.parameters.keys()):
+        kwargs["ghost_mode"] = ghost_mode
+    rmd = read_mesh_data(
+        filename,
+        comm,
+        engine=engine,
+        ghost_mode=ghost_mode,
+        time=time,
+        legacy=legacy,
+        read_from_partition=read_from_partition,
+    )
     return dolfinx.mesh.create_mesh(
         comm,
-        **read_mesh_data(
-            filename,
-            comm,
-            engine=engine,
-            ghost_mode=ghost_mode,
-            time=time,
-            legacy=legacy,
-            read_from_partition=read_from_partition,
-        ),
-        **kwargs,
+        **rmd,
+        **kwargs,  # type: ignore[arg-type]
     )
 
 
