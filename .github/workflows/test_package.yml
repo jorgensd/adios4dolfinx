@@ -72,8 +72,6 @@ jobs:
       - name: Update pip
         run: python3 -m pip install --break-system-packages --upgrade pip setuptools
 
-      - name: Install nanobind with pin if stable
-
       - name: Configure HDF5 MPI Environment
         run: |
           # Evaluate architecture dynamically and write to GITHUB_ENV
