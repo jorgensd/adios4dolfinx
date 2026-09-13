@@ -60,6 +60,9 @@ jobs:
 
   test-code:
     runs-on: ubuntu-24.04
+    # A deadlock in the parallel test run otherwise burns GitHub's 6 hour
+    # job limit and blocks the "pages" concurrency group for that long.
+    timeout-minutes: 45
     needs:
       [create-datasets, create-legacy-datasets, check-formatting, get_image_tag]
     container: ghcr.io/fenics/test-env:current
@@ -106,20 +109,39 @@ jobs:
         if: needs.get_image_tag.outputs.image == 'nightly'
         uses: jorgensd/actions/install-dolfinx@v0.4
         with:
-          adios2: v2.12.1
+          # TEMPORARY (bisect run A): normally v2.12.1. The stable leg
+          # deadlocks in the 4 rank test run and differs from this one on
+          # three axes at once (adios2, FEniCS version, nanobind pin).
+          # "default" takes Ubuntu 26.04's apt adios2 2.11, which is the
+          # only change here, so a hang in this leg pins the cause on
+          # adios2 and a pass exonerates it. Restore v2.12.1 afterwards.
+          adios2: default
           petsc_arch: linux-gnu-real64-32
           working-directory: ${{ env.working-directory}}
 
       - name: Install package
         run: python3 -m pip install --break-system-packages .[test] --no-build-isolation
 
+      # Deliberately not in the "test" extra: this is a CI-only diagnostic
+      # for the deadlock, not something the test suite depends on.
+      - name: Install hang diagnostics
+        run: python3 -m pip install --break-system-packages pytest-timeout
+
       - name: Run tests
+        timeout-minutes: 15
         run: |
           coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
 
+      # --output tag (OpenMPI 5 / PRTE) prefixes every line with the rank:
+      # pytest -v writes the test id without a trailing newline, so without
+      # it the merged output cannot show which ranks entered a test.
+      # --timeout-method=thread dumps every thread's stack on every rank
+      # before exiting, so a deadlock leaves a traceback instead of silence.
       - name: Run tests in parallel
+        timeout-minutes: 20
         run: |
-          mpirun -n 4 coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
+          mpirun -n 4 --output tag coverage run --rcfile=.coveragerc -m mpi4py \
+            -m pytest -xvs --timeout=180 --timeout-method=thread ./tests/
 
       - name: Combine coverage reports
         run: |
