@@ -126,21 +126,6 @@ jobs:
         run: |
           coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
 
-      # DIAGNOSTIC, remove once the deadlock is resolved. The full parallel
-      # run deadlocks in comm.Create_dist_graph at a position that moves
-      # between runs (test 502, then 686, then 47), always in a test that
-      # reads on COMM_WORLD. Running one such group on its own separates a
-      # data-dependent bug from drift accumulated across the session:
-      # hangs here => data-dependent, passes here => cumulative.
-      # continue-on-error so the full run below still reports too.
-      - name: Run COMM_WORLD-read tests in isolation (diagnostic)
-        timeout-minutes: 10
-        continue-on-error: true
-        run: |
-          mpirun -n 4 --output tag python3 -m mpi4py -m pytest -x -q \
-            --timeout=120 --timeout-method=thread \
-            "tests/test_checkpointing.py::test_read_write_P_2D" -k read_comm1
-
       # --output tag (OpenMPI 5 / PRTE) prefixes every line with the rank:
       # pytest -v writes the test id without a trailing newline, so without
       # it the merged output cannot show which ranks entered a test.
@@ -149,8 +134,34 @@ jobs:
       - name: Run tests in parallel
         timeout-minutes: 20
         run: |
+          # DIAGNOSTIC, remove once the deadlock is resolved. The deadlock is
+          # cumulative, not data-dependent: the COMM_WORLD-read tests pass in
+          # 4.5s on their own but the full session deadlocks in
+          # comm.Create_dist_graph after a number of tests that varies wildly
+          # (502, 686, 47, 77). Something per-test is not being released, and
+          # once it runs out MPI communicator creation blocks. This plugin
+          # lives in the step, not the repo, so the test suite stays clean.
+          cat > hang_probe.py <<'PROBE'
+          import os
+          from mpi4py import MPI
+
+          _n = 0
+
+
+          def pytest_runtest_teardown(item, nextitem):
+              global _n
+              _n += 1
+              if _n % 25:
+                  return
+              fds = len(os.listdir("/proc/self/fd"))
+              rss = next(
+                  (l.split()[1] for l in open("/proc/self/status") if l.startswith("VmRSS")),
+                  "?",
+              )
+              print(f"\n[probe] n={_n} rank={MPI.COMM_WORLD.rank} fds={fds} rss={rss}kB", flush=True)
+          PROBE
           mpirun -n 4 --output tag coverage run --rcfile=.coveragerc -m mpi4py \
-            -m pytest -xvs --timeout=180 --timeout-method=thread ./tests/
+            -m pytest -xvs -p hang_probe --timeout=180 --timeout-method=thread ./tests/
 
       - name: Combine coverage reports
         run: |
