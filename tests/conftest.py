@@ -1,3 +1,5 @@
+import gc
+
 from mpi4py import MPI
 
 import dolfinx
@@ -7,6 +9,30 @@ import numpy.typing
 import pytest
 
 import adios4dolfinx
+
+
+def pytest_runtest_teardown(item):
+    """Collect garbage after every test to force calling destructors
+    which might be collective.
+
+    DOLFINx objects own MPI communicators that ``dolfinx::MPI::Comm``
+    releases with ``MPI_Comm_free``, a collective call. Left to the
+    cyclic garbage collector those destructors run at a moment that
+    differs from rank to rank, so the ranks stop agreeing on the order
+    of communicator operations and a later communicator-creating call
+    deadlocks. Mirrors the same hook in DOLFINx's own test suite.
+    """
+    # Do the normal teardown
+    item.teardown()
+
+    # Collect the garbage (call destructors collectively)
+    del item
+    # Only the youngest generation is collected: the reference cycles a
+    # single test leaves behind are created fresh each time and so are
+    # always in generation 0, while a full collection rescans the whole
+    # accumulated heap on every test.
+    gc.collect(0)
+    MPI.COMM_WORLD.Barrier()
 
 
 @pytest.fixture(scope="module")

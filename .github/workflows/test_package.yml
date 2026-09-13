@@ -109,13 +109,7 @@ jobs:
         if: needs.get_image_tag.outputs.image == 'nightly'
         uses: jorgensd/actions/install-dolfinx@v0.4
         with:
-          # TEMPORARY (bisect run A): normally v2.12.1. The stable leg
-          # deadlocks in the 4 rank test run and differs from this one on
-          # three axes at once (adios2, FEniCS version, nanobind pin).
-          # "default" takes Ubuntu 26.04's apt adios2 2.11, which is the
-          # only change here, so a hang in this leg pins the cause on
-          # adios2 and a pass exonerates it. Restore v2.12.1 afterwards.
-          adios2: default
+          adios2: v2.12.1
           petsc_arch: linux-gnu-real64-32
           working-directory: ${{ env.working-directory}}
 
