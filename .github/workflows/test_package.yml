@@ -126,6 +126,21 @@ jobs:
         run: |
           coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
 
+      # DIAGNOSTIC, remove once the deadlock is resolved. The full parallel
+      # run deadlocks in comm.Create_dist_graph at a position that moves
+      # between runs (test 502, then 686, then 47), always in a test that
+      # reads on COMM_WORLD. Running one such group on its own separates a
+      # data-dependent bug from drift accumulated across the session:
+      # hangs here => data-dependent, passes here => cumulative.
+      # continue-on-error so the full run below still reports too.
+      - name: Run COMM_WORLD-read tests in isolation (diagnostic)
+        timeout-minutes: 10
+        continue-on-error: true
+        run: |
+          mpirun -n 4 --output tag python3 -m mpi4py -m pytest -x -q \
+            --timeout=120 --timeout-method=thread \
+            "tests/test_checkpointing.py::test_read_write_P_2D" -k read_comm1
+
       # --output tag (OpenMPI 5 / PRTE) prefixes every line with the rank:
       # pytest -v writes the test id without a trailing newline, so without
       # it the merged output cannot show which ranks entered a test.
