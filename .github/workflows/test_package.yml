@@ -134,13 +134,42 @@ jobs:
       - name: Run tests in parallel
         timeout-minutes: 20
         run: |
-          # DIAGNOSTIC, remove once the deadlock is resolved. The deadlock is
-          # cumulative, not data-dependent: the COMM_WORLD-read tests pass in
-          # 4.5s on their own but the full session deadlocks in
-          # comm.Create_dist_graph after a number of tests that varies wildly
-          # (502, 686, 47, 77). Something per-test is not being released, and
-          # once it runs out MPI communicator creation blocks. This plugin
-          # lives in the step, not the repo, so the test suite stays clean.
+          # DIAGNOSTIC, remove once the deadlock is resolved. Five stable runs
+          # all deadlock with every rank inside the same non-adjacent
+          # comm.Create_dist_graph (checkpointing.py:503), at a test index that
+          # is random (502, 686, 47, 77, 16). Create_dist_graph_adjacent runs
+          # three times per read_function and has never hung. Log every rank's
+          # arguments to the three non-adjacent calls so a degenerate or
+          # out-of-range neighbour list would be visible on the last lines
+          # before the hang. Patches the installed copy, not the repo.
+          python3 - "$(python3 -c 'import adios4dolfinx,os;print(os.path.dirname(adios4dolfinx.__file__))')" <<'PATCH'
+          import pathlib
+          import re
+          import sys
+
+          pkg = pathlib.Path(sys.argv[1])
+          call = re.compile(r"^(\s*)\w+ = comm\.Create_dist_graph\($")
+          arg = re.compile(r"\[len\((\w+)\)\]")
+          total = 0
+          for name in ("comm_helpers.py", "checkpointing.py"):
+              path = pkg / name
+              lines = path.read_text().splitlines(keepends=True)
+              out = []
+              for i, line in enumerate(lines):
+                  m = call.match(line.rstrip("\n"))
+                  if m and i + 1 < len(lines):
+                      a = arg.search(lines[i + 1])
+                      if a:
+                          var, ind = a.group(1), m.group(1)
+                          out.append(
+                              f'{ind}print(f"[dg] {name}:{i + 1} r={{comm.rank}} '
+                              f'n={{len({var})}} d={{{var}.tolist()}}", flush=True)\n'
+                          )
+                          total += 1
+                  out.append(line)
+              path.write_text("".join(out))
+          print(f"instrumented {total} Create_dist_graph call sites", flush=True)
+          PATCH
           cat > hang_probe.py <<'PROBE'
           import os
           from mpi4py import MPI
@@ -151,7 +180,7 @@ jobs:
           def pytest_runtest_teardown(item, nextitem):
               global _n
               _n += 1
-              if _n % 25:
+              if _n % 5:
                   return
               fds = len(os.listdir("/proc/self/fd"))
               rss = next(
