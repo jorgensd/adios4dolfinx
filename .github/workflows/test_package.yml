@@ -170,27 +170,14 @@ jobs:
               path.write_text("".join(out))
           print(f"instrumented {total} Create_dist_graph call sites", flush=True)
           PATCH
-          cat > hang_probe.py <<'PROBE'
-          import os
-          from mpi4py import MPI
-
-          _n = 0
-
-
-          def pytest_runtest_teardown(item, nextitem):
-              global _n
-              _n += 1
-              if _n % 5:
-                  return
-              fds = len(os.listdir("/proc/self/fd"))
-              rss = next(
-                  (l.split()[1] for l in open("/proc/self/status") if l.startswith("VmRSS")),
-                  "?",
-              )
-              print(f"\n[probe] n={_n} rank={MPI.COMM_WORLD.rank} fds={fds} rss={rss}kB", flush=True)
-          PROBE
-          mpirun -n 4 --output tag coverage run --rcfile=.coveragerc -m mpi4py \
-            -m pytest -xvs -p hang_probe --timeout=180 --timeout-method=thread ./tests/
+          # The probe showed fds flat at 21 and RSS flat on every rank, and the
+          # [dg] lines showed all four ranks entering with valid neighbour lists,
+          # so nothing is leaking and the arguments are fine: the block is inside
+          # OpenMPI's own MPI_Dist_graph_create. topo/treematch is the component
+          # that implements it; exclude it to test whether it is the culprit.
+          mpirun -n 4 --output tag --mca topo '^treematch' \
+            coverage run --rcfile=.coveragerc -m mpi4py \
+            -m pytest -xvs --timeout=180 --timeout-method=thread ./tests/
 
       - name: Combine coverage reports
         run: |
