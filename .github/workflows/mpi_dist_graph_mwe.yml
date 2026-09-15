@@ -1,0 +1,129 @@
+name: MPI dist_graph MWE
+
+# Standalone reproducer for the deadlock that made the parallel test run in
+# test_package.yml hang: every rank blocks inside MPI_Dist_graph_create with a
+# valid neighbour list. Pure mpi4py, no DOLFINx and no adios4dolfinx, so it can
+# go straight to an OpenMPI bug report. Delete this file once resolved.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+
+env:
+  OMPI_ALLOW_RUN_AS_ROOT: 1
+  OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
+  PRTE_MCA_rmaps_default_mapping_policy: :oversubscribe
+
+jobs:
+  dist-graph-mwe:
+    runs-on: ubuntu-24.04
+    container: ghcr.io/fenics/test-env:current
+    timeout-minutes: 20
+
+    steps:
+      - name: MPI version
+        run: |
+          ompi_info --version || true
+          python3 -c "from mpi4py import MPI; print(MPI.Get_library_version())"
+
+      - name: Write reproducer
+        run: |
+          cat > mwe_dist_graph.py <<'MWE'
+          """Deadlock in MPI_Dist_graph_create with OpenMPI's topo/treematch component.
+
+          Pure mpi4py, no other dependencies. Run with 4 ranks:
+
+              mpirun -n 4 python3 mwe_dist_graph.py            # expected: hangs
+              mpirun -n 4 --mca topo ^treematch python3 mwe_dist_graph.py   # expected: passes
+
+          Every rank blocks inside MPI_Dist_graph_create with a valid, in-range
+          neighbour list. The iteration it happens on varies between runs.
+
+          The sequence mirrors a real workload (adios4dolfinx.read_function): a
+          communicator is duplicated per iteration, a few distributed-graph
+          communicators are created on it with asymmetric edge sets, queried with
+          MPI_Dist_graph_neighbors and freed, with neighbourhood collectives on an
+          adjacent dist-graph communicator in between.
+          """
+
+          import faulthandler
+          import sys
+
+          from mpi4py import MPI
+
+          import numpy as np
+
+          ITERATIONS = 4000
+          HEARTBEAT = 100
+          WATCHDOG_SECONDS = 120
+
+          # Edge sets observed at the deadlock, as (rank -> destinations) for 4 ranks.
+          # They are asymmetric, which is legal: each rank declares only its own
+          # outgoing edges.
+          PATTERNS = [
+              [[0, 1, 2, 3], [2, 3], [0, 1, 2, 3], [0, 1]],
+              [[0, 1], [0, 1, 2], [1, 2, 3], [2, 3]],
+              [[0, 1], [0, 1, 3], [0, 2, 3], [2, 3]],
+          ]
+
+
+          def main() -> int:
+              world = MPI.COMM_WORLD
+              if world.size != 4:
+                  if world.rank == 0:
+                      print(f"needs exactly 4 ranks, got {world.size}", file=sys.stderr)
+                  return 2
+
+              # A hang self-reports instead of running to the job timeout.
+              faulthandler.enable()
+              faulthandler.dump_traceback_later(WATCHDOG_SECONDS, exit=True)
+
+              if world.rank == 0:
+                  print(MPI.Get_library_version().strip(), flush=True)
+
+              for it in range(ITERATIONS):
+                  # Fresh communicator per iteration, as a new mesh would give.
+                  comm = world.Dup()
+                  for pattern in PATTERNS:
+                      dests = np.array(pattern[comm.rank], dtype=np.int32)
+
+                      graph = comm.Create_dist_graph(
+                          [comm.rank], [len(dests)], dests.tolist(), reorder=False
+                      )
+                      source, dest, _ = graph.Get_dist_neighbors()
+                      graph.Free()
+                      assert list(dest) == dests.tolist(), (comm.rank, dest, dests)
+
+                      # Neighbourhood traffic on the adjacent form, as the real
+                      # workload does between the non-adjacent creates.
+                      adjacent = comm.Create_dist_graph_adjacent(source, dest, reorder=False)
+                      send = np.full(len(dest), comm.rank, dtype=np.int32)
+                      recv = np.zeros(len(source), dtype=np.int32)
+                      adjacent.Neighbor_alltoall(send, recv)
+                      adjacent.Free()
+                  comm.Free()
+
+                  if it % HEARTBEAT == 0 and world.rank == 0:
+                      print(f"iteration {it}", flush=True)
+
+              faulthandler.cancel_dump_traceback_later()
+              world.Barrier()
+              if world.rank == 0:
+                  print(f"completed {ITERATIONS} iterations without deadlock", flush=True)
+              return 0
+
+
+          if __name__ == "__main__":
+              sys.exit(main())
+          MWE
+
+      - name: Default topo components (expected to deadlock)
+        continue-on-error: true
+        timeout-minutes: 6
+        run: mpirun -n 4 --output tag python3 mwe_dist_graph.py
+
+      - name: Without topo/treematch (expected to pass)
+        timeout-minutes: 6
+        run: mpirun -n 4 --output tag --mca topo '^treematch' python3 mwe_dist_graph.py

@@ -322,7 +322,10 @@ def create_function_data_on_original_mesh(
     # Get offsets of dofmap
     num_cells_local = local_cell_range[1] - local_cell_range[0]
     num_dofs_local_dmap = num_cells_local * num_dofs_per_cell
-    dofmap_imap = dolfinx.common.IndexMap(mesh.comm, num_dofs_local_dmap)
+    if hasattr(dolfinx.common, "index_map"):
+        dofmap_imap = dolfinx.common.index_map(mesh.comm, num_dofs_local_dmap)
+    else:
+        dofmap_imap = dolfinx.common.IndexMap(mesh.comm, num_dofs_local_dmap)  # type: ignore
     local_dofmap_offsets = np.arange(num_cells_local + 1, dtype=np.int64)
     local_dofmap_offsets[:] *= num_dofs_per_cell
     local_dofmap_offsets[:] += dofmap_imap.local_range[0]

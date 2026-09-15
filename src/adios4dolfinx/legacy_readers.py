@@ -337,7 +337,7 @@ def read_mesh_from_legacy_h5(
         x=mesh_geometry,
         e=domain,
         partitioner=None,
-        **kwargs,
+        **kwargs,  # type: ignore[arg-type]
     )
 
 

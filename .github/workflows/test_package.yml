@@ -25,6 +25,13 @@ on:
 env:
   DEB_PYTHON_INSTALL_LAYOUT: deb_system
   DEFAULT_TAG: nightly
+  HDF5_MPI: "ON"
+  HDF5_INCLUDEDIR: "/usr/include/hdf5/openmpi"
+  H5PY_SETUP_REQUIRES: 0
+  OMPI_ALLOW_RUN_AS_ROOT: 1
+  OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
+  PRTE_MCA_rmaps_default_mapping_policy: :oversubscribe
+
 
 jobs:
   get_image_tag:
@@ -53,38 +60,90 @@ jobs:
 
   test-code:
     runs-on: ubuntu-24.04
+    # A deadlock in the parallel test run otherwise burns GitHub's 6 hour
+    # job limit and blocks the "pages" concurrency group for that long.
+    timeout-minutes: 45
     needs:
       [create-datasets, create-legacy-datasets, check-formatting, get_image_tag]
-    container: ghcr.io/fenics/dolfinx/dolfinx:${{ needs.get_image_tag.outputs.image }}
+    container: ghcr.io/fenics/test-env:current
+    env:
+      working-directory: ./src
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Update pip
         run: python3 -m pip install --break-system-packages --upgrade pip setuptools
 
+      - name: Configure HDF5 MPI Environment
+        run: |
+          # Evaluate architecture dynamically and write to GITHUB_ENV
+          ARCH_TRIPLET=$(gcc -print-multiarch)
+          echo "HDF5_LIBDIR=/usr/lib/${ARCH_TRIPLET}/hdf5/openmpi" >> $GITHUB_ENV
+
       - name: Download legacy data
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: legacy_mpich
           path: ./legacy
 
       - name: Download legacy data
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: legacy_checkpoint_mpich
           path: ./legacy_checkpoint
 
+      - name: Install DOLFINx (stable)
+        if: needs.get_image_tag.outputs.image == 'stable'
+        uses: jorgensd/actions/install-dolfinx@v0.4
+        with:
+          adios2: default
+          petsc_arch: linux-gnu-real64-32
+          dolfinx: release
+          basix: release
+          ufl: release
+          ffcx: release
+          working-directory: ${{ env.working-directory}}
+
+      - name: Install DOLFINx (nightly)
+        if: needs.get_image_tag.outputs.image == 'nightly'
+        uses: jorgensd/actions/install-dolfinx@v0.4
+        with:
+          adios2: v2.12.1
+          petsc_arch: linux-gnu-real64-32
+          working-directory: ${{ env.working-directory}}
+
       - name: Install package
-        run: python3 -m pip install --break-system-packages .[test]
+        run: python3 -m pip install --break-system-packages .[test] --no-build-isolation
+
+      # Kept CI-only rather than added to the "test" extra: it exists so a
+      # deadlock fails the step with a per-rank traceback instead of running
+      # to GitHub's job limit, which is a property of how we run CI rather
+      # than a dependency of the test suite.
+      - name: Install hang diagnostics
+        run: python3 -m pip install --break-system-packages pytest-timeout
 
       - name: Run tests
+        timeout-minutes: 15
         run: |
           coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
 
+      # --output tag (OpenMPI 5 / PRTE) prefixes every line with the rank:
+      # pytest -v writes the test id without a trailing newline, so without
+      # it the merged output cannot show which ranks entered a test.
+      # --timeout-method=thread dumps every thread's stack on every rank
+      # before exiting, so a deadlock leaves a traceback instead of silence.
+      # --mca topo ^treematch: OpenMPI's treematch component implements the
+      # non-adjacent MPI_Dist_graph_create, and it deadlocks there at random
+      # (6/6 runs, after anywhere from 16 to 686 tests, every rank inside the
+      # call with valid in-range neighbour lists and no resource growth).
+      # Excluding it selects the basic implementation and the suite passes.
       - name: Run tests in parallel
+        timeout-minutes: 20
         run: |
-          mpirun -n 4 coverage run --rcfile=.coveragerc -m mpi4py -m pytest -xvs ./tests/
+          mpirun -n 4 --output tag --mca topo '^treematch' \
+            coverage run --rcfile=.coveragerc -m mpi4py \
+            -m pytest -xvs --timeout=180 --timeout-method=thread ./tests/
 
       - name: Combine coverage reports
         run: |
@@ -93,7 +152,7 @@ jobs:
           coverage html
 
       - name: Upload coverage report as artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: code-coverage-report
           path: htmlcov

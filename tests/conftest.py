@@ -1,3 +1,5 @@
+import gc
+
 from mpi4py import MPI
 
 import dolfinx
@@ -7,6 +9,30 @@ import numpy.typing
 import pytest
 
 import adios4dolfinx
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_runtest_teardown(item, nextitem):
+    """Collect garbage after every test to force calling destructors
+    which might be collective.
+
+    DOLFINx objects own MPI communicators that ``dolfinx::MPI::Comm``
+    releases with ``MPI_Comm_free``, a collective call, and so does every
+    ``adios2.ADIOS(comm)``. Left to the cyclic garbage collector those
+    destructors run at a moment that differs from rank to rank, so the
+    ranks stop agreeing on the order of communicator operations and a
+    later communicator-creating call deadlocks. DOLFINx's own test suite
+    carries the same hook.
+
+    ``trylast`` puts this after pytest's own teardown, so fixture
+    finalizers have already dropped their references when we collect.
+    Unlike DOLFINx we collect every generation, not just generation 0:
+    the objects that own communicators here survive long enough to be
+    promoted, and leaving them to an automatic generation-2 pass puts
+    the collective destructor back at a rank-dependent moment.
+    """
+    gc.collect()
+    MPI.COMM_WORLD.Barrier()
 
 
 @pytest.fixture(scope="module")
