@@ -816,8 +816,10 @@ def write_mesh(
         ownership_array[ownership_offset[:-1]] = mesh.comm.rank
         insert_position = np.flatnonzero(ownership_array == -1)
         ownership_array[insert_position] = cell_array
-
-        partition_map = dolfinx.common.IndexMap(mesh.comm, ownership_array.size)
+        if hasattr(dolfinx.common, "index_map"):
+            partition_map = dolfinx.common.index_map(mesh.comm, ownership_array.size)
+        else:
+            partition_map = dolfinx.common.IndexMap(mesh.comm, ownership_array.size)  # type: ignore
         ownership_offset += partition_map.local_range[0]
         partition_range = partition_map.local_range
         partition_global = partition_map.size_global
@@ -903,7 +905,10 @@ def write_function(
     # Convert imap index to global index
     imap_global = dofmap.index_map.local_to_global(dmap_loc)
     dofmap_global = imap_global * index_map_bs + dmap_rem
-    dofmap_imap = dolfinx.common.IndexMap(mesh.comm, num_dofs_local_dmap)
+    if hasattr(dolfinx.common, "index_map"):
+        dofmap_imap = dolfinx.common.index_map(mesh.comm, num_dofs_local_dmap)
+    else:
+        dofmap_imap = dolfinx.common.IndexMap(mesh.comm, num_dofs_local_dmap)  # type: ignore
 
     # Compute dofmap offsets
     local_dofmap_offsets = np.arange(num_cells_local + 1, dtype=np.int64)
