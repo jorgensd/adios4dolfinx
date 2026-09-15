@@ -14,7 +14,6 @@ import pathlib
 
 import dolfin
 import numpy as np
-import ufl_legacy as ufl
 
 
 def create_reference_data(
@@ -29,10 +28,13 @@ def create_reference_data(
     mesh = dolfin.UnitCubeMesh(1, 1, 1)
     V = dolfin.FunctionSpace(mesh, family, degree)
     W = dolfin.VectorFunctionSpace(mesh, family, degree)
-    x = dolfin.SpatialCoordinate(mesh)
 
-    f0 = ufl.conditional(ufl.gt(x[0], 0.5), x[1], 2 * x[0])
-    v0 = dolfin.project(f0, V)
+    # NOTE: v0 must be exactly representable in the (family, degree) function space above,
+    # and written via interpolation (not dolfin.project, which goes through a linear solve
+    # and does not reproduce exact nodal values here) so that comparisons against a fresh
+    # dolfinx solve/interpolation in test_legacy_readers.py are not sensitive to quadrature
+    # or solver differences between legacy dolfin and current dolfinx.
+    v0 = dolfin.interpolate(dolfin.Expression("x[0]*x[0] + 2*x[1]*x[2] - x[1]", degree=2), V)
     w0 = dolfin.interpolate(dolfin.Expression(("x[0]", "3*x[2]", "7*x[1]"), degree=1), W)
 
     v1 = dolfin.interpolate(dolfin.Expression("x[0]", degree=1), V)

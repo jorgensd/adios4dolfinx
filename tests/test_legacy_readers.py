@@ -5,7 +5,6 @@
 # SPDX-License-Identifier:    MIT
 
 
-import inspect
 import pathlib
 
 from mpi4py import MPI
@@ -14,7 +13,6 @@ import dolfinx
 import numpy as np
 import pytest
 import ufl
-from dolfinx.fem.petsc import LinearProblem
 
 from adios4dolfinx import (
     read_function,
@@ -77,23 +75,12 @@ def test_legacy_function():
         pytest.skip(f"{path} does not exist")
     mesh = read_mesh_from_legacy_h5(path, comm, "/mesh")
     V = dolfinx.fem.functionspace(mesh, ("DG", 2))
-    u = ufl.TrialFunction(V)
-    v = ufl.TestFunction(V)
-    a = ufl.inner(u, v) * ufl.dx
-    x = ufl.SpatialCoordinate(mesh)
-    f = ufl.conditional(ufl.gt(x[0], 0.5), x[1], 2 * x[0])
-    L = ufl.inner(f, v) * ufl.dx
-
     uh = dolfinx.fem.Function(V)
-    if "petsc_options_prefix" in inspect.signature(LinearProblem.__init__).parameters.keys():
-        extra_options = {"petsc_options_prefix": "legacy_test"}
-    else:
-        extra_options = {}
-    problem = LinearProblem(
-        a, L, bcs=[], u=uh, petsc_options={"ksp_type": "preonly", "pc_type": "lu"}, **extra_options
-    )
-    problem.solve()
 
+    def f_expr(x):
+        return x[0] * x[0] + 2 * x[1] * x[2] - x[1]
+
+    uh.interpolate(f_expr)
     u_in = dolfinx.fem.Function(V)
     read_function_from_legacy_h5(path, mesh.comm, u_in, group="v")
     np.testing.assert_allclose(uh.x.array, u_in.x.array, atol=1e-14)
@@ -115,24 +102,13 @@ def test_read_legacy_function_from_checkpoint():
         pytest.skip(f"{path} does not exist")
     mesh = read_mesh_from_legacy_h5(path, comm, "/Mesh/mesh")
 
+    def f_expr(x):
+        return x[0] * x[0] + 2 * x[1] * x[2] - x[1]
+
     V = dolfinx.fem.functionspace(mesh, ("DG", 2))
-    u = ufl.TrialFunction(V)
-    v = ufl.TestFunction(V)
-    a = ufl.inner(u, v) * ufl.dx
-    x = ufl.SpatialCoordinate(mesh)
-    f = ufl.conditional(ufl.gt(x[0], 0.5), x[1], 2 * x[0])
-    L = ufl.inner(f, v) * ufl.dx
-
     uh = dolfinx.fem.Function(V)
-    if "petsc_options_prefix" in inspect.signature(LinearProblem.__init__).parameters.keys():
-        extra_options = {"petsc_options_prefix": "legacy_checkpoint_test"}
-    else:
-        extra_options = {}
-    problem = LinearProblem(
-        a, L, bcs=[], u=uh, petsc_options={"ksp_type": "preonly", "pc_type": "lu"}, **extra_options
-    )
-    problem.solve()
 
+    uh.interpolate(f_expr)
     u_in = dolfinx.fem.Function(V)
     read_function_from_legacy_h5(path, mesh.comm, u_in, group="v", step=0)
     assert np.allclose(uh.x.array, u_in.x.array)
