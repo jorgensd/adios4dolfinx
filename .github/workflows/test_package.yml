@@ -116,8 +116,10 @@ jobs:
       - name: Install package
         run: python3 -m pip install --break-system-packages .[test] --no-build-isolation
 
-      # Deliberately not in the "test" extra: this is a CI-only diagnostic
-      # for the deadlock, not something the test suite depends on.
+      # Kept CI-only rather than added to the "test" extra: it exists so a
+      # deadlock fails the step with a per-rank traceback instead of running
+      # to GitHub's job limit, which is a property of how we run CI rather
+      # than a dependency of the test suite.
       - name: Install hang diagnostics
         run: python3 -m pip install --break-system-packages pytest-timeout
 
@@ -131,50 +133,14 @@ jobs:
       # it the merged output cannot show which ranks entered a test.
       # --timeout-method=thread dumps every thread's stack on every rank
       # before exiting, so a deadlock leaves a traceback instead of silence.
+      # --mca topo ^treematch: OpenMPI's treematch component implements the
+      # non-adjacent MPI_Dist_graph_create, and it deadlocks there at random
+      # (6/6 runs, after anywhere from 16 to 686 tests, every rank inside the
+      # call with valid in-range neighbour lists and no resource growth).
+      # Excluding it selects the basic implementation and the suite passes.
       - name: Run tests in parallel
         timeout-minutes: 20
         run: |
-          # DIAGNOSTIC, remove once the deadlock is resolved. Five stable runs
-          # all deadlock with every rank inside the same non-adjacent
-          # comm.Create_dist_graph (checkpointing.py:503), at a test index that
-          # is random (502, 686, 47, 77, 16). Create_dist_graph_adjacent runs
-          # three times per read_function and has never hung. Log every rank's
-          # arguments to the three non-adjacent calls so a degenerate or
-          # out-of-range neighbour list would be visible on the last lines
-          # before the hang. Patches the installed copy, not the repo.
-          python3 - "$(python3 -c 'import adios4dolfinx,os;print(os.path.dirname(adios4dolfinx.__file__))')" <<'PATCH'
-          import pathlib
-          import re
-          import sys
-
-          pkg = pathlib.Path(sys.argv[1])
-          call = re.compile(r"^(\s*)\w+ = comm\.Create_dist_graph\($")
-          arg = re.compile(r"\[len\((\w+)\)\]")
-          total = 0
-          for name in ("comm_helpers.py", "checkpointing.py"):
-              path = pkg / name
-              lines = path.read_text().splitlines(keepends=True)
-              out = []
-              for i, line in enumerate(lines):
-                  m = call.match(line.rstrip("\n"))
-                  if m and i + 1 < len(lines):
-                      a = arg.search(lines[i + 1])
-                      if a:
-                          var, ind = a.group(1), m.group(1)
-                          out.append(
-                              f'{ind}print(f"[dg] {name}:{i + 1} r={{comm.rank}} '
-                              f'n={{len({var})}} d={{{var}.tolist()}}", flush=True)\n'
-                          )
-                          total += 1
-                  out.append(line)
-              path.write_text("".join(out))
-          print(f"instrumented {total} Create_dist_graph call sites", flush=True)
-          PATCH
-          # The probe showed fds flat at 21 and RSS flat on every rank, and the
-          # [dg] lines showed all four ranks entering with valid neighbour lists,
-          # so nothing is leaking and the arguments are fine: the block is inside
-          # OpenMPI's own MPI_Dist_graph_create. topo/treematch is the component
-          # that implements it; exclude it to test whether it is the culprit.
           mpirun -n 4 --output tag --mca topo '^treematch' \
             coverage run --rcfile=.coveragerc -m mpi4py \
             -m pytest -xvs --timeout=180 --timeout-method=thread ./tests/
