@@ -31,6 +31,14 @@ env:
   OMPI_ALLOW_RUN_AS_ROOT: 1
   OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
   PRTE_MCA_rmaps_default_mapping_policy: :oversubscribe
+  # Works around open-mpi/ompi#13918: MPI_Dist_graph_create deadlocks at
+  # random under the treematch topology component, because it exchanges edge
+  # metadata on hard-coded tags -50/-51 that the nonblocking-collective tag
+  # allocator can count down into. Selecting the basic component avoids it.
+  # Fixed upstream by open-mpi/ompi#13933, first tagged in OpenMPI v5.0.11;
+  # the image currently ships 5.0.10. MPICH ignores the variable, so it is
+  # safe to set unconditionally. Drop once the image has OpenMPI >= 5.0.11.
+  OMPI_MCA_topo: basic
 
 
 jobs:
@@ -116,13 +124,6 @@ jobs:
       - name: Install package
         run: python3 -m pip install --break-system-packages .[test] --no-build-isolation
 
-      # Kept CI-only rather than added to the "test" extra: it exists so a
-      # deadlock fails the step with a per-rank traceback instead of running
-      # to GitHub's job limit, which is a property of how we run CI rather
-      # than a dependency of the test suite.
-      - name: Install hang diagnostics
-        run: python3 -m pip install --break-system-packages pytest-timeout
-
       - name: Run tests
         timeout-minutes: 15
         run: |
@@ -131,19 +132,11 @@ jobs:
       # --output tag (OpenMPI 5 / PRTE) prefixes every line with the rank:
       # pytest -v writes the test id without a trailing newline, so without
       # it the merged output cannot show which ranks entered a test.
-      # --timeout-method=thread dumps every thread's stack on every rank
-      # before exiting, so a deadlock leaves a traceback instead of silence.
-      # --mca topo ^treematch: OpenMPI's treematch component implements the
-      # non-adjacent MPI_Dist_graph_create, and it deadlocks there at random
-      # (6/6 runs, after anywhere from 16 to 686 tests, every rank inside the
-      # call with valid in-range neighbour lists and no resource growth).
-      # Excluding it selects the basic implementation and the suite passes.
       - name: Run tests in parallel
         timeout-minutes: 20
         run: |
-          mpirun -n 4 --output tag --mca topo '^treematch' \
-            coverage run --rcfile=.coveragerc -m mpi4py \
-            -m pytest -xvs --timeout=180 --timeout-method=thread ./tests/
+          mpirun -n 4 --output tag coverage run --rcfile=.coveragerc -m mpi4py \
+            -m pytest -xvs ./tests/
 
       - name: Combine coverage reports
         run: |
