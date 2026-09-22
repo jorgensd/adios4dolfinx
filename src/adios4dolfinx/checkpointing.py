@@ -412,7 +412,11 @@ def read_function(
     # Compute index of input cells and get cell permutation
     num_owned_cells = mesh.topology.index_map(mesh.topology.dim).size_local
     input_cells = mesh.topology.original_cell_index[:num_owned_cells]
-    mesh.topology.create_entity_permutations()
+    getattr(
+        mesh.topology,
+        "create_cell_permutations",
+        getattr(mesh.topology, "create_entity_permutations"),
+    )()
     cell_perm = mesh.topology.get_cell_permutation_info()[:num_owned_cells]
 
     # Compute mesh->input communicator
@@ -884,7 +888,11 @@ def write_function(
     mesh = u.function_space.mesh
     comm = mesh.comm
     assert isinstance(comm, MPI.Intracomm)
-    mesh.topology.create_entity_permutations()
+    getattr(
+        mesh.topology,
+        "create_cell_permutations",
+        getattr(mesh.topology, "create_entity_permutations"),
+    )()
     cell_perm = mesh.topology.get_cell_permutation_info()
     num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
     local_cell_range = mesh.topology.index_map(mesh.topology.dim).local_range
