@@ -136,7 +136,10 @@ def read_attributes(
 
 
 def read_timestamps(
-    filename: typing.Union[Path, str], comm: MPI.Intracomm, function_name: str, engine="BP4"
+    filename: typing.Union[Path, str],
+    comm: MPI.Intracomm,
+    function_name: str,
+    engine="BP4",
 ) -> npt.NDArray[np.float64]:
     """
     Read time-stamps from a checkpoint file.
@@ -222,7 +225,9 @@ def write_meshtags(
         mesh._cpp_object, dim, local_tag_entities, False
     )
 
-    indices = mesh.geometry.index_map().local_to_global(entities_to_geometry.reshape(-1))
+    indices = mesh.geometry.index_map().local_to_global(
+        entities_to_geometry.reshape(-1)
+    )
 
     name = meshtag_name or meshtags.name
 
@@ -258,7 +263,9 @@ def write_meshtags(
         adios_file.file.Put(values_var, vals, adios2.Mode.Sync)
 
         # Write meshtag dim
-        adios_file.io.DefineAttribute(name + "_dim", np.array([meshtags.dim], dtype=np.uint8))
+        adios_file.io.DefineAttribute(
+            name + "_dim", np.array([meshtags.dim], dtype=np.uint8)
+        )
 
         adios_file.file.PerformPuts()
         adios_file.file.EndStep()
@@ -339,7 +346,9 @@ def read_meshtags(
         values = adios_file.io.InquireVariable(values_name)
         val_shape = values.Shape()
         assert val_shape[0] == top_shape[0]
-        values.SetSelection([[topology_range[0]], [topology_range[1] - topology_range[0]]])
+        values.SetSelection(
+            [[topology_range[0]], [topology_range[1] - topology_range[0]]]
+        )
         tag_values = np.empty((topology_range[1] - topology_range[0]), dtype=np.int32)
         adios_file.file.Get(values, tag_values, adios2.Mode.Deferred)
 
@@ -401,18 +410,26 @@ def read_function(
                 sorted(
                     map(
                         lambda x: x.split("_time")[0],
-                        filter(lambda x: x.endswith("_time"), adios_file.io.AvailableVariables()),
+                        filter(
+                            lambda x: x.endswith("_time"),
+                            adios_file.io.AvailableVariables(),
+                        ),
                     )
                 )
             )
             if name not in variables:
-                raise KeyError(f"{name} not found in {filename}. Did you mean one of {variables}?")
+                raise KeyError(
+                    f"{name} not found in {filename}. Did you mean one of {variables}?"
+                )
 
     # ----------------------Step 1---------------------------------
     # Compute index of input cells and get cell permutation
     num_owned_cells = mesh.topology.index_map(mesh.topology.dim).size_local
     input_cells = mesh.topology.original_cell_index[:num_owned_cells]
-    mesh.topology.create_entity_permutations()
+    if hasattr(mesh.topology, "create_cell_permutations"):
+        mesh.topology.create_cell_permutations()
+    else:
+        mesh.topology.create_entity_permutations()  # type: ignore[call-arg]
     cell_perm = mesh.topology.get_cell_permutation_info()[:num_owned_cells]
 
     # Compute mesh->input communicator
@@ -438,9 +455,12 @@ def read_function(
     )
     # Compute owner of dofs in dofmap
     num_dofs_global = (
-        u.function_space.dofmap.index_map.size_global * u.function_space.dofmap.index_map_bs
+        u.function_space.dofmap.index_map.size_global
+        * u.function_space.dofmap.index_map_bs
     )
-    dof_owner = index_owner(comm, input_dofmap.array.astype(np.int64), np.int64(num_dofs_global))
+    dof_owner = index_owner(
+        comm, input_dofmap.array.astype(np.int64), np.int64(num_dofs_global)
+    )
 
     # --------------------Step 4-----------------------------------
     # Read array from file and communicate them to input dofmap process
@@ -467,7 +487,12 @@ def read_function(
         local_input_range = compute_local_range(comm, num_cells_global)
         input_local_cell_index = inc_cells - local_input_range[0]
         input_perms = read_cell_perms(
-            adios, comm, filename, "CellPermutations", np.int64(num_cells_global), engine
+            adios,
+            comm,
+            filename,
+            "CellPermutations",
+            np.int64(num_cells_global),
+            engine,
         )
         # Start by sorting data array by cell permutation
         num_dofs_per_cell = input_dofmap.offsets[1:] - input_dofmap.offsets[:-1]
@@ -577,8 +602,12 @@ def read_mesh_data(
         topology = adios_file.io.InquireVariable("Topology")
         shape = topology.Shape()
         local_range = compute_local_range(comm, shape[0])
-        topology.SetSelection([[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]])
-        mesh_topology = np.empty((local_range[1] - local_range[0], shape[1]), dtype=np.int64)
+        topology.SetSelection(
+            [[local_range[0], 0], [local_range[1] - local_range[0], shape[1]]]
+        )
+        mesh_topology = np.empty(
+            (local_range[1] - local_range[0], shape[1]), dtype=np.int64
+        )
         adios_file.file.Get(topology, mesh_topology, adios2.Mode.Deferred)
 
         # Check validity of partitioning information
@@ -588,7 +617,9 @@ def read_mesh_data(
             par_num_procs = adios_file.io.InquireAttribute("PartitionProcesses")
             num_procs = par_num_procs.Data()[0]
             if num_procs != comm.size:
-                raise ValueError(f"Number of processes in file ({num_procs})!=({comm.size=})")
+                raise ValueError(
+                    f"Number of processes in file ({num_procs})!=({comm.size=})"
+                )
 
         # Get mesh cell type
         if "CellType" not in adios_file.io.AvailableAttributes().keys():
@@ -613,7 +644,9 @@ def read_mesh_data(
                     arr = adios_file.io.InquireVariable(time_name)
                     time_shape = arr.Shape()
                     arr.SetSelection([[0], [time_shape[0]]])
-                    times = np.empty(time_shape[0], dtype=adios_to_numpy_dtype[arr.Type()])
+                    times = np.empty(
+                        time_shape[0], dtype=adios_to_numpy_dtype[arr.Type()]
+                    )
                     adios_file.file.Get(arr, times, adios2.Mode.Sync)
                     if times[0] == time:
                         break
@@ -625,7 +658,9 @@ def read_mesh_data(
                 adios_file.file.EndStep()
 
             if time_name not in adios_file.io.AvailableVariables().keys():
-                raise KeyError(f"No data associated with {time_name}={time} found in {filename}")
+                raise KeyError(
+                    f"No data associated with {time_name}={time} found in {filename}"
+                )
 
         # Get mesh geometry
         if "Points" not in adios_file.io.AvailableVariables().keys():
@@ -660,11 +695,19 @@ def read_mesh_data(
 
     if read_from_partition:
         partition_graph = read_adjacency_list(
-            adios, comm, filename, "PartitioningData", "PartitioningOffset", shape[0], engine
+            adios,
+            comm,
+            filename,
+            "PartitioningData",
+            "PartitioningOffset",
+            shape[0],
+            engine,
         )
         if not hasattr(dolfinx.mesh, "create_cell_partitioner"):
 
-            def partitioner(comm, nparts, local_graph, node_weights, edge_weights, ghosting):
+            def partitioner(
+                comm, nparts, local_graph, node_weights, edge_weights, ghosting
+            ):
                 assert len(local_graph) % (len(partition_graph.offsets) - 1) == 0
                 return partition_graph._cpp_object
         else:
@@ -792,7 +835,9 @@ def write_mesh(
         # Get partitioning
         if Version(dolfinx.__version__) > Version("0.9.0"):
             consensus_tag = 1202
-            cell_map = mesh.topology.index_map(mesh.topology.dim).index_to_dest_ranks(consensus_tag)
+            cell_map = mesh.topology.index_map(mesh.topology.dim).index_to_dest_ranks(
+                consensus_tag
+            )
         else:
             cell_map = mesh.topology.index_map(mesh.topology.dim).index_to_dest_ranks()  # type: ignore[call-arg]
         num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
@@ -811,8 +856,12 @@ def write_mesh(
                 cell_array = cell_array[: cell_offsets[-1]]
 
         # Compute adjacency with current process as first entry
-        ownership_array = np.full(num_cells_local + cell_offsets[-1], -1, dtype=np.int32)
-        ownership_offset = (cell_offsets + np.arange(len(cell_offsets))).astype(np.int32)
+        ownership_array = np.full(
+            num_cells_local + cell_offsets[-1], -1, dtype=np.int32
+        )
+        ownership_offset = (cell_offsets + np.arange(len(cell_offsets))).astype(
+            np.int32
+        )
         ownership_array[ownership_offset[:-1]] = mesh.comm.rank
         insert_position = np.flatnonzero(ownership_array == -1)
         ownership_array[insert_position] = cell_array
@@ -884,7 +933,10 @@ def write_function(
     mesh = u.function_space.mesh
     comm = mesh.comm
     assert isinstance(comm, MPI.Intracomm)
-    mesh.topology.create_entity_permutations()
+    if hasattr(mesh.topology, "create_cell_permutations"):
+        mesh.topology.create_cell_permutations()
+    else:
+        mesh.topology.create_entity_permutations()  # type: ignore[call-arg]
     cell_perm = mesh.topology.get_cell_permutation_info()
     num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
     local_cell_range = mesh.topology.index_map(mesh.topology.dim).local_range
@@ -916,7 +968,9 @@ def write_function(
     local_dofmap_offsets += dofmap_imap.local_range[0]
 
     num_dofs_global = dofmap.index_map.size_global * dofmap.index_map_bs
-    local_dof_range = tuple(np.asarray(dofmap.index_map.local_range) * dofmap.index_map_bs)
+    local_dof_range = tuple(
+        np.asarray(dofmap.index_map.local_range) * dofmap.index_map_bs
+    )
     num_dofs_local = local_dof_range[1] - local_dof_range[0]
 
     # Create internal data structure for function data to write to file
@@ -935,4 +989,6 @@ def write_function(
     )
     # Write to file
     fname = Path(filename)
-    _internal_function_writer(fname, comm, function_data, engine, mode, time, "FunctionWriter")
+    _internal_function_writer(
+        fname, comm, function_data, engine, mode, time, "FunctionWriter"
+    )
