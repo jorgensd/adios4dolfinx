@@ -136,7 +136,10 @@ def read_attributes(
 
 
 def read_timestamps(
-    filename: typing.Union[Path, str], comm: MPI.Intracomm, function_name: str, engine="BP4"
+    filename: typing.Union[Path, str],
+    comm: MPI.Intracomm,
+    function_name: str,
+    engine="BP4",
 ) -> npt.NDArray[np.float64]:
     """
     Read time-stamps from a checkpoint file.
@@ -401,7 +404,10 @@ def read_function(
                 sorted(
                     map(
                         lambda x: x.split("_time")[0],
-                        filter(lambda x: x.endswith("_time"), adios_file.io.AvailableVariables()),
+                        filter(
+                            lambda x: x.endswith("_time"),
+                            adios_file.io.AvailableVariables(),
+                        ),
                     )
                 )
             )
@@ -412,7 +418,10 @@ def read_function(
     # Compute index of input cells and get cell permutation
     num_owned_cells = mesh.topology.index_map(mesh.topology.dim).size_local
     input_cells = mesh.topology.original_cell_index[:num_owned_cells]
-    mesh.topology.create_entity_permutations()
+    if hasattr(mesh.topology, "create_cell_permutations"):
+        mesh.topology.create_cell_permutations()
+    else:
+        mesh.topology.create_entity_permutations()  # type: ignore[call-arg]
     cell_perm = mesh.topology.get_cell_permutation_info()[:num_owned_cells]
 
     # Compute mesh->input communicator
@@ -467,7 +476,12 @@ def read_function(
         local_input_range = compute_local_range(comm, num_cells_global)
         input_local_cell_index = inc_cells - local_input_range[0]
         input_perms = read_cell_perms(
-            adios, comm, filename, "CellPermutations", np.int64(num_cells_global), engine
+            adios,
+            comm,
+            filename,
+            "CellPermutations",
+            np.int64(num_cells_global),
+            engine,
         )
         # Start by sorting data array by cell permutation
         num_dofs_per_cell = input_dofmap.offsets[1:] - input_dofmap.offsets[:-1]
@@ -660,7 +674,13 @@ def read_mesh_data(
 
     if read_from_partition:
         partition_graph = read_adjacency_list(
-            adios, comm, filename, "PartitioningData", "PartitioningOffset", shape[0], engine
+            adios,
+            comm,
+            filename,
+            "PartitioningData",
+            "PartitioningOffset",
+            shape[0],
+            engine,
         )
         if not hasattr(dolfinx.mesh, "create_cell_partitioner"):
 
@@ -884,7 +904,10 @@ def write_function(
     mesh = u.function_space.mesh
     comm = mesh.comm
     assert isinstance(comm, MPI.Intracomm)
-    mesh.topology.create_entity_permutations()
+    if hasattr(mesh.topology, "create_cell_permutations"):
+        mesh.topology.create_cell_permutations()
+    else:
+        mesh.topology.create_entity_permutations()  # type: ignore[call-arg]
     cell_perm = mesh.topology.get_cell_permutation_info()
     num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
     local_cell_range = mesh.topology.index_map(mesh.topology.dim).local_range

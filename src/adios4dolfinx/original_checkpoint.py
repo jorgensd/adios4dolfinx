@@ -270,7 +270,10 @@ def create_function_data_on_original_mesh(
     local_cell_index = recv_cells - local_cell_range[0]
 
     # Pack and send cell permutation info
-    mesh.topology.create_entity_permutations()
+    if hasattr(mesh.topology, "create_cell_permutations"):
+        mesh.topology.create_cell_permutations()
+    else:
+        mesh.topology.create_entity_permutations()  # type: ignore[call-arg]
     cell_permutation_info = mesh.topology.get_cell_permutation_info()[:num_owned_cells]
     send_perm = np.empty_like(send_cells, dtype=np.uint32)
     send_perm[cell_insert_position] = cell_permutation_info
