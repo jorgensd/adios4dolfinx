@@ -812,7 +812,7 @@ def write_mesh(
         cell_imap = mesh.topology.index_map(mesh.topology.dim)
         consensus_tag = 1202
         sig = inspect.signature(cell_imap.index_to_dest_ranks).parameters
-        if "consensus_tag" in sig:
+        if "tag" in sig:
             cell_map = cell_imap.index_to_dest_ranks(consensus_tag)  # type: ignore[call-arg]
         else:
             cell_map = cell_imap.index_to_dest_ranks()
