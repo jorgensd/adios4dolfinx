@@ -18,7 +18,6 @@ import dolfinx
 import numpy as np
 import numpy.typing as npt
 import ufl
-from packaging.version import Version
 
 from .adios2_helpers import (
     ADIOSFile,
@@ -810,12 +809,15 @@ def write_mesh(
         partition_processes = mesh.comm.size
 
         # Get partitioning
-        if Version(dolfinx.__version__) > Version("0.9.0"):
-            consensus_tag = 1202
-            cell_map = mesh.topology.index_map(mesh.topology.dim).index_to_dest_ranks(consensus_tag)
+        cell_imap = mesh.topology.index_map(mesh.topology.dim)
+        consensus_tag = 1202
+        sig = inspect.signature(cell_imap.index_to_dest_ranks).parameters
+        if "consensus_tag" in sig:
+            cell_map = cell_imap.index_to_dest_ranks(consensus_tag)  # type: ignore[call-arg]
         else:
-            cell_map = mesh.topology.index_map(mesh.topology.dim).index_to_dest_ranks()  # type: ignore[call-arg]
-        num_cells_local = mesh.topology.index_map(mesh.topology.dim).size_local
+            cell_map = cell_imap.index_to_dest_ranks()
+
+        num_cells_local = cell_imap.size_local
         try:
             cell_offsets = cell_map.offsets[: num_cells_local + 1]  # type: ignore[attr-defined]
             if cell_offsets[-1] == 0:
