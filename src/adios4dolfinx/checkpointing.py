@@ -136,7 +136,10 @@ def read_attributes(
 
 
 def read_timestamps(
-    filename: typing.Union[Path, str], comm: MPI.Intracomm, function_name: str, engine="BP4"
+    filename: typing.Union[Path, str],
+    comm: MPI.Intracomm,
+    function_name: str,
+    engine="BP4",
 ) -> npt.NDArray[np.float64]:
     """
     Read time-stamps from a checkpoint file.
@@ -401,7 +404,10 @@ def read_function(
                 sorted(
                     map(
                         lambda x: x.split("_time")[0],
-                        filter(lambda x: x.endswith("_time"), adios_file.io.AvailableVariables()),
+                        filter(
+                            lambda x: x.endswith("_time"),
+                            adios_file.io.AvailableVariables(),
+                        ),
                     )
                 )
             )
@@ -471,7 +477,12 @@ def read_function(
         local_input_range = compute_local_range(comm, num_cells_global)
         input_local_cell_index = inc_cells - local_input_range[0]
         input_perms = read_cell_perms(
-            adios, comm, filename, "CellPermutations", np.int64(num_cells_global), engine
+            adios,
+            comm,
+            filename,
+            "CellPermutations",
+            np.int64(num_cells_global),
+            engine,
         )
         # Start by sorting data array by cell permutation
         num_dofs_per_cell = input_dofmap.offsets[1:] - input_dofmap.offsets[:-1]
@@ -664,7 +675,13 @@ def read_mesh_data(
 
     if read_from_partition:
         partition_graph = read_adjacency_list(
-            adios, comm, filename, "PartitioningData", "PartitioningOffset", shape[0], engine
+            adios,
+            comm,
+            filename,
+            "PartitioningData",
+            "PartitioningOffset",
+            shape[0],
+            engine,
         )
         if not hasattr(dolfinx.mesh, "create_cell_partitioner"):
 
