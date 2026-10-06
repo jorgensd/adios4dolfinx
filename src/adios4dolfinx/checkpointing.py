@@ -811,11 +811,16 @@ def write_mesh(
         # Get partitioning
         cell_imap = mesh.topology.index_map(mesh.topology.dim)
         consensus_tag = 1202
-        sig = inspect.signature(cell_imap.index_to_dest_ranks).parameters
-        if "tag" in sig:
+        signature_inputs = inspect.signature(cell_imap.index_to_dest_ranks).parameters
+        if len(signature_inputs) == 2:
             cell_map = cell_imap.index_to_dest_ranks(consensus_tag)  # type: ignore[call-arg]
-        else:
+        elif len(signature_inputs) == 0:
             cell_map = cell_imap.index_to_dest_ranks()
+        else:
+            raise RuntimeError(
+                f"Unexpected signature for index_to_dest_ranks: {signature_inputs}. "
+                "Please report this to the adios4dolfinx developers."
+            )
 
         num_cells_local = cell_imap.size_local
         try:
