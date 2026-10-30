@@ -682,19 +682,27 @@ def read_mesh_data(
             shape[0],
             engine,
         )
-        if not hasattr(dolfinx.mesh, "create_cell_partitioner"):
 
-            def partitioner(comm, nparts, local_graph, node_weights, edge_weights, ghosting):
-                assert len(local_graph) % (len(partition_graph.offsets) - 1) == 0
-                return partition_graph._cpp_object
-        else:
+        # The arguments DOLFINx passes to a partitioner callback have changed
+        # over time: 0.11 calls it with
+        # ``(comm, nparts, cell_types, local_graph)``, while newer versions call
+        # it with ``(comm, nparts, dual_graph, cell_weights, edge_weights,
+        # ghosting)`` (see https://github.com/FEniCS/dolfinx/pull/4403).
+        # We read the partitioning from file, so the returned graph does not
+        # depend on any of these arguments. Accept them all and stay agnostic to
+        # the calling convention rather than branching on `dolfinx.__version__`,
+        # which does not distinguish pre-releases and post-releases reliably.
+        def partitioner(
+            *args: typing.Any, **kwargs: typing.Any
+        ) -> dolfinx.cpp.graph.AdjacencyList_int32:
+            if hasattr(partition_graph, "_cpp_object"):
+                cpp_obj = partition_graph._cpp_object
+                assert isinstance(cpp_obj, dolfinx.cpp.graph.AdjacencyList_int32)
+                return cpp_obj
+            else:
+                assert isinstance(partition_graph, dolfinx.cpp.graph.AdjacencyList_int32)
+                return partition_graph
 
-            def partitioner(comm: MPI.Intracomm, n, m, topo):  # type: ignore
-                assert len(topo[0]) % (len(partition_graph.offsets) - 1) == 0
-                if hasattr(partition_graph, "_cpp_object"):
-                    return partition_graph._cpp_object  # For modern DOLFINx wrappers
-                else:
-                    return partition_graph
     else:
         if hasattr(dolfinx.mesh, "create_cell_partitioner"):
             sig = inspect.signature(dolfinx.mesh.create_cell_partitioner)
