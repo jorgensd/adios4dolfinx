@@ -672,6 +672,7 @@ def read_mesh_data(
     )
     domain = ufl.Mesh(element)
 
+    partitioner: typing.Callable[..., typing.Any]
     if read_from_partition:
         partition_graph = read_adjacency_list(
             adios,
@@ -692,7 +693,7 @@ def read_mesh_data(
         # depend on any of these arguments. Accept them all and stay agnostic to
         # the calling convention rather than branching on `dolfinx.__version__`,
         # which does not distinguish pre-releases and post-releases reliably.
-        def partitioner(
+        def _custom_partitioner(
             *args: typing.Any, **kwargs: typing.Any
         ) -> dolfinx.cpp.graph.AdjacencyList_int32:
             if hasattr(partition_graph, "_cpp_object"):
@@ -703,6 +704,7 @@ def read_mesh_data(
                 assert isinstance(partition_graph, dolfinx.cpp.graph.AdjacencyList_int32)
                 return partition_graph
 
+        partitioner = _custom_partitioner
     else:
         if hasattr(dolfinx.mesh, "create_cell_partitioner"):
             sig = inspect.signature(dolfinx.mesh.create_cell_partitioner)
